@@ -19,8 +19,6 @@ export function Appointments() {
   
   // Filter states
   const [filterDoctor, setFilterDoctor] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
   const [filterStatus, setFilterStatus] = useState<'scheduled' | 'completed' | 'cancelled' | ''>('');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -47,8 +45,6 @@ export function Appointments() {
       
       const filters = {
         doctor_id: filterDoctor || undefined,
-        date_from: filterDateFrom || undefined,
-        date_to: filterDateTo || undefined,
         status: filterStatus || undefined,
         limit: 100,
       };
@@ -77,7 +73,7 @@ export function Appointments() {
     } finally {
       setLoading(false);
     }
-  }, [filterDoctor, filterDateFrom, filterDateTo, filterStatus]);
+  }, [filterDoctor, filterStatus]);
 
   useEffect(() => {
     fetchData();
@@ -85,12 +81,10 @@ export function Appointments() {
 
   const clearFilters = () => {
     setFilterDoctor('');
-    setFilterDateFrom('');
-    setFilterDateTo('');
     setFilterStatus('');
   };
-  
-  const hasActiveFilters = filterDoctor || filterDateFrom || filterDateTo || filterStatus;
+
+  const hasActiveFilters = filterDoctor || filterStatus;
 
   const onSubmit = async (data: AppointmentFormData) => {
     setApiError('');
@@ -198,24 +192,6 @@ export function Appointments() {
               </select>
             </div>
             <div className="filter-group">
-              <label>From Date</label>
-              <input 
-                type="date" 
-                value={filterDateFrom} 
-                onChange={(e) => setFilterDateFrom(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="filter-group">
-              <label>To Date</label>
-              <input 
-                type="date" 
-                value={filterDateTo} 
-                onChange={(e) => setFilterDateTo(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="filter-group">
               <label>Status</label>
               <select 
                 value={filterStatus} 
@@ -318,8 +294,8 @@ export function Appointments() {
                 const isValidDate = appointmentTime && !isNaN(new Date(appointmentTime).getTime());
                 return (
                   <tr key={apt.id}>
-                    <td>{apt.patient?.name}</td>
-                    <td>{apt.doctor?.name}</td>
+                    <td>{apt.patient?.name || `${apt.patient?.first_name || ''} ${apt.patient?.last_name || ''}`.trim() || '-'}</td>
+                    <td>{apt.doctor?.name || apt.doctor?.user?.full_name || '-'}</td>
                     <td>{isValidDate ? new Date(appointmentTime).toLocaleString() : '-'}</td>
                     <td>{getStatusBadge(apt.status)}</td>
                     <td>{apt.notes || '-'}</td>

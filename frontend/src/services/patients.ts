@@ -11,7 +11,7 @@ export interface CreatePatientData {
 
 export const patientsApi = {
   getAll: async (params?: { search?: string; skip?: number; limit?: number }) => {
-    const response = await api.get('/patients', { params });
+    const response = await api.get('/patients', { params: { skip: 0, limit: 100, ...params } });
     return response.data;
   },
   create: async (patient: CreatePatientData) => {

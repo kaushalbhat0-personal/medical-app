@@ -36,14 +36,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    // Debug: Log error details (only in development)
-    if (import.meta.env.DEV) {
-      console.error('[API Error]', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
-    }
+    // Debug: Log error details
+    console.error('API ERROR:', error.response?.data || error.message);
 
     // Extract error message from response
     const data = error.response?.data as { detail?: string; message?: string; errors?: string[] } | undefined;
@@ -62,7 +56,7 @@ api.interceptors.response.use(
         toast.error('Session expired. Please log in again.');
         window.location.href = '/login';
       }
-      return Promise.reject(error);
+      return Promise.reject(error.response?.data || error);
     }
 
     // Handle 403 Forbidden
@@ -95,6 +89,7 @@ api.interceptors.response.use(
       toast.error(message);
     }
 
-    return Promise.reject(error);
+    // Return clean error data for consistent error handling
+    return Promise.reject(error.response?.data || error);
   }
 );

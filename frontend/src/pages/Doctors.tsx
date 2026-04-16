@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { doctorsApi } from '../services';
+import { ErrorState } from '../components/common/ErrorState';
 import type { Doctor } from '../types';
 
 export function Doctors() {
@@ -7,30 +8,36 @@ export function Doctors() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const data = await doctorsApi.getAll();
-        // Safe array handling - ensure we always set an array
-        const safeData = Array.isArray(data) ? data : [];
-        console.log('doctors:', safeData);
-        setDoctors(safeData);
-      } catch {
-        setError('Failed to load doctors');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDoctors();
+  const fetchDoctors = useCallback(async () => {
+    try {
+      setError('');
+      setLoading(true);
+      const data = await doctorsApi.getAll();
+      // Safe array handling - ensure we always set an array
+      const safeData = Array.isArray(data) ? data : [];
+      console.log('doctors:', safeData);
+      setDoctors(safeData);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load doctors';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDoctors();
+  }, [fetchDoctors]);
 
   // Array validation before rendering
   if (!Array.isArray(doctors)) {
     return (
       <div className="page-container">
-        <h1>Doctors</h1>
-        <div className="error-message">Invalid data received</div>
+        <ErrorState
+          title="Data Error"
+          description="Invalid doctor data received from server."
+          onRetry={fetchDoctors}
+        />
       </div>
     );
   }
@@ -51,7 +58,14 @@ export function Doctors() {
         <p className="subtitle">Medical staff directory</p>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && (
+        <ErrorState
+          title="Failed to load doctors"
+          description="Unable to fetch doctor records. Please try again."
+          error={error}
+          onRetry={fetchDoctors}
+        />
+      )}
 
       {doctors?.length === 0 ? (
         <div className="empty-state">

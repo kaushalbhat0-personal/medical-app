@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { billingApi, patientsApi } from '../services';
+import { ErrorState } from '../components/common/ErrorState';
 import type { Bill, Patient } from '../types';
 import { billingSchema, type BillingFormData } from '../validation';
 
@@ -90,8 +91,11 @@ export function Billing() {
   if (!Array.isArray(bills) || !Array.isArray(patients)) {
     return (
       <div className="page-container">
-        <h1>Billing</h1>
-        <div className="error-message">Invalid data received</div>
+        <ErrorState
+          title="Data Error"
+          description="Invalid billing data received from server."
+          onRetry={fetchData}
+        />
       </div>
     );
   }
@@ -130,7 +134,7 @@ export function Billing() {
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
                 <option value="0">Select patient</option>
                 {patients.map((p) => (
-                  <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                  <option key={p.id} value={p.id}>{p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown'}</option>
                 ))}
               </select>
               {errors.patient_id && <span className="field-error">{errors.patient_id.message}</span>}
@@ -190,7 +194,7 @@ export function Billing() {
             <tbody>
               {bills.map((bill) => (
                 <tr key={bill.id}>
-                  <td>{bill.patient.first_name} {bill.patient.last_name}</td>
+                  <td>{bill.patient?.name || `${bill.patient?.first_name || ''} ${bill.patient?.last_name || ''}`.trim() || '-'}</td>
                   <td>{bill.description}</td>
                   <td className="amount">${bill.amount.toFixed(2)} {bill.currency}</td>
                   <td>{new Date(bill.due_date).toLocaleDateString()}</td>
