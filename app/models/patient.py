@@ -31,3 +31,4 @@ class Patient(Base):
     )
 
     appointments = relationship("Appointment", back_populates="patient")
+    billings = relationship("Billing", back_populates="patient")

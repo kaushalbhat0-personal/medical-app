@@ -1,28 +1,43 @@
 from datetime import datetime
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-AppointmentStatus = Literal["scheduled", "completed", "cancelled"]
+from app.models.appointment import AppointmentStatus
+
+
+class PatientMini(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+
+
+class DoctorMini(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
 
 
 class AppointmentCreate(BaseModel):
     patient_id: UUID
     doctor_id: UUID
     appointment_time: datetime
-    status: AppointmentStatus = "scheduled"
+    status: AppointmentStatus = AppointmentStatus.scheduled
 
 
 class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    patient_id: UUID
-    doctor_id: UUID
     appointment_time: datetime
     status: AppointmentStatus
+    created_by: UUID
     created_at: datetime
+
+    patient: PatientMini
+    doctor: DoctorMini
 
 
 class AppointmentUpdate(BaseModel):
