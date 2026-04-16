@@ -38,10 +38,11 @@ export function Patients() {
   const fetchPatients = async () => {
     try {
       setError(null);
-      const response = await patientsApi.getAll({ search });
-      // Handle both { data: [...] } and direct array responses
-      const data = Array.isArray(response) ? response : response?.data || [];
-      setPatients(data);
+      const data = await patientsApi.getAll({ search });
+      // Safe array handling - ensure we always set an array
+      const safeData = Array.isArray(data) ? data : [];
+      console.log('patients:', safeData);
+      setPatients(safeData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load patients';
       setError(errorMessage);
@@ -67,6 +68,19 @@ export function Patients() {
       <div className="page-container">
         <h1>Patients</h1>
         <div className="loading-spinner">Loading...</div>
+      </div>
+    );
+  }
+
+  // Array validation before rendering
+  if (!Array.isArray(patients)) {
+    return (
+      <div className="page-container">
+        <ErrorState 
+          title="Data Error"
+          description="Invalid patient data received."
+          onRetry={fetchPatients}
+        />
       </div>
     );
   }

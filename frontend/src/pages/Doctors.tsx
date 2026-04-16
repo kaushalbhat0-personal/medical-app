@@ -11,9 +11,10 @@ export function Doctors() {
     const fetchDoctors = async () => {
       try {
         const data = await doctorsApi.getAll();
-        // Handle both { data: [...] } and direct array responses
-        const doctorsData = Array.isArray(data) ? data : data?.data || [];
-        setDoctors(doctorsData);
+        // Safe array handling - ensure we always set an array
+        const safeData = Array.isArray(data) ? data : [];
+        console.log('doctors:', safeData);
+        setDoctors(safeData);
       } catch {
         setError('Failed to load doctors');
       } finally {
@@ -24,11 +25,12 @@ export function Doctors() {
     fetchDoctors();
   }, []);
 
-  if (!doctors) {
+  // Array validation before rendering
+  if (!Array.isArray(doctors)) {
     return (
       <div className="page-container">
         <h1>Doctors</h1>
-        <div className="loading-spinner">Loading...</div>
+        <div className="error-message">Invalid data received</div>
       </div>
     );
   }

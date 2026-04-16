@@ -39,8 +39,15 @@ export function Billing() {
         billingApi.getAll(),
         patientsApi.getAll(),
       ]);
-      setBills(billsData);
-      setPatients(patientsData);
+      // Safe array handling - ensure we always set arrays
+      const safeBills = Array.isArray(billsData) ? billsData : [];
+      const safePatients = Array.isArray(patientsData) ? patientsData : [];
+      
+      console.log('bills:', safeBills);
+      console.log('patients:', safePatients);
+      
+      setBills(safeBills);
+      setPatients(safePatients);
     } catch {
       setError('Failed to load billing data');
     } finally {
@@ -78,6 +85,16 @@ export function Billing() {
     };
     return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
   };
+
+  // Array validation before rendering
+  if (!Array.isArray(bills) || !Array.isArray(patients)) {
+    return (
+      <div className="page-container">
+        <h1>Billing</h1>
+        <div className="error-message">Invalid data received</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

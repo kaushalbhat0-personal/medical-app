@@ -53,19 +53,24 @@ export function Appointments() {
         limit: 100,
       };
       
-      const [appointmentsResponse, patientsResponse, doctorsResponse] = await Promise.all([
+      const [appointmentsData, patientsData, doctorsData] = await Promise.all([
         appointmentsApi.getAll(filters),
         patientsApi.getAll(),
         doctorsApi.getAll(),
       ]);
       
-      // Handle both { data: [...] } and direct array responses
-      const appointmentsData = Array.isArray(appointmentsResponse) ? appointmentsResponse : appointmentsResponse?.data || [];
-      const patientsData = Array.isArray(patientsResponse) ? patientsResponse : patientsResponse?.data || [];
-      const doctorsData = Array.isArray(doctorsResponse) ? doctorsResponse : doctorsResponse?.data || [];
-      setAppointments(appointmentsData);
-      setPatients(patientsData);
-      setDoctors(doctorsData);
+      // Safe array handling - ensure we always set arrays
+      const safeAppointments = Array.isArray(appointmentsData) ? appointmentsData : [];
+      const safePatients = Array.isArray(patientsData) ? patientsData : [];
+      const safeDoctors = Array.isArray(doctorsData) ? doctorsData : [];
+      
+      console.log('appointments:', safeAppointments);
+      console.log('patients:', safePatients);
+      console.log('doctors:', safeDoctors);
+      
+      setAppointments(safeAppointments);
+      setPatients(safePatients);
+      setDoctors(safeDoctors);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load appointments';
       setError(errorMessage);
@@ -110,6 +115,19 @@ export function Appointments() {
     };
     return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
   };
+
+  // Array validation before rendering
+  if (!Array.isArray(appointments) || !Array.isArray(patients) || !Array.isArray(doctors)) {
+    return (
+      <div className="page-container">
+        <ErrorState 
+          title="Data Error"
+          description="Invalid data received from server."
+          onRetry={fetchData}
+        />
+      </div>
+    );
+  }
 
   if (loading && appointments.length === 0) {
     return (

@@ -13,6 +13,7 @@ export function Dashboard() {
       try {
         setError(null);
         const data = await dashboardApi.getStats();
+        console.log('dashboard stats:', data);
         setStats(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard stats');
@@ -23,6 +24,19 @@ export function Dashboard() {
 
     fetchStats();
   }, []);
+
+  // Stats validation
+  if (!loading && stats && typeof stats !== 'object') {
+    return (
+      <div className="page-container">
+        <ErrorState 
+          title="Data Error"
+          description="Invalid dashboard data received."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
