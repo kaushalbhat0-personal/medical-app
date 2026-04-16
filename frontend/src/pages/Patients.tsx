@@ -9,7 +9,7 @@ import { patientSchema, type PatientFormData } from '../validation';
 export function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
   const [search, setSearch] = useState('');

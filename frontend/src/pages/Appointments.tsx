@@ -5,13 +5,13 @@ import { Filter, X } from 'lucide-react';
 import { appointmentsApi, patientsApi, doctorsApi } from '../services';
 import { ErrorState } from '../components/common/ErrorState';
 import { GlobalLoader } from '../components/common/GlobalLoader';
-import type { Appointment } from '../types';
+import type { Appointment, Patient, Doctor } from '../types';
 import { appointmentSchema, type AppointmentFormData } from '../validation';
 
 export function Appointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [patients, setPatients] = useState([]);
-  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
