@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useFetch<T>(
   handler: (...args: any[]) => Promise<T>,
@@ -9,7 +9,12 @@ export function useFetch<T>(
   const [refetching, setRefetching] = useState(false); // background updates
   const [error, setError] = useState<string | null>(null);
 
+  // Use ref to track current params for refetch calls
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   const fetchData = useCallback(async (isRefetch = false) => {
+    console.log('FETCH CALLED, isRefetch:', isRefetch);
     try {
       setError(null);
       if (isRefetch) {
@@ -18,7 +23,7 @@ export function useFetch<T>(
         setLoading(true);
       }
 
-      const result = await handler(params);
+      const result = await handler(paramsRef.current);
       setData(result);
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
@@ -26,11 +31,14 @@ export function useFetch<T>(
       setLoading(false);
       setRefetching(false);
     }
-  }, [handler, params]);
+  }, [handler]);
+
+  // Stable dependency - stringify params to avoid object reference issues
+  const paramsKey = JSON.stringify(params);
 
   useEffect(() => {
     fetchData(false);
-  }, [params]);
+  }, [paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { data, loading, refetching, error, refetch: () => fetchData(true) };
 }

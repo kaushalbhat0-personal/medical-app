@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Filter, X } from 'lucide-react';
@@ -21,11 +21,17 @@ export function Appointments() {
   const [filterStatus, setFilterStatus] = useState<AppointmentFilters['status'] | ''>('');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Stable filters object - only recreate when filter values actually change
+  const filters = useMemo(
+    () => ({
+      doctor_id: filterDoctor ? String(filterDoctor) : undefined,
+      status: filterStatus || undefined,
+    }),
+    [filterDoctor, filterStatus]
+  );
+
   // Data fetching via hook
-  const { appointments, patients, doctors, loading, refetching, error, refetch } = useAppointments({
-    doctor_id: filterDoctor ? String(filterDoctor) : undefined,
-    status: filterStatus || undefined,
-  });
+  const { appointments, patients, doctors, loading, refetching, error, refetch } = useAppointments(filters);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
