@@ -25,7 +25,7 @@ export function Topbar({ user, onLogout }: TopbarProps) {
         
         {user && (
           <div className="user-menu">
-            <span className="user-email">{user.email}</span>
+            <span className="user-email">{user.email || user.full_name || 'User'}</span>
             <button className="logout-btn" onClick={onLogout}>
               Logout
             </button>

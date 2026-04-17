@@ -6,13 +6,13 @@ import type { LoginCredentials } from '../types';
 import { loginSchema, type LoginFormData } from '../validation';
 
 interface LoginPageProps {
-  onLogin: (credentials: LoginCredentials) => Promise<boolean>;
+  onLogin: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function Login({ onLogin }: LoginPageProps) {
   const [apiError, setApiError] = useState('');
   const navigate = useNavigate();
-  
+
   const {
     register,
     handleSubmit,
@@ -24,12 +24,13 @@ export function Login({ onLogin }: LoginPageProps) {
   const onSubmit = async (data: LoginFormData) => {
     setApiError('');
 
-    const success = await onLogin({ email: data.email, password: data.password });
+    const result = await onLogin({ email: data.email, password: data.password });
 
-    if (success) {
+    if (result.success) {
       navigate('/dashboard');
     } else {
-      setApiError('Login failed. Please check your credentials and try again.');
+      // Show specific error message from API if available
+      setApiError(result.error || 'Login failed. Please check your credentials and try again.');
     }
   };
 

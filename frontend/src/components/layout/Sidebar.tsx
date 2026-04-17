@@ -41,11 +41,11 @@ export function Sidebar({ user }: SidebarProps) {
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">
-              {user.full_name.charAt(0).toUpperCase()}
+              {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="user-details">
-              <p className="user-name">{user.full_name}</p>
-              <p className="user-role">{user.role}</p>
+              <p className="user-name">{user.full_name || user.email || 'User'}</p>
+              <p className="user-role">{user.role || 'Unknown'}</p>
             </div>
           </div>
         </div>

@@ -12,9 +12,14 @@ import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+// Debug: Log API configuration
+if (import.meta.env.DEV) {
+  console.log('[API] Base URL:', API_BASE_URL);
+}
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,6 +31,12 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      // Debug: Log token being sent (mask most of it)
+      if (import.meta.env.DEV) {
+        console.log('[API] Sending request with token:', `${token.substring(0, 10)}...`);
+      }
+    } else if (import.meta.env.DEV) {
+      console.log('[API] No token found for request to:', config.url);
     }
     return config;
   },

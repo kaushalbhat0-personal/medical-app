@@ -6,7 +6,7 @@ interface UseAuthReturn {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<boolean>;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -29,6 +29,10 @@ export const useAuth = (): UseAuthReturn => {
     const token = localStorage.getItem('token');
     const storedUser = safeParseUser();
 
+    if (import.meta.env.DEV) {
+      console.log('[useAuth] Token on init:', token ? `${token.substring(0, 10)}...` : 'none');
+    }
+
     if (token) {
       setIsAuthenticated(true);
       if (storedUser) {
@@ -38,26 +42,37 @@ export const useAuth = (): UseAuthReturn => {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (credentials: LoginCredentials): Promise<boolean> => {
+  const login = useCallback(async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
+      if (import.meta.env.DEV) {
+        console.log('[useAuth] Attempting login for:', credentials.email);
+      }
+
       const response: LoginResponse = await authApi.login(credentials.email, credentials.password);
+
+      if (import.meta.env.DEV) {
+        console.log('[useAuth] Login response:', { hasToken: !!response.access_token, hasUser: !!response.user });
+      }
 
       if (response.access_token) {
         localStorage.setItem('token', response.access_token);
         setIsAuthenticated(true);
 
-        // Only store user if backend returns it
-        if (response.user) {
-          localStorage.setItem('user', JSON.stringify(response.user));
-          setUser(response.user);
-        }
+        // Store user data safely
+        const userData = response.user || {};
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData as User);
 
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch {
-      return false;
+      return { success: false, error: 'No access token received' };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      if (import.meta.env.DEV) {
+        console.error('[useAuth] Login error:', error);
+      }
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
@@ -68,6 +83,8 @@ export const useAuth = (): UseAuthReturn => {
     localStorage.removeItem('user');
     setIsAuthenticated(false);
     setUser(null);
+    // Force redirect to login
+    window.location.href = '/login';
   }, []);
 
   return {

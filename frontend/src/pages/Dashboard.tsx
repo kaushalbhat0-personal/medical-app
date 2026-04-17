@@ -76,22 +76,22 @@ export function Dashboard() {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">�</div>
+          <div className="stat-icon">👤</div>
           <div className="stat-content">
             <h3>Total Patients</h3>
             <p className="stat-value">
-              {stats?.total_patients.toLocaleString() || '0'}
+              {(stats?.total_patients ?? 0).toLocaleString()}
             </p>
             <span className="stat-label">Registered patients</span>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">�‍⚕️</div>
+          <div className="stat-icon">👨‍⚕️</div>
           <div className="stat-content">
             <h3>Total Doctors</h3>
             <p className="stat-value">
-              {stats?.total_doctors.toLocaleString() || '0'}
+              {(stats?.total_doctors ?? 0).toLocaleString()}
             </p>
             <span className="stat-label">Available doctors</span>
           </div>
@@ -102,7 +102,7 @@ export function Dashboard() {
           <div className="stat-content">
             <h3>Today's Appointments</h3>
             <p className="stat-value">
-              {stats?.today_appointments || 0}
+              {stats?.today_appointments ?? 0}
             </p>
             <span className="stat-label">{new Date().toLocaleDateString()}</span>
           </div>
@@ -113,7 +113,7 @@ export function Dashboard() {
           <div className="stat-content">
             <h3>Total Revenue</h3>
             <p className="stat-value">
-              ${stats?.total_revenue.toLocaleString() || '0'}
+              ${(stats?.total_revenue ?? 0).toLocaleString()}
             </p>
             <span className="stat-label">All time revenue</span>
           </div>
