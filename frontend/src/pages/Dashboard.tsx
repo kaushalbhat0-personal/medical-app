@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi } from '../services';
 import { ErrorState } from '../components/common/ErrorState';
+import { EmptyState } from '../components/common/EmptyState';
 import type { DashboardStats } from '../types';
 
 export function Dashboard() {
@@ -13,7 +14,6 @@ export function Dashboard() {
       try {
         setError(null);
         const data = await dashboardApi.getStats();
-        console.log('dashboard stats:', data);
         setStats(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard stats');
@@ -25,45 +25,25 @@ export function Dashboard() {
     fetchStats();
   }, []);
 
-  // Stats validation
-  if (!loading && stats && typeof stats !== 'object') {
-    return (
-      <div className="page-container">
-        <ErrorState 
-          title="Data Error"
-          description="Invalid dashboard data received."
-          onRetry={() => window.location.reload()}
-        />
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="page-container">
-        <h1>Dashboard</h1>
-        <div className="stats-grid">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="stat-card skeleton">
-              <div className="skeleton-line" />
-              <div className="skeleton-line short" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="loading-spinner">Loading...</div>;
 
   if (error) {
     return (
-      <div className="page-container">
-        <ErrorState 
-          title="Failed to load dashboard"
-          description="Unable to fetch dashboard statistics. Please try again."
-          error={error}
-          onRetry={() => window.location.reload()}
-        />
-      </div>
+      <ErrorState
+        title="Something went wrong"
+        description="Failed to load data"
+        error={error}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  if (!stats || typeof stats !== 'object') {
+    return (
+      <EmptyState
+        title="No data available"
+        description="Dashboard statistics are currently unavailable."
+      />
     );
   }
 

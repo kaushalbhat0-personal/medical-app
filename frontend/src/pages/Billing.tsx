@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { billingApi, patientsApi } from '../services';
 import { ErrorState } from '../components/common/ErrorState';
+import { EmptyState } from '../components/common/EmptyState';
 import type { Bill, Patient } from '../types';
 import { billingSchema, type BillingFormData } from '../validation';
 
@@ -41,14 +42,8 @@ export function Billing() {
         patientsApi.getAll(),
       ]);
       // Safe array handling - ensure we always set arrays
-      const safeBills = Array.isArray(billsData) ? billsData : [];
-      const safePatients = Array.isArray(patientsData) ? patientsData : [];
-      
-      console.log('bills:', safeBills);
-      console.log('patients:', safePatients);
-      
-      setBills(safeBills);
-      setPatients(safePatients);
+      setBills(Array.isArray(billsData) ? billsData : []);
+      setPatients(Array.isArray(patientsData) ? patientsData : []);
     } catch {
       setError('Failed to load billing data');
     } finally {
@@ -87,25 +82,25 @@ export function Billing() {
     return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
   };
 
-  // Array validation before rendering
-  if (!Array.isArray(bills) || !Array.isArray(patients)) {
+  if (loading) return <div className="loading-spinner">Loading...</div>;
+
+  if (error) {
     return (
-      <div className="page-container">
-        <ErrorState
-          title="Data Error"
-          description="Invalid billing data received from server."
-          onRetry={fetchData}
-        />
-      </div>
+      <ErrorState
+        title="Something went wrong"
+        description="Failed to load data"
+        error={error}
+        onRetry={fetchData}
+      />
     );
   }
 
-  if (loading) {
+  if (!Array.isArray(bills) || bills.length === 0) {
     return (
-      <div className="page-container">
-        <h1>Billing</h1>
-        <div className="loading-spinner">Loading...</div>
-      </div>
+      <EmptyState
+        title="No data available"
+        description="There are no bills to display at the moment."
+      />
     );
   }
 
@@ -170,16 +165,7 @@ export function Billing() {
         </form>
       )}
 
-      {error && <div className="error-message">{error}</div>}
-
-      {bills.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🧾</div>
-          <h3>No bills yet</h3>
-          <p>Create your first bill to get started</p>
-        </div>
-      ) : (
-        <div className="data-table">
+      <div className="data-table">
           <table>
             <thead>
               <tr>
@@ -213,8 +199,7 @@ export function Billing() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Filter, X } from 'lucide-react';
 import { appointmentsApi, patientsApi, doctorsApi } from '../services';
 import { ErrorState } from '../components/common/ErrorState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { EmptyState } from '../components/common/EmptyState';
 import type { Appointment, Patient, Doctor } from '../types';
 import { appointmentSchema, type AppointmentFormData } from '../validation';
 
@@ -56,17 +56,9 @@ export function Appointments() {
       ]);
       
       // Safe array handling - ensure we always set arrays
-      const safeAppointments = Array.isArray(appointmentsData) ? appointmentsData : [];
-      const safePatients = Array.isArray(patientsData) ? patientsData : [];
-      const safeDoctors = Array.isArray(doctorsData) ? doctorsData : [];
-      
-      console.log('appointments:', safeAppointments);
-      console.log('patients:', safePatients);
-      console.log('doctors:', safeDoctors);
-      
-      setAppointments(safeAppointments);
-      setPatients(safePatients);
-      setDoctors(safeDoctors);
+      setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+      setPatients(Array.isArray(patientsData) ? patientsData : []);
+      setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load appointments';
       setError(errorMessage);
@@ -110,38 +102,25 @@ export function Appointments() {
     return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
   };
 
-  // Array validation before rendering
-  if (!Array.isArray(appointments) || !Array.isArray(patients) || !Array.isArray(doctors)) {
-    return (
-      <div className="page-container">
-        <ErrorState 
-          title="Data Error"
-          description="Invalid data received from server."
-          onRetry={fetchData}
-        />
-      </div>
-    );
-  }
-
-  if (loading && appointments.length === 0) {
-    return (
-      <div className="page-container relative min-h-[400px]">
-        <h1>Appointments</h1>
-        <GlobalLoader message="Loading appointments..." />
-      </div>
-    );
-  }
+  if (loading && appointments.length === 0) return <div className="loading-spinner">Loading...</div>;
 
   if (error) {
     return (
-      <div className="page-container">
-        <ErrorState 
-          title="Failed to load appointments"
-          description="Unable to fetch appointment records. Please try again."
-          error={error}
-          onRetry={fetchData}
-        />
-      </div>
+      <ErrorState
+        title="Something went wrong"
+        description="Failed to load data"
+        error={error}
+        onRetry={fetchData}
+      />
+    );
+  }
+
+  if (!Array.isArray(appointments) || appointments.length === 0) {
+    return (
+      <EmptyState
+        title="No data available"
+        description="There are no appointments to display at the moment."
+      />
     );
   }
 
@@ -268,44 +247,34 @@ export function Appointments() {
         </form>
       )}
 
-      {error && <div className="error-message">{error}</div>}
-
-      {appointments?.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📅</div>
-          <h3>No appointments scheduled</h3>
-          <p>Create your first appointment to get started</p>
-        </div>
-      ) : (
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Doctor</th>
-                <th>Date & Time</th>
-                <th>Status</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {appointments?.map((apt) => {
-                const appointmentTime = apt.appointment_time || apt.scheduled_at;
-                const isValidDate = appointmentTime && !isNaN(new Date(appointmentTime).getTime());
-                return (
-                  <tr key={apt.id}>
-                    <td>{apt.patient?.name || `${apt.patient?.first_name || ''} ${apt.patient?.last_name || ''}`.trim() || '-'}</td>
-                    <td>{apt.doctor?.name || apt.doctor?.user?.full_name || '-'}</td>
-                    <td>{isValidDate ? new Date(appointmentTime).toLocaleString() : '-'}</td>
-                    <td>{getStatusBadge(apt.status)}</td>
-                    <td>{apt.notes || '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="data-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {appointments?.map((apt) => {
+              const appointmentTime = apt.appointment_time || apt.scheduled_at;
+              const isValidDate = appointmentTime && !isNaN(new Date(appointmentTime).getTime());
+              return (
+                <tr key={apt.id}>
+                  <td>{apt.patient?.name || `${apt.patient?.first_name || ''} ${apt.patient?.last_name || ''}`.trim() || '-'}</td>
+                  <td>{apt.doctor?.name || apt.doctor?.user?.full_name || '-'}</td>
+                  <td>{isValidDate ? new Date(appointmentTime).toLocaleString() : '-'}</td>
+                  <td>{getStatusBadge(apt.status)}</td>
+                  <td>{apt.notes || '-'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

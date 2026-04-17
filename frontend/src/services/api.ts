@@ -26,26 +26,27 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor - attach auth token + clean params
+// Request interceptor - attach auth token + clean params + dev logging
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Log request details in dev mode
+    if (import.meta.env.DEV) {
+      console.log('API REQUEST:', {
+        url: config.url,
+        method: config.method,
+        params: config.params,
+        data: config.data,
+      });
+    }
+
     const token = localStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
-      // Debug: Log token being sent (mask most of it)
-      if (import.meta.env.DEV) {
-        console.log('[API] Sending request with token:', `${token.substring(0, 10)}...`);
-      }
-    } else if (import.meta.env.DEV) {
-      console.log('[API] No token found for request to:', config.url);
     }
 
     // GLOBAL FIX: Clean params to prevent FastAPI 422 errors from empty strings
     if (config.params) {
       config.params = cleanParams(config.params);
-      if (import.meta.env.DEV) {
-        console.log('[API] Cleaned params:', config.params);
-      }
     }
 
     return config;

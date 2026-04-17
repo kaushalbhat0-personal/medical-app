@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import debounce from 'lodash.debounce';
 import { patientsApi } from '../services';
 import { ErrorState } from '../components/common/ErrorState';
+import { EmptyState } from '../components/common/EmptyState';
 import type { Patient } from '../types';
 import { patientSchema, type PatientFormData } from '../validation';
 
@@ -12,7 +14,23 @@ export function Patients() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearch(value);
+      }, 400),
+    []
+  );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const {
     register,
@@ -43,9 +61,7 @@ export function Patients() {
         search: search.trim() || undefined,
       });
       // Safe array handling - ensure we always set an array
-      const safeData = Array.isArray(data) ? data : [];
-      console.log('patients:', safeData);
-      setPatients(safeData);
+      setPatients(Array.isArray(data) ? data : []);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load patients';
       setError(errorMessage);
@@ -66,38 +82,25 @@ export function Patients() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page-container">
-        <h1>Patients</h1>
-        <div className="loading-spinner">Loading...</div>
-      </div>
-    );
-  }
-
-  // Array validation before rendering
-  if (!Array.isArray(patients)) {
-    return (
-      <div className="page-container">
-        <ErrorState 
-          title="Data Error"
-          description="Invalid patient data received."
-          onRetry={fetchPatients}
-        />
-      </div>
-    );
-  }
+  if (loading) return <div className="loading-spinner">Loading...</div>;
 
   if (error) {
     return (
-      <div className="page-container">
-        <ErrorState 
-          title="Failed to load patients"
-          description="Unable to fetch patient records. Please try again."
-          error={error}
-          onRetry={fetchPatients}
-        />
-      </div>
+      <ErrorState
+        title="Something went wrong"
+        description="Failed to load data"
+        error={error}
+        onRetry={fetchPatients}
+      />
+    );
+  }
+
+  if (!Array.isArray(patients) || patients.length === 0) {
+    return (
+      <EmptyState
+        title="No data available"
+        description="There are no patients to display at the moment."
+      />
     );
   }
 
@@ -120,8 +123,12 @@ export function Patients() {
         <input
           type="text"
           placeholder="Search patients..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSearchInput(value);
+            debouncedSearch(value);
+          }}
           className="search-input"
         />
       </div>
@@ -167,16 +174,7 @@ export function Patients() {
         </form>
       )}
 
-      {error && <div className="error-message">{error}</div>}
-
-      {patients.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🏥</div>
-          <h3>No patients yet</h3>
-          <p>Add your first patient to get started</p>
-        </div>
-      ) : (
-        <div className="data-table">
+      <div className="data-table">
           <table>
             <thead>
               <tr>
@@ -202,7 +200,6 @@ export function Patients() {
             </tbody>
           </table>
         </div>
-      )}
     </div>
   );
 }
