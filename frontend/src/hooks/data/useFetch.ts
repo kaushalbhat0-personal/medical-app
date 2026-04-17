@@ -5,13 +5,18 @@ export function useFetch<T>(
   params?: any
 ) {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);      // initial load only
+  const [refetching, setRefetching] = useState(false); // background updates
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRefetch = false) => {
     try {
       setError(null);
-      setLoading(true);
+      if (isRefetch) {
+        setRefetching(true);
+      } else {
+        setLoading(true);
+      }
 
       const result = await handler(params);
       setData(result);
@@ -19,12 +24,13 @@ export function useFetch<T>(
       setError(err?.message || 'Something went wrong');
     } finally {
       setLoading(false);
+      setRefetching(false);
     }
   }, [handler, params]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(false);
   }, [params]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, refetching, error, refetch: () => fetchData(true) };
 }

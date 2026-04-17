@@ -9,7 +9,7 @@ export interface AppointmentFilters {
 }
 
 export function useAppointments(filters?: AppointmentFilters) {
-  const { data, loading, error, refetch } = useFetch(
+  const { data, loading, refetching, error, refetch } = useFetch(
     fetchAppointmentDataHandler,
     filters
   );
@@ -19,6 +19,7 @@ export function useAppointments(filters?: AppointmentFilters) {
     patients: safeArray<Patient>(data?.patients),
     doctors: safeArray<Doctor>(data?.doctors),
     loading,
+    refetching,
     error,
     refetch,
   };

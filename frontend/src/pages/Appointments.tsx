@@ -22,7 +22,7 @@ export function Appointments() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Data fetching via hook
-  const { appointments, patients, doctors, loading, error, refetch } = useAppointments({
+  const { appointments, patients, doctors, loading, refetching, error, refetch } = useAppointments({
     doctor_id: filterDoctor ? String(filterDoctor) : undefined,
     status: filterStatus || undefined,
   });
@@ -71,8 +71,8 @@ export function Appointments() {
   };
 
   // Safe rendering guards - only show empty after loading completes
-  const isLoading = loading;
-  const isEmpty = !loading && appointments.length === 0;
+  const isLoading = loading && appointments.length === 0; // Only block UI on initial load
+  const isEmpty = !loading && !refetching && appointments.length === 0;
 
   return (
     <div className="page-container">
@@ -86,7 +86,7 @@ export function Appointments() {
             type="button"
             className={`btn-secondary ${hasActiveFilters ? 'active' : ''}`}
             onClick={() => setShowFilters(!showFilters)}
-            disabled={loading}
+            disabled={loading || refetching}
           >
             <Filter className="h-4 w-4 mr-1" />
             Filters {hasActiveFilters && '(Active)'}
@@ -94,7 +94,7 @@ export function Appointments() {
           <button
             className="btn-primary"
             onClick={() => setShowForm(!showForm)}
-            disabled={loading}
+            disabled={loading || refetching}
           >
             {showForm ? 'Cancel' : '+ New Appointment'}
           </button>
@@ -102,6 +102,9 @@ export function Appointments() {
       </div>
 
       {isLoading && <GlobalLoader />}
+      {refetching && (
+        <div className="text-sm text-gray-500 py-2 text-right">Updating...</div>
+      )}
 
       {error && (
         <ErrorState
@@ -127,7 +130,7 @@ export function Appointments() {
               <select
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(Number(e.target.value) || '')}
-                disabled={loading}
+                disabled={loading || refetching}
               >
                 <option value="">All Doctors</option>
                 {doctors.map((d) => (
@@ -142,7 +145,7 @@ export function Appointments() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as AppointmentFilters['status'])}
-                disabled={loading}
+                disabled={loading || refetching}
               >
                 <option value="">All Status</option>
                 <option value="scheduled">Scheduled</option>
@@ -165,9 +168,9 @@ export function Appointments() {
               type="button"
               className="btn-primary"
               onClick={refetch}
-              disabled={loading}
+              disabled={loading || refetching}
             >
-              {loading ? 'Loading...' : 'Apply Filters'}
+              {refetching ? 'Updating...' : 'Apply Filters'}
             </button>
           </div>
         </div>
