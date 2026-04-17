@@ -1,54 +1,35 @@
-import { useState, useEffect } from 'react';
-import { dashboardApi } from '../services';
+import { useDashboard } from '../hooks';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import type { DashboardStats } from '../types';
+import { GlobalLoader } from '../components/common/GlobalLoader';
 
 export function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Data fetching via hook
+  const { stats, loading, error, refetch } = useDashboard();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setError(null);
-        const data = await dashboardApi.getStats();
-        setStats(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard stats');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (loading) return <div className="loading-spinner">Loading...</div>;
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Something went wrong"
-        description="Failed to load data"
-        error={error}
-        onRetry={() => window.location.reload()}
-      />
-    );
-  }
-
-  if (!stats || typeof stats !== 'object') {
-    return (
-      <EmptyState
-        title="No data available"
-        description="Dashboard statistics are currently unavailable."
-      />
-    );
-  }
+  // Safe rendering guards
+  const isEmpty = !stats || (stats.total_patients === 0 && stats.total_doctors === 0);
 
   return (
     <div className="page-container">
+      {loading && <GlobalLoader />}
+
+      {error && (
+        <ErrorState
+          title="Something went wrong"
+          description="Failed to load data"
+          error={error}
+          onRetry={refetch}
+        />
+      )}
+
+      {!error && isEmpty && (
+        <EmptyState
+          title="No data available"
+          description="Dashboard statistics are currently unavailable."
+        />
+      )}
+
       <div className="page-header">
         <h1>Dashboard</h1>
         <p className="subtitle">Overview of your hospital's performance</p>

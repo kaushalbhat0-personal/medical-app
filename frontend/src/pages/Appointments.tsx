@@ -1,26 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Filter, X } from 'lucide-react';
-import { appointmentsApi, patientsApi, doctorsApi } from '../services';
+import { useAppointments, type AppointmentFilters } from '../hooks';
+import { createAppointmentHandler } from '../handlers';
+import { EMPTY_APPOINTMENT, APPOINTMENT_STATUS_CLASSES } from '../constants';
+import {
+  formatPatientName,
+  formatDoctorName,
+  formatDateTimeSafe,
+} from '../utils';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import type { Appointment, Patient, Doctor } from '../types';
+import { GlobalLoader } from '../components/common/GlobalLoader';
 import { appointmentSchema, type AppointmentFormData } from '../validation';
 
 export function Appointments() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Filter states
+  const [filterDoctor, setFilterDoctor] = useState<number | ''>('');
+  const [filterStatus, setFilterStatus] = useState<AppointmentFilters['status'] | ''>('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Data fetching via hook
+  const { appointments, patients, doctors, loading, error, refetch } = useAppointments({
+    doctor_id: filterDoctor ? String(filterDoctor) : undefined,
+    status: filterStatus || undefined,
+  });
+
+  // Form state
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
-  
-  // Filter states
-  const [filterDoctor, setFilterDoctor] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'scheduled' | 'completed' | 'cancelled' | ''>('');
-  const [showFilters, setShowFilters] = useState(false);
 
   const {
     register,
@@ -29,100 +38,40 @@ export function Appointments() {
     formState: { errors, isSubmitting },
   } = useForm<AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
-    defaultValues: {
-      patient_id: 0,
-      doctor_id: 0,
-      scheduled_at: '',
-      notes: '',
-    },
+    defaultValues: EMPTY_APPOINTMENT,
   });
 
-  // Fetch data with filters
-  const fetchData = useCallback(async () => {
-    try {
-      setError('');
-      setLoading(true);
-      
-      const filters = {
-        doctor_id: filterDoctor || undefined,
-        status: filterStatus || undefined,
-        limit: 100,
-      };
-      
-      const [appointmentsData, patientsData, doctorsData] = await Promise.all([
-        appointmentsApi.getAll(filters),
-        patientsApi.getAll(),
-        doctorsApi.getAll(),
-      ]);
-      
-      // Safe array handling - ensure we always set arrays
-      setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
-      setPatients(Array.isArray(patientsData) ? patientsData : []);
-      setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load appointments';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [filterDoctor, filterStatus]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const hasActiveFilters = filterDoctor || filterStatus;
 
   const clearFilters = () => {
     setFilterDoctor('');
     setFilterStatus('');
   };
 
-  const hasActiveFilters = filterDoctor || filterStatus;
-
+  // Create handler
   const onSubmit = async (data: AppointmentFormData) => {
     setApiError('');
+    // Form validation to prevent 422 errors
+    if (!data.patient_id || !data.doctor_id) {
+      setApiError('Please select both patient and doctor');
+      return;
+    }
     try {
-      setLoading(true);
-      await appointmentsApi.create(data);
+      await createAppointmentHandler(data);
       setShowForm(false);
       reset();
-      await fetchData();
+      refetch();
     } catch {
       setApiError('Failed to create appointment');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusClasses: Record<string, string> = {
-      scheduled: 'status-badge scheduled',
-      completed: 'status-badge completed',
-      cancelled: 'status-badge cancelled',
-    };
-    return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
+  const getStatusBadgeClass = (status: string): string => {
+    return APPOINTMENT_STATUS_CLASSES[status] || 'status-badge';
   };
 
-  if (loading && appointments.length === 0) return <div className="loading-spinner">Loading...</div>;
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Something went wrong"
-        description="Failed to load data"
-        error={error}
-        onRetry={fetchData}
-      />
-    );
-  }
-
-  if (!Array.isArray(appointments) || appointments.length === 0) {
-    return (
-      <EmptyState
-        title="No data available"
-        description="There are no appointments to display at the moment."
-      />
-    );
-  }
+  // Safe rendering guards
+  const isEmpty = appointments.length === 0;
 
   return (
     <div className="page-container">
@@ -141,7 +90,7 @@ export function Appointments() {
             <Filter className="h-4 w-4 mr-1" />
             Filters {hasActiveFilters && '(Active)'}
           </button>
-          <button 
+          <button
             className="btn-primary"
             onClick={() => setShowForm(!showForm)}
             disabled={loading}
@@ -151,30 +100,47 @@ export function Appointments() {
         </div>
       </div>
 
-      {/* Filters Panel */}
+      {loading && <GlobalLoader />}
+
+      {error && (
+        <ErrorState
+          title="Something went wrong"
+          description="Failed to load data"
+          error={error}
+          onRetry={refetch}
+        />
+      )}
+
+      {!error && isEmpty && (
+        <EmptyState
+          title="No data available"
+          description="There are no appointments to display at the moment."
+        />
+      )}
+
       {showFilters && (
         <div className="filters-panel">
           <div className="filters-grid">
             <div className="filter-group">
               <label>Doctor</label>
-              <select 
-                value={filterDoctor} 
-                onChange={(e) => setFilterDoctor(e.target.value)}
+              <select
+                value={filterDoctor}
+                onChange={(e) => setFilterDoctor(Number(e.target.value) || '')}
                 disabled={loading}
               >
                 <option value="">All Doctors</option>
                 {doctors.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name || d.user?.full_name || 'Unknown'} - {d.specialization || d.specialty || 'General'}
+                    {formatDoctorName(d)} - {d.specialization || d.specialty || 'General'}
                   </option>
                 ))}
               </select>
             </div>
             <div className="filter-group">
               <label>Status</label>
-              <select 
-                value={filterStatus} 
-                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as AppointmentFilters['status'])}
                 disabled={loading}
               >
                 <option value="">All Status</option>
@@ -185,8 +151,8 @@ export function Appointments() {
             </div>
           </div>
           <div className="filters-actions">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-text"
               onClick={clearFilters}
               disabled={!hasActiveFilters || loading}
@@ -194,10 +160,10 @@ export function Appointments() {
               <X className="h-4 w-4 mr-1" />
               Clear Filters
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-primary"
-              onClick={fetchData}
+              onClick={refetch}
               disabled={loading}
             >
               {loading ? 'Loading...' : 'Apply Filters'}
@@ -215,8 +181,10 @@ export function Appointments() {
               <label>Patient</label>
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
                 <option value="0">Select patient</option>
-                {patients?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown'}</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {formatPatientName(p)}
+                  </option>
                 ))}
               </select>
               {errors.patient_id && <span className="field-error">{errors.patient_id.message}</span>}
@@ -225,8 +193,10 @@ export function Appointments() {
               <label>Doctor</label>
               <select {...register('doctor_id', { valueAsNumber: true })} disabled={isSubmitting}>
                 <option value="0">Select doctor</option>
-                {doctors?.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name || d.user?.full_name || 'Unknown'} - {d.specialization || d.specialty || 'General'}</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {formatDoctorName(d)} - {d.specialization || d.specialty || 'General'}
+                  </option>
                 ))}
               </select>
               {errors.doctor_id && <span className="field-error">{errors.doctor_id.message}</span>}
@@ -259,15 +229,16 @@ export function Appointments() {
             </tr>
           </thead>
           <tbody>
-            {appointments?.map((apt) => {
+            {appointments.map((apt) => {
               const appointmentTime = apt.appointment_time || apt.scheduled_at;
-              const isValidDate = appointmentTime && !isNaN(new Date(appointmentTime).getTime());
               return (
                 <tr key={apt.id}>
-                  <td>{apt.patient?.name || `${apt.patient?.first_name || ''} ${apt.patient?.last_name || ''}`.trim() || '-'}</td>
-                  <td>{apt.doctor?.name || apt.doctor?.user?.full_name || '-'}</td>
-                  <td>{isValidDate ? new Date(appointmentTime).toLocaleString() : '-'}</td>
-                  <td>{getStatusBadge(apt.status)}</td>
+                  <td>{formatPatientName(apt.patient)}</td>
+                  <td>{formatDoctorName(apt.doctor)}</td>
+                  <td>{formatDateTimeSafe(appointmentTime)}</td>
+                  <td>
+                    <span className={getStatusBadgeClass(apt.status)}>{apt.status}</span>
+                  </td>
                   <td>{apt.notes || '-'}</td>
                 </tr>
               );

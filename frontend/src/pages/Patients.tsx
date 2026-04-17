@@ -1,36 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import debounce from 'lodash.debounce';
-import { patientsApi } from '../services';
+import { usePatients } from '../hooks';
+import { createPatientHandler } from '../handlers';
+import { EMPTY_PATIENT } from '../constants';
+import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import type { Patient } from '../types';
+import { GlobalLoader } from '../components/common/GlobalLoader';
 import { patientSchema, type PatientFormData } from '../validation';
 
 export function Patients() {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [apiError, setApiError] = useState('');
+  // Search state with debounce
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
   const debouncedSearch = useMemo(
-    () =>
-      debounce((value: string) => {
-        setSearch(value);
-      }, 400),
+    () => debounce((value: string) => setSearch(value), 400),
     []
   );
 
-  // Cleanup debounce on unmount
-  useEffect(() => {
-    return () => {
-      debouncedSearch.cancel();
-    };
-  }, [debouncedSearch]);
+  // Data fetching via hook
+  const { patients, loading, error, refetch } = usePatients(search);
+
+  // Form state
+  const [showForm, setShowForm] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const {
     register,
@@ -39,82 +35,55 @@ export function Patients() {
     formState: { errors, isSubmitting },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
-    defaultValues: {
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      date_of_birth: '',
-      medical_history: '',
-    },
+    defaultValues: EMPTY_PATIENT,
   });
 
-  useEffect(() => {
-    fetchPatients();
-  }, [search]);
-
-  const fetchPatients = async () => {
-    try {
-      setError(null);
-      // Pass search as undefined if empty - global sanitizer will clean it
-      const data = await patientsApi.getAll({
-        search: search.trim() || undefined,
-      });
-      // Safe array handling - ensure we always set an array
-      setPatients(Array.isArray(data) ? data : []);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load patients';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Create handler
   const onSubmit = async (data: PatientFormData) => {
     setApiError('');
+    // Form validation to prevent 422 errors
+    if (!data.first_name || !data.last_name) {
+      setApiError('Please enter first and last name');
+      return;
+    }
     try {
-      await patientsApi.create(data);
+      await createPatientHandler(data);
       setShowForm(false);
       reset();
-      fetchPatients();
+      refetch();
     } catch {
       setApiError('Failed to create patient');
     }
   };
 
-  if (loading) return <div className="loading-spinner">Loading...</div>;
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Something went wrong"
-        description="Failed to load data"
-        error={error}
-        onRetry={fetchPatients}
-      />
-    );
-  }
-
-  if (!Array.isArray(patients) || patients.length === 0) {
-    return (
-      <EmptyState
-        title="No data available"
-        description="There are no patients to display at the moment."
-      />
-    );
-  }
+  // Safe rendering guards
+  const isEmpty = patients.length === 0;
 
   return (
     <div className="page-container">
+      {loading && <GlobalLoader />}
+
+      {error && (
+        <ErrorState
+          title="Something went wrong"
+          description="Failed to load data"
+          error={error}
+          onRetry={refetch}
+        />
+      )}
+
+      {!error && isEmpty && (
+        <EmptyState
+          title="No data available"
+          description="There are no patients to display at the moment."
+        />
+      )}
       <div className="page-header with-actions">
         <div>
           <h1>Patients</h1>
           <p className="subtitle">Manage patient records</p>
         </div>
-        <button 
-          className="btn-primary"
-          onClick={() => setShowForm(!showForm)}
-        >
+        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : '+ Add Patient'}
         </button>
       </div>
@@ -175,31 +144,29 @@ export function Patients() {
       )}
 
       <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>DOB / Age</th>
-                <th>Registered</th>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>DOB / Age</th>
+              <th>Registered</th>
+            </tr>
+          </thead>
+          <tbody>
+            {patients.map((patient) => (
+              <tr key={patient.id}>
+                <td><strong>{formatPatientName(patient)}</strong></td>
+                <td>{patient.email || '-'}</td>
+                <td>{patient.phone || '-'}</td>
+                <td>{formatPatientDobOrAge(patient)}</td>
+                <td>{formatDateSafe(patient.created_at)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {patients.map((patient) => (
-                <tr key={patient.id}>
-                  <td>
-                    <strong>{patient.name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || '-'}</strong>
-                  </td>
-                  <td>{patient.email || '-'}</td>
-                  <td>{patient.phone || '-'}</td>
-                  <td>{patient.date_of_birth && !isNaN(new Date(patient.date_of_birth).getTime()) ? new Date(patient.date_of_birth).toLocaleDateString() : (patient.age ? `${patient.age} years` : '-')}</td>
-                  <td>{patient.created_at && !isNaN(new Date(patient.created_at).getTime()) ? new Date(patient.created_at).toLocaleDateString() : '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

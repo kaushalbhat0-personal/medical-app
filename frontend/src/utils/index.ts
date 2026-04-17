@@ -11,3 +11,18 @@ export {
 
 // Re-export API utilities for centralized imports
 export { cleanParams, safeArray, safeObject } from './api';
+
+// Re-export data transformation utilities
+export {
+  formatPatientName,
+  formatDoctorName,
+  formatDoctorDisplay,
+  formatAppointmentPatientName,
+  formatAppointmentDoctorName,
+  formatDateSafe,
+  formatDateTimeSafe,
+  formatPatientDobOrAge,
+  formatCurrency,
+  getInitials,
+  formatDoctorInitials,
+} from './data';

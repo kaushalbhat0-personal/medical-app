@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { billingApi, patientsApi } from '../services';
+import { useBilling } from '../hooks';
+import { createBillHandler, payBillHandler } from '../handlers';
+import { BILLING_STATUS_CLASSES, CURRENCIES } from '../constants';
+import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import type { Bill, Patient } from '../types';
+import { GlobalLoader } from '../components/common/GlobalLoader';
 import { billingSchema, type BillingFormData } from '../validation';
 
 export function Billing() {
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Data fetching via hook
+  const { bills, patients, loading, error, refetch } = useBilling();
+
+  // Form state
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
@@ -31,90 +34,66 @@ export function Billing() {
     },
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [billsData, patientsData] = await Promise.all([
-        billingApi.getAll(),
-        patientsApi.getAll(),
-      ]);
-      // Safe array handling - ensure we always set arrays
-      setBills(Array.isArray(billsData) ? billsData : []);
-      setPatients(Array.isArray(patientsData) ? patientsData : []);
-    } catch {
-      setError('Failed to load billing data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Create handler
   const onSubmit = async (data: BillingFormData) => {
     setApiError('');
+    // Form validation to prevent 422 errors
+    if (!data.patient_id || !data.amount || data.amount <= 0) {
+      setApiError('Please select a patient and enter a valid amount');
+      return;
+    }
     try {
-      await billingApi.create(data);
+      await createBillHandler(data);
       setShowForm(false);
       reset();
-      fetchData();
+      refetch();
     } catch {
       setApiError('Failed to create bill');
     }
   };
 
+  // Pay handler
   const handlePay = async (billId: number) => {
     try {
-      await billingApi.pay(billId);
-      fetchData();
+      await payBillHandler(billId);
+      refetch();
     } catch {
       alert('Failed to process payment');
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusClasses: Record<string, string> = {
-      pending: 'status-badge pending',
-      paid: 'status-badge paid',
-      cancelled: 'status-badge cancelled',
-      refunded: 'status-badge refunded',
-    };
-    return <span className={statusClasses[status] || 'status-badge'}>{status}</span>;
+  const getStatusBadgeClass = (status: string): string => {
+    return BILLING_STATUS_CLASSES[status] || 'status-badge';
   };
 
-  if (loading) return <div className="loading-spinner">Loading...</div>;
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Something went wrong"
-        description="Failed to load data"
-        error={error}
-        onRetry={fetchData}
-      />
-    );
-  }
-
-  if (!Array.isArray(bills) || bills.length === 0) {
-    return (
-      <EmptyState
-        title="No data available"
-        description="There are no bills to display at the moment."
-      />
-    );
-  }
+  // Safe rendering guards
+  const isEmpty = bills.length === 0;
 
   return (
     <div className="page-container">
+      {loading && <GlobalLoader />}
+
+      {error && (
+        <ErrorState
+          title="Something went wrong"
+          description="Failed to load data"
+          error={error}
+          onRetry={refetch}
+        />
+      )}
+
+      {!error && isEmpty && (
+        <EmptyState
+          title="No data available"
+          description="There are no bills to display at the moment."
+        />
+      )}
       <div className="page-header with-actions">
         <div>
           <h1>Billing</h1>
           <p className="subtitle">Manage invoices and payments</p>
         </div>
-        <button 
-          className="btn-primary"
-          onClick={() => setShowForm(!showForm)}
-        >
+        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : '+ Create Bill'}
         </button>
       </div>
@@ -129,22 +108,31 @@ export function Billing() {
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
                 <option value="0">Select patient</option>
                 {patients.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown'}</option>
+                  <option key={p.id} value={p.id}>
+                    {formatPatientName(p)}
+                  </option>
                 ))}
               </select>
               {errors.patient_id && <span className="field-error">{errors.patient_id.message}</span>}
             </div>
             <div className="form-group">
               <label>Amount</label>
-              <input type="number" step="0.01" {...register('amount', { valueAsNumber: true })} disabled={isSubmitting} />
+              <input
+                type="number"
+                step="0.01"
+                {...register('amount', { valueAsNumber: true })}
+                disabled={isSubmitting}
+              />
               {errors.amount && <span className="field-error">{errors.amount.message}</span>}
             </div>
             <div className="form-group">
               <label>Currency</label>
               <select {...register('currency')} disabled={isSubmitting}>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                {CURRENCIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
               </select>
               {errors.currency && <span className="field-error">{errors.currency.message}</span>}
             </div>
@@ -166,39 +154,38 @@ export function Billing() {
       )}
 
       <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th>Actions</th>
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bills.map((bill) => (
+              <tr key={bill.id}>
+                <td>{formatPatientName(bill.patient)}</td>
+                <td>{bill.description || '-'}</td>
+                <td className="amount">{formatCurrency(bill.amount, bill.currency)}</td>
+                <td>{formatDateSafe(bill.due_date)}</td>
+                <td>
+                  <span className={getStatusBadgeClass(bill.status)}>{bill.status}</span>
+                </td>
+                <td>
+                  {bill.status === 'pending' && (
+                    <button className="btn-small btn-pay" onClick={() => handlePay(bill.id)}>
+                      Pay
+                    </button>
+                  )}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {bills.map((bill) => (
-                <tr key={bill.id}>
-                  <td>{bill.patient?.name || `${bill.patient?.first_name || ''} ${bill.patient?.last_name || ''}`.trim() || '-'}</td>
-                  <td>{bill.description || '-'}</td>
-                  <td className="amount">${(bill.amount ?? 0).toFixed(2)} {bill.currency || 'USD'}</td>
-                  <td>{bill.due_date && !isNaN(new Date(bill.due_date).getTime()) ? new Date(bill.due_date).toLocaleDateString() : '-'}</td>
-                  <td>{getStatusBadge(bill.status || 'pending')}</td>
-                  <td>
-                    {bill.status === 'pending' && (
-                      <button 
-                        className="btn-small btn-pay"
-                        onClick={() => handlePay(bill.id)}
-                      >
-                        Pay
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
