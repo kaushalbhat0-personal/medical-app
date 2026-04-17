@@ -1,26 +1,26 @@
 from app.schemas.dashboard import DashboardResponse
-from app.schemas.patient import Patient, PatientCreate, PatientUpdate
-from app.schemas.doctor import Doctor, DoctorCreate, DoctorUpdate
-from app.schemas.appointment import Appointment, AppointmentCreate, AppointmentUpdate
-from app.schemas.billing import Billing, BillingCreate, BillingUpdate
-from app.schemas.user import User, UserCreate, UserUpdate
+from app.schemas.patient import PatientRead, PatientCreate, PatientUpdate
+from app.schemas.doctor import DoctorRead, DoctorCreate, DoctorUpdate
+from app.schemas.appointment import AppointmentRead, AppointmentCreate, AppointmentUpdate
+from app.schemas.billing import BillingRead, BillingCreate, BillingUpdate
+from app.schemas.user import UserRead, UserCreate, UserUpdate
 from app.schemas.auth import Token, TokenData
 
 __all__ = [
     "DashboardResponse",
-    "Patient",
+    "PatientRead",
     "PatientCreate",
     "PatientUpdate",
-    "Doctor",
+    "DoctorRead",
     "DoctorCreate",
     "DoctorUpdate",
-    "Appointment",
+    "AppointmentRead",
     "AppointmentCreate",
     "AppointmentUpdate",
-    "Billing",
+    "BillingRead",
     "BillingCreate",
     "BillingUpdate",
-    "User",
+    "UserRead",
     "UserCreate",
     "UserUpdate",
     "Token",
