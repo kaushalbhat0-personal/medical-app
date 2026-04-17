@@ -64,11 +64,11 @@ export function Appointments() {
     }
     try {
       await createAppointmentHandler(data);
-      setShowForm(false);
       reset();
-      refetch();
-    } catch {
-      setApiError('Failed to create appointment');
+      setShowForm(false);
+      await refetch();
+    } catch (err: any) {
+      setApiError(err?.message || 'Failed to create appointment');
     }
   };
 
@@ -190,7 +190,7 @@ export function Appointments() {
             <div className="form-group">
               <label>Patient</label>
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
-                <option value="0">Select patient</option>
+                <option value="">Select patient</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.id}>
                     {formatPatientName(p)}
@@ -202,7 +202,7 @@ export function Appointments() {
             <div className="form-group">
               <label>Doctor</label>
               <select {...register('doctor_id', { valueAsNumber: true })} disabled={isSubmitting}>
-                <option value="0">Select doctor</option>
+                <option value="">Select doctor</option>
                 {doctors.map((d) => (
                   <option key={d.id} value={d.id}>
                     {formatDoctorName(d)} - {d.specialization || d.specialty || 'General'}

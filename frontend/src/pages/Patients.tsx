@@ -48,11 +48,11 @@ export function Patients() {
     }
     try {
       await createPatientHandler(data);
-      setShowForm(false);
       reset();
-      refetch();
-    } catch {
-      setApiError('Failed to create patient');
+      setShowForm(false);
+      await refetch();
+    } catch (err: any) {
+      setApiError(err?.message || 'Failed to create patient');
     }
   };
 
