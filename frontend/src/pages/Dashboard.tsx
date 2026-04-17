@@ -12,7 +12,7 @@ export function Dashboard() {
   const isEmpty = !loading && (!stats || (stats.total_patients === 0 && stats.total_doctors === 0));
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {isLoading && <GlobalLoader />}
 
       {error && (
@@ -36,7 +36,7 @@ export function Dashboard() {
         <p className="subtitle">Overview of your hospital's performance</p>
       </div>
 
-      <div className="stats-grid">
+      <div className="stats-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card">
           <div className="stat-icon">👤</div>
           <div className="stat-content">
@@ -84,7 +84,7 @@ export function Dashboard() {
 
       <div className="quick-actions">
         <h2>Quick Actions</h2>
-        <div className="action-buttons">
+        <div className="action-buttons flex flex-col sm:flex-row gap-2">
           <a href="/patients/new" className="action-btn">
             <span>👤</span>
             Add Patient

@@ -58,10 +58,14 @@ export function Patients() {
 
   // Safe rendering guards - only show empty after loading completes
   const isLoading = loading;
-  const isEmpty = !loading && patients.length === 0;
+  const safePatients = Array.isArray(patients) ? patients : [];
+  const isEmpty = !loading && safePatients.length === 0;
+
+  // Debug log
+  console.log('PATIENTS:', patients);
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {isLoading && <GlobalLoader />}
 
       {error && (
@@ -79,7 +83,7 @@ export function Patients() {
           description="There are no patients to display at the moment."
         />
       )}
-      <div className="page-header with-actions">
+      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
         <div>
           <h1>Patients</h1>
           <p className="subtitle">Manage patient records</p>
@@ -107,7 +111,7 @@ export function Patients() {
         <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
           <h3>New Patient</h3>
           {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid">
+          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
               <label>First Name</label>
               <input {...register('first_name')} disabled={isSubmitting} />
@@ -144,8 +148,8 @@ export function Patients() {
         </form>
       )}
 
-      <div className="data-table">
-        <table>
+      <div className="data-table overflow-x-auto">
+        <table className="min-w-full">
           <thead>
             <tr>
               <th>Name</th>
@@ -156,13 +160,13 @@ export function Patients() {
             </tr>
           </thead>
           <tbody>
-            {patients.map((patient) => (
-              <tr key={patient.id}>
+            {Array.isArray(patients) && patients.map((patient) => (
+              <tr key={patient?.id || Math.random()}>
                 <td><strong>{formatPatientName(patient)}</strong></td>
-                <td>{patient.email || '-'}</td>
-                <td>{patient.phone || '-'}</td>
+                <td>{patient?.email || '-'}</td>
+                <td>{patient?.phone || '-'}</td>
                 <td>{formatPatientDobOrAge(patient)}</td>
-                <td>{formatDateSafe(patient.created_at)}</td>
+                <td>{formatDateSafe(patient?.created_at)}</td>
               </tr>
             ))}
           </tbody>

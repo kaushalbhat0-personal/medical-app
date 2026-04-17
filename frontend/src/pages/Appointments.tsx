@@ -81,13 +81,13 @@ export function Appointments() {
   const isEmpty = !loading && !refetching && appointments.length === 0;
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="page-header with-actions">
         <div>
           <h1>Appointments</h1>
           <p className="subtitle">Schedule and manage appointments</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
             className={`btn-secondary ${hasActiveFilters ? 'active' : ''}`}
@@ -130,7 +130,7 @@ export function Appointments() {
 
       {showFilters && (
         <div className="filters-panel">
-          <div className="filters-grid">
+          <div className="filters-grid grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="filter-group">
               <label>Doctor</label>
               <select
@@ -186,7 +186,7 @@ export function Appointments() {
         <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
           <h3>New Appointment</h3>
           {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid">
+          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
               <label>Patient</label>
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
@@ -227,8 +227,8 @@ export function Appointments() {
         </form>
       )}
 
-      <div className="data-table">
-        <table>
+      <div className="data-table overflow-x-auto">
+        <table className="min-w-full">
           <thead>
             <tr>
               <th>Patient</th>

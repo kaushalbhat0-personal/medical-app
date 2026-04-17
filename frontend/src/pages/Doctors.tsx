@@ -13,7 +13,7 @@ export function Doctors() {
   const isEmpty = !loading && doctors.length === 0;
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {isLoading && <GlobalLoader />}
 
       {error && (
@@ -36,7 +36,7 @@ export function Doctors() {
         <p className="subtitle">Medical staff directory</p>
       </div>
 
-      <div className="doctors-grid">
+      <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {doctors.map((doctor) => (
           <div key={doctor.id} className="doctor-card">
             <div className="doctor-avatar">{formatDoctorInitials(doctor)}</div>

@@ -71,7 +71,7 @@ export function Billing() {
   const isEmpty = !loading && bills.length === 0;
 
   return (
-    <div className="page-container">
+    <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {isLoading && <GlobalLoader />}
 
       {error && (
@@ -103,7 +103,7 @@ export function Billing() {
         <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
           <h3>New Bill</h3>
           {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid">
+          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
               <label>Patient</label>
               <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
@@ -154,8 +154,8 @@ export function Billing() {
         </form>
       )}
 
-      <div className="data-table">
-        <table>
+      <div className="data-table overflow-x-auto">
+        <table className="min-w-full">
           <thead>
             <tr>
               <th>Patient</th>
