@@ -4,7 +4,7 @@ from app.schemas.doctor import DoctorRead, DoctorCreate, DoctorUpdate
 from app.schemas.appointment import AppointmentRead, AppointmentCreate, AppointmentUpdate
 from app.schemas.billing import BillingRead, BillingCreate, BillingUpdate
 from app.schemas.user import UserRead, UserCreate, UserUpdate
-from app.schemas.auth import Token, TokenData
+from app.schemas.auth import Token
 
 __all__ = [
     "DashboardResponse",
@@ -24,5 +24,4 @@ __all__ = [
     "UserCreate",
     "UserUpdate",
     "Token",
-    "TokenData",
 ]
