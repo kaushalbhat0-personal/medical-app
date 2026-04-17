@@ -66,12 +66,13 @@ export function Billing() {
     return BILLING_STATUS_CLASSES[status] || 'status-badge';
   };
 
-  // Safe rendering guards
-  const isEmpty = bills.length === 0;
+  // Safe rendering guards - only show empty after loading completes
+  const isLoading = loading;
+  const isEmpty = !loading && bills.length === 0;
 
   return (
     <div className="page-container">
-      {loading && <GlobalLoader />}
+      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState

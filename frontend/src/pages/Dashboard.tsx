@@ -7,12 +7,13 @@ export function Dashboard() {
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
 
-  // Safe rendering guards
-  const isEmpty = !stats || (stats.total_patients === 0 && stats.total_doctors === 0);
+  // Safe rendering guards - only show empty after loading completes
+  const isLoading = loading;
+  const isEmpty = !loading && (!stats || (stats.total_patients === 0 && stats.total_doctors === 0));
 
   return (
     <div className="page-container">
-      {loading && <GlobalLoader />}
+      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState

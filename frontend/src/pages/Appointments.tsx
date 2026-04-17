@@ -70,8 +70,9 @@ export function Appointments() {
     return APPOINTMENT_STATUS_CLASSES[status] || 'status-badge';
   };
 
-  // Safe rendering guards
-  const isEmpty = appointments.length === 0;
+  // Safe rendering guards - only show empty after loading completes
+  const isLoading = loading;
+  const isEmpty = !loading && appointments.length === 0;
 
   return (
     <div className="page-container">
@@ -100,7 +101,7 @@ export function Appointments() {
         </div>
       </div>
 
-      {loading && <GlobalLoader />}
+      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState

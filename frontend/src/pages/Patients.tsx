@@ -56,12 +56,13 @@ export function Patients() {
     }
   };
 
-  // Safe rendering guards
-  const isEmpty = patients.length === 0;
+  // Safe rendering guards - only show empty after loading completes
+  const isLoading = loading;
+  const isEmpty = !loading && patients.length === 0;
 
   return (
     <div className="page-container">
-      {loading && <GlobalLoader />}
+      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState
