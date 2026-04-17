@@ -38,7 +38,10 @@ export function Patients() {
   const fetchPatients = async () => {
     try {
       setError(null);
-      const data = await patientsApi.getAll({ search });
+      // Pass search as undefined if empty - global sanitizer will clean it
+      const data = await patientsApi.getAll({
+        search: search.trim() || undefined,
+      });
       // Safe array handling - ensure we always set an array
       const safeData = Array.isArray(data) ? data : [];
       console.log('patients:', safeData);

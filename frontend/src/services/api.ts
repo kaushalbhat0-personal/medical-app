@@ -9,6 +9,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
+import { cleanParams } from '../utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -25,7 +26,7 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor - attach auth token
+// Request interceptor - attach auth token + clean params
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
@@ -38,6 +39,15 @@ api.interceptors.request.use(
     } else if (import.meta.env.DEV) {
       console.log('[API] No token found for request to:', config.url);
     }
+
+    // GLOBAL FIX: Clean params to prevent FastAPI 422 errors from empty strings
+    if (config.params) {
+      config.params = cleanParams(config.params);
+      if (import.meta.env.DEV) {
+        console.log('[API] Cleaned params:', config.params);
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

@@ -195,10 +195,10 @@ export function Billing() {
               {bills.map((bill) => (
                 <tr key={bill.id}>
                   <td>{bill.patient?.name || `${bill.patient?.first_name || ''} ${bill.patient?.last_name || ''}`.trim() || '-'}</td>
-                  <td>{bill.description}</td>
-                  <td className="amount">${bill.amount.toFixed(2)} {bill.currency}</td>
-                  <td>{new Date(bill.due_date).toLocaleDateString()}</td>
-                  <td>{getStatusBadge(bill.status)}</td>
+                  <td>{bill.description || '-'}</td>
+                  <td className="amount">${(bill.amount ?? 0).toFixed(2)} {bill.currency || 'USD'}</td>
+                  <td>{bill.due_date && !isNaN(new Date(bill.due_date).getTime()) ? new Date(bill.due_date).toLocaleDateString() : '-'}</td>
+                  <td>{getStatusBadge(bill.status || 'pending')}</td>
                   <td>
                     {bill.status === 'pending' && (
                       <button 
