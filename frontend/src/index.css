@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Hospital Management System - Global Styles */
 
 :root {
@@ -378,17 +382,13 @@ button {
   background: var(--gray-50);
 }
 
-/* Page Container */
-.page-container {
-  max-width: 1200px;
-}
+/* Page Container - responsive via Tailwind */
 
 .page-header {
   margin-bottom: 1.5rem;
 }
 
 .page-header.with-actions {
-  display: flex;
   justify-content: space-between;
   align-items: flex-start;
 }
@@ -398,13 +398,7 @@ button {
   margin-top: 0.25rem;
 }
 
-/* Stats Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
+/* Stats Grid - responsive via Tailwind */
 
 .stat-card {
   display: flex;
@@ -463,8 +457,6 @@ button {
 }
 
 .action-buttons {
-  display: flex;
-  gap: 1rem;
   flex-wrap: wrap;
 }
 
@@ -506,9 +498,6 @@ button {
 }
 
 .form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
   margin-bottom: 1rem;
 }
 
@@ -636,12 +625,7 @@ button {
   color: var(--text-light);
 }
 
-/* Doctors Grid */
-.doctors-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
+/* Doctors Grid - responsive via Tailwind */
 
 .doctor-card {
   display: flex;

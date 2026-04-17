@@ -11,22 +11,22 @@ interface MainLayoutProps {
 
 export function MainLayout({ user, onLogout, children }: MainLayoutProps) {
   return (
-    <div className="main-layout">
-      <Sidebar user={user} />
-      
-      <div className="main-content-wrapper">
+    <div className="flex min-h-screen">
+      <div className="w-64 flex-shrink-0">
+        <Sidebar user={user} />
+      </div>
+
+      <main className="flex-1 min-w-0">
         <Topbar user={user} onLogout={onLogout} />
-        
-        <div className="content-area">
-          <main className="main-content">
+        <div className="flex">
+          <div className="flex-1 min-w-0 p-6">
             {children}
-          </main>
-          
-          <aside className="right-panel">
+          </div>
+          <aside className="w-80 flex-shrink-0 hidden lg:block p-6 bg-gray-50 border-l">
             <HealthNews />
           </aside>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

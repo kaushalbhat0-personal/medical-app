@@ -15,7 +15,7 @@ const navItems = [
 
 export function Sidebar({ user }: SidebarProps) {
   return (
-    <aside className="sidebar overflow-y-auto h-screen">
+    <aside className="sidebar h-screen overflow-y-auto bg-gray-900 text-white flex flex-col w-full">
       <div className="sidebar-header">
         <h1 className="logo">🏥 HMS</h1>
         <p className="tagline">Hospital Management</p>
