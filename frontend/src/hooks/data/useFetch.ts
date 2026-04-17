@@ -1,20 +1,32 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/**
+ * Generic data fetching hook with loading and error states
+ * Prevents infinite re-renders by using refs for handler and params
+ */
 export function useFetch<T>(
   handler: (...args: any[]) => Promise<T>,
   params?: any
 ) {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);      // initial load only
-  const [refetching, setRefetching] = useState(false); // background updates
+  const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use ref to track current params for refetch calls
+  // Use refs to prevent unnecessary re-renders and stale closures
+  const handlerRef = useRef(handler);
   const paramsRef = useRef(params);
+
+  // Keep refs current
+  handlerRef.current = handler;
   paramsRef.current = params;
 
   const fetchData = useCallback(async (isRefetch = false) => {
-    console.log('FETCH CALLED, isRefetch:', isRefetch);
+    // Debug logging in development only
+    if (import.meta.env.DEV) {
+      console.log('[useFetch] Fetching, isRefetch:', isRefetch);
+    }
+
     try {
       setError(null);
       if (isRefetch) {
@@ -23,22 +35,25 @@ export function useFetch<T>(
         setLoading(true);
       }
 
-      const result = await handler(paramsRef.current);
+      const result = await handlerRef.current(paramsRef.current);
       setData(result);
     } catch (err: any) {
-      setError(err?.message || 'Something went wrong');
+      const errorMessage = err?.message || err?.detail || 'Something went wrong';
+      setError(errorMessage);
+      // Preserve null data on error - don't fallback to empty defaults
+      setData(null);
     } finally {
       setLoading(false);
       setRefetching(false);
     }
-  }, [handler]);
+  }, []); // No dependencies - uses refs for everything
 
-  // Stable dependency - stringify params to avoid object reference issues
+  // Stable dependency key for params comparison
   const paramsKey = JSON.stringify(params);
 
   useEffect(() => {
     fetchData(false);
-  }, [paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchData, paramsKey]);
 
   return { data, loading, refetching, error, refetch: () => fetchData(true) };
 }

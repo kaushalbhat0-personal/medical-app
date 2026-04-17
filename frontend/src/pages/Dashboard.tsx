@@ -7,27 +7,34 @@ export function Dashboard() {
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
 
-  // Safe rendering guards - only show empty after loading completes
-  const isLoading = loading;
-  const isEmpty = !loading && (!stats || (stats.total_patients === 0 && stats.total_doctors === 0));
+  // Show loader only during initial data fetch (when data is null)
+  // Don't show loader on refetch or when we have cached data
+  const showLoader = loading && !stats;
+
+  // Empty state: data loaded successfully but all counts are zero
+  const isEmpty =
+    !loading &&
+    !error &&
+    stats.total_patients === 0 &&
+    stats.total_doctors === 0;
 
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {isLoading && <GlobalLoader />}
+      {showLoader && <GlobalLoader />}
 
       {error && (
         <ErrorState
-          title="Something went wrong"
-          description="Failed to load data"
+          title="Failed to load dashboard"
+          description="Unable to fetch dashboard statistics. Please try again."
           error={error}
           onRetry={refetch}
         />
       )}
 
-      {!error && isEmpty && (
+      {!error && !loading && isEmpty && (
         <EmptyState
           title="No data available"
-          description="Dashboard statistics are currently unavailable."
+          description="Dashboard statistics are currently empty. Add patients, doctors, or appointments to see data here."
         />
       )}
 
