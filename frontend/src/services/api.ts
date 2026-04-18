@@ -10,6 +10,7 @@ import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
+import { navigateTo } from '../utils/navigation';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -79,7 +80,7 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         toast.error('Session expired. Please log in again.');
-        window.location.href = '/login';
+        navigateTo('/login');
       }
       return Promise.reject(error.response?.data || error);
     }

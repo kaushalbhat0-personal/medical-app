@@ -36,7 +36,7 @@ export function Appointments() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const form = useForm({
+  const form = useForm<AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: EMPTY_APPOINTMENT,
     mode: 'onBlur',
@@ -73,7 +73,9 @@ export function Appointments() {
 
       reset();
       setShowForm(false);
-      await refetch();
+      await refetch().catch((err) => {
+        console.error('Refetch failed:', err);
+      });
     } catch (err: any) {
       // Handle different error types
       let errorMessage = 'Failed to create appointment';

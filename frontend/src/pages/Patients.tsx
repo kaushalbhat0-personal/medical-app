@@ -55,7 +55,9 @@ export function Patients() {
 
       reset();
       setShowForm(false);
-      await refetch();
+      await refetch().catch((err) => {
+        console.error('Refetch failed:', err);
+      });
     } catch (err: any) {
       let errorMessage = 'Failed to create patient';
 

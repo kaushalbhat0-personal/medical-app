@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './hooks/useAuth';
+import { setNavigator } from './utils/navigation';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AnimatedPage } from './animations';
@@ -15,6 +17,11 @@ import { Billing } from './pages/Billing';
 function AnimatedRoutes() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setNavigator(navigate);
+  }, [navigate]);
 
   return (
     <AnimatePresence mode="wait">

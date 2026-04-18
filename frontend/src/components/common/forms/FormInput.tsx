@@ -16,10 +16,8 @@ export function FormInput<TFieldValues extends Record<string, unknown>>({
 
   const error = errors[name];
 
-  // Determine if this is a number input that needs valueAsNumber
-  const registerProps = type === 'number'
-    ? register(name, { valueAsNumber: true })
-    : register(name);
+  // Always register as raw string — Zod schemas handle all coercion via z.any().transform()
+  const registerProps = register(name);
 
   return (
     <div className="space-y-2">
