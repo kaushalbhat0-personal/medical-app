@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';
 import { HealthNews } from '../components/layout/HealthNews';
-import { sidebarVariants, overlayVariants } from '../animations';
 import type { User } from '../types';
 
 interface MainLayoutProps {
@@ -12,44 +10,84 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
+
 export function MainLayout({ user, onLogout, children }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Mobile drawer state
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Desktop collapse state
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Load collapse state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (saved !== null) {
+      setIsCollapsed(saved === 'true');
+    }
+  }, []);
+
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
+  }, [isCollapsed]);
+
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed(prev => !prev);
+  }, []);
+
+  // Close mobile drawer on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden">
-      {/* Mobile Sidebar Overlay with animation */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial="closed"
-            animate="open"
-            exit="closed"
-            variants={overlayVariants}
-            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            style={{ willChange: 'opacity' }}
-          />
-        )}
-      </AnimatePresence>
+    <div className="flex min-h-screen w-full overflow-hidden bg-gray-50">
+      {/* Mobile Overlay */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity duration-300 ${
+          mobileOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'
+        }`}
+        onClick={() => setMobileOpen(false)}
+      />
 
-      {/* Sidebar - hidden on mobile, animated drawer on mobile */}
-      <motion.aside
-        initial={false}
-        animate={sidebarOpen ? 'open' : 'closed'}
-        variants={sidebarVariants}
-        className="fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 lg:translate-x-0 lg:static lg:block"
-        style={{ willChange: 'transform' }}
+      {/* Sidebar Container */}
+      <aside
+        className={`fixed top-0 left-0 z-50 h-full bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex-shrink-0
+          /* Mobile: drawer behavior with transform */
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          /* Desktop: always visible, no transform */
+          lg:static lg:translate-x-0 lg:flex
+          /* Width: expanded or collapsed on desktop, full on mobile */
+          ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
+          w-64
+        `}
       >
-        <Sidebar user={user} onClose={() => setSidebarOpen(false)} />
-      </motion.aside>
+        <Sidebar
+          user={user}
+          onClose={() => setMobileOpen(false)}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={toggleCollapse}
+        />
+      </aside>
 
-      <main className="flex-1 w-full overflow-x-hidden min-w-0">
-        <Topbar user={user} onLogout={onLogout} onMenuToggle={() => setSidebarOpen(true)} />
+      {/* Main Content */}
+      <main className="flex-1 w-full overflow-x-hidden min-w-0 lg:ml-0">
+        <Topbar
+          user={user}
+          onLogout={onLogout}
+          onMenuToggle={() => setMobileOpen(true)}
+        />
         <div className="flex w-full">
           <div className="flex-1 min-w-0 p-4 sm:p-6">
             {children}
           </div>
-          <aside className="w-80 flex-shrink-0 hidden xl:block p-6 bg-gray-50 border-l">
+          <aside className="w-80 flex-shrink-0 hidden xl:block p-6 bg-gray-50 border-l border-gray-200">
             <HealthNews />
           </aside>
         </div>
