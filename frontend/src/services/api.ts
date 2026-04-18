@@ -40,6 +40,9 @@ api.interceptors.request.use(
     }
 
     const token = localStorage.getItem('token');
+    if (import.meta.env.DEV) {
+      console.log('TOKEN:', token ? `${token.substring(0, 15)}...` : 'none');
+    }
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import Depends
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.api.http_exceptions import (
@@ -13,7 +13,7 @@ from app.core.security import decode_access_token
 from app.crud import crud_user
 from app.models.user import User
 
-http_bearer = HTTPBearer(auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 
 
 def _user_id_from_access_token(token: str) -> UUID:
@@ -32,12 +32,9 @@ def _user_id_from_access_token(token: str) -> UUID:
 
 
 def get_current_user(
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
-    bearer: HTTPAuthorizationCredentials | None = Depends(http_bearer),
 ) -> User:
-    if bearer is None or not bearer.credentials:
-        raise unauthorized_credentials_exception()
-    token = bearer.credentials
     user_id = _user_id_from_access_token(token)
     user = crud_user.get_user(db, user_id)
     if user is None:

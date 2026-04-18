@@ -1,6 +1,7 @@
-from datetime import datetime, date
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import pytz
 
 from app.models.patient import Patient
 from app.models.doctor import Doctor
@@ -12,10 +13,15 @@ def get_dashboard_stats(db: Session) -> dict:
     total_patients = db.query(Patient).count()
     total_doctors = db.query(Doctor).count()
 
-    today = datetime.utcnow().date()
+    # Use IST timezone for accurate "today" filtering
+    ist = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(ist)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
 
     today_appointments = db.query(Appointment).filter(
-        func.date(Appointment.appointment_time) == today,
+        Appointment.appointment_time >= start,
+        Appointment.appointment_time < end,
         Appointment.is_deleted == False
     ).count()
 
