@@ -82,9 +82,9 @@ export function Appointments() {
 
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="page-header with-actions">
+      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
         <div>
-          <h1>Appointments</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Appointments</h1>
           <p className="subtitle">Schedule and manage appointments</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">

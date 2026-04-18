@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
+import { X } from 'lucide-react';
 import type { User } from '../../types';
 
 interface SidebarProps {
   user: User | null;
+  onClose?: () => void;
 }
 
 const navItems = [
@@ -13,12 +15,24 @@ const navItems = [
   { path: '/billing', label: 'Billing', icon: '💰' },
 ];
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, onClose }: SidebarProps) {
   return (
     <aside className="sidebar h-screen overflow-y-auto bg-gray-900 text-white flex flex-col w-full">
       <div className="sidebar-header">
-        <h1 className="logo">🏥 HMS</h1>
-        <p className="tagline">Hospital Management</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="logo">🏥 HMS</h1>
+            <p className="tagline">Hospital Management</p>
+          </div>
+          {/* Mobile close button */}
+          <button
+            onClick={onClose}
+            className="lg:hidden p-2 hover:bg-gray-800 rounded-md transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
       
       <nav className="sidebar-nav">

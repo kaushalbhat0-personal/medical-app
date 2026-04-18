@@ -89,9 +89,9 @@ export function Billing() {
           description="There are no bills to display at the moment."
         />
       )}
-      <div className="page-header with-actions">
+      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
         <div>
-          <h1>Billing</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Billing</h1>
           <p className="subtitle">Manage invoices and payments</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>

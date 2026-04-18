@@ -85,7 +85,7 @@ export function Patients() {
       )}
       <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
         <div>
-          <h1>Patients</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Patients</h1>
           <p className="subtitle">Manage patient records</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>

@@ -41,7 +41,7 @@ export function Dashboard() {
       {!error && !loading && (
         <>
           <div className="page-header">
-            <h1>Dashboard</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Dashboard</h1>
             <p className="subtitle">Overview of your hospital's performance</p>
           </div>
 

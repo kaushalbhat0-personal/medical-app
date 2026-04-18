@@ -32,7 +32,7 @@ export function Doctors() {
         />
       )}
       <div className="page-header">
-        <h1>Doctors</h1>
+        <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Doctors</h1>
         <p className="subtitle">Medical staff directory</p>
       </div>
 
