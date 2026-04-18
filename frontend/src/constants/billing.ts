@@ -11,7 +11,7 @@ export const BILLING_DEFAULT_PARAMS = {
 export const EMPTY_BILL = {
   patient_id: 0,
   amount: 0,
-  currency: 'USD' as const,
+  currency: 'INR' as const,
   description: '',
   due_date: '',
 };
@@ -31,7 +31,5 @@ export const BILLING_STATUS_CLASSES: Record<string, string> = {
 };
 
 export const CURRENCIES = [
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'GBP', label: 'GBP' },
+  { value: 'INR', label: 'INR' },
 ] as const;

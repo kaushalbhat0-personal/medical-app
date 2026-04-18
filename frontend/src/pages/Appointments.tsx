@@ -36,7 +36,7 @@ export function Appointments() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const form = useForm<AppointmentFormData>({
+  const form = useForm({
     resolver: zodResolver(appointmentSchema),
     defaultValues: EMPTY_APPOINTMENT,
     mode: 'onBlur',
@@ -217,7 +217,7 @@ export function Appointments() {
       {showForm && (
         <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">New Appointment</h3>
-          <FormWrapper
+          <FormWrapper<AppointmentFormData>
             form={form}
             onSubmit={onSubmit}
             submitLabel="Schedule Appointment"

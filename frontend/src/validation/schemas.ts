@@ -15,37 +15,38 @@ const isValidDate = (dateString: string) => {
   return date >= minDate && date <= maxDate && !isNaN(date.getTime());
 };
 
+
 // Login form validation
 export const loginSchema = z.object({
   email: z
-    .string({ required_error: 'Email is required' })
+    .string()
     .min(1, 'Email is required')
     .email('Please enter a valid email address'),
   password: z
-    .string({ required_error: 'Password is required' })
+    .string()
     .min(1, 'Password is required'),
 });
 
 // Patient form validation
 export const patientSchema = z.object({
   first_name: z
-    .string({ required_error: 'First name is required' })
+    .string()
     .min(1, 'First name is required')
     .min(2, 'First name must be at least 2 characters')
     .max(50, 'First name must be less than 50 characters')
     .regex(/^[a-zA-Z\s'-]+$/, 'First name can only contain letters, spaces, hyphens and apostrophes'),
   last_name: z
-    .string({ required_error: 'Last name is required' })
+    .string()
     .min(1, 'Last name is required')
     .min(2, 'Last name must be at least 2 characters')
     .max(50, 'Last name must be less than 50 characters')
     .regex(/^[a-zA-Z\s'-]+$/, 'Last name can only contain letters, spaces, hyphens and apostrophes'),
   email: z
-    .string({ required_error: 'Email is required' })
+    .string()
     .min(1, 'Email is required')
     .email('Please enter a valid email address'),
   phone: z
-    .string({ required_error: 'Phone number is required' })
+    .string()
     .min(1, 'Phone number is required')
     .regex(/^\+?[\d\s-()]{10,}$/, 'Phone number must be at least 10 digits')
     .refine(
@@ -53,7 +54,7 @@ export const patientSchema = z.object({
       'Phone number must contain at least 10 digits'
     ),
   date_of_birth: z
-    .string({ required_error: 'Date of birth is required' })
+    .string()
     .min(1, 'Date of birth is required')
     .refine(isValidDate, 'Please enter a valid date')
     .refine(
@@ -71,16 +72,20 @@ export const patientSchema = z.object({
     .optional(),
 });
 
+// Helper for coercing number inputs with clean type inference
+const numberField = (schema: z.ZodNumber) =>
+  z.any().transform((val) => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string' && val !== '' && !isNaN(Number(val))) return Number(val);
+    return val;
+  }).pipe(schema);
+
 // Appointment form validation
 export const appointmentSchema = z.object({
-  patient_id: z
-    .number({ required_error: 'Please select a patient', invalid_type_error: 'Please select a patient' })
-    .min(1, 'Please select a patient'),
-  doctor_id: z
-    .number({ required_error: 'Please select a doctor', invalid_type_error: 'Please select a doctor' })
-    .min(1, 'Please select a doctor'),
+  patient_id: numberField(z.number().min(1, 'Please select a patient')),
+  doctor_id: numberField(z.number().min(1, 'Please select a doctor')),
   scheduled_at: z
-    .string({ required_error: 'Date and time is required' })
+    .string()
     .min(1, 'Date and time is required')
     .refine(isValidDate, 'Please enter a valid date and time')
     .refine(isFutureDate, 'Appointment must be scheduled for a future date and time'),
@@ -92,22 +97,16 @@ export const appointmentSchema = z.object({
 
 // Billing form validation
 export const billingSchema = z.object({
-  patient_id: z
-    .number({ required_error: 'Please select a patient', invalid_type_error: 'Please select a patient' })
-    .min(1, 'Please select a patient'),
-  amount: z
-    .number({ required_error: 'Amount is required', invalid_type_error: 'Please enter a valid amount' })
-    .min(0.01, 'Amount must be greater than 0')
-    .max(999999999.99, 'Amount is too large'),
-  currency: z
-    .enum(['USD', 'EUR', 'GBP'], { message: 'Please select a currency' }),
+  patient_id: numberField(z.number().min(1, 'Please select a patient')),
+  amount: numberField(z.number().positive('Amount must be greater than 0').max(999999999.99, 'Amount is too large')),
+  currency: z.literal('INR'),
   description: z
-    .string({ required_error: 'Description is required' })
+    .string()
     .min(1, 'Description is required')
     .min(3, 'Description must be at least 3 characters')
     .max(200, 'Description must be less than 200 characters'),
   due_date: z
-    .string({ required_error: 'Due date is required' })
+    .string()
     .min(1, 'Due date is required')
     .refine(isValidDate, 'Please enter a valid due date'),
 });
