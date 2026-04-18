@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
 import type { LoginCredentials } from '../types';
 import { loginSchema, type LoginFormData } from '../validation';
 
@@ -24,13 +25,29 @@ export function Login({ onLogin }: LoginPageProps) {
   const onSubmit = async (data: LoginFormData) => {
     setApiError('');
 
-    const result = await onLogin({ email: data.email, password: data.password });
+    // Prevent double submission
+    if (isSubmitting) {
+      return;
+    }
 
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
-      // Show specific error message from API if available
-      setApiError(result.error || 'Login failed. Please check your credentials and try again.');
+    try {
+      const result = await onLogin({ email: data.email, password: data.password });
+
+      if (result.success) {
+        toast.success('Welcome back!', {
+          duration: 2000,
+          icon: '👋',
+        });
+        navigate('/dashboard');
+      } else {
+        const errorMessage = result.error || 'Login failed. Please check your credentials and try again.';
+        setApiError(errorMessage);
+        toast.error(errorMessage, { duration: 5000 });
+      }
+    } catch (err: any) {
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      setApiError(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 

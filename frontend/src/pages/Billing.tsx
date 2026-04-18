@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
 import { useBilling } from '../hooks';
 import { createBillHandler, payBillHandler } from '../handlers';
 import { BILLING_STATUS_CLASSES, CURRENCIES } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
-import { ErrorState } from '../components/common/ErrorState';
-import { EmptyState } from '../components/common/EmptyState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
 import { billingSchema, type BillingFormData } from '../validation';
 
 export function Billing() {
@@ -18,12 +17,7 @@ export function Billing() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<BillingFormData>({
+  const form = useForm<BillingFormData>({
     resolver: zodResolver(billingSchema),
     defaultValues: {
       patient_id: 0,
@@ -32,33 +26,69 @@ export function Billing() {
       description: '',
       due_date: '',
     },
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
 
-  // Create handler
+  const { reset } = form;
+
+  // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: BillingFormData) => {
     setApiError('');
-    // Form validation to prevent 422 errors
-    if (!data.patient_id || !data.amount || data.amount <= 0) {
-      setApiError('Please select a patient and enter a valid amount');
+
+    // Prevent double submission
+    if (form.formState.isSubmitting) {
       return;
     }
+
     try {
       await createBillHandler(data);
-      setShowForm(false);
+
+      toast.success('Bill created successfully', {
+        duration: 3000,
+        icon: '💰',
+      });
+
       reset();
-      refetch();
-    } catch {
-      setApiError('Failed to create bill');
+      setShowForm(false);
+      await refetch();
+    } catch (err: any) {
+      let errorMessage = 'Failed to create bill';
+
+      if (err?.detail) {
+        errorMessage = err.detail;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      setApiError(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 
-  // Pay handler
+  // Pay handler with toast notifications
   const handlePay = async (billId: number) => {
     try {
       await payBillHandler(billId);
-      refetch();
-    } catch {
-      alert('Failed to process payment');
+
+      toast.success('Payment processed successfully', {
+        duration: 3000,
+        icon: '💳',
+      });
+
+      await refetch();
+    } catch (err: any) {
+      let errorMessage = 'Failed to process payment';
+
+      if (err?.detail) {
+        errorMessage = err.detail;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 
@@ -100,58 +130,61 @@ export function Billing() {
       </div>
 
       {showForm && (
-        <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
-          <h3>New Bill</h3>
-          {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-group">
-              <label>Patient</label>
-              <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
-                <option value="0">Select patient</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {formatPatientName(p)}
-                  </option>
-                ))}
-              </select>
-              {errors.patient_id && <span className="field-error">{errors.patient_id.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                {...register('amount', { valueAsNumber: true })}
-                disabled={isSubmitting}
+        <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">New Bill</h3>
+          <FormWrapper
+            form={form}
+            onSubmit={onSubmit}
+            submitLabel="Create Bill"
+            loadingLabel="Creating..."
+            apiError={apiError}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <FormSelect<BillingFormData>
+                name="patient_id"
+                label="Patient"
+                placeholder="Select patient"
+                options={patients.map((p) => ({
+                  value: p.id,
+                  label: formatPatientName(p),
+                }))}
+                disabled={form.formState.isSubmitting}
+                required
               />
-              {errors.amount && <span className="field-error">{errors.amount.message}</span>}
+              <FormInput<BillingFormData>
+                name="amount"
+                label="Amount"
+                type="number"
+                disabled={form.formState.isSubmitting}
+                required
+              />
+              <FormSelect<BillingFormData>
+                name="currency"
+                label="Currency"
+                options={CURRENCIES.map((c) => ({
+                  value: c.value,
+                  label: c.label,
+                }))}
+                disabled={form.formState.isSubmitting}
+                required
+              />
+              <FormInput<BillingFormData>
+                name="due_date"
+                label="Due Date"
+                type="date"
+                disabled={form.formState.isSubmitting}
+                required
+              />
             </div>
-            <div className="form-group">
-              <label>Currency</label>
-              <select {...register('currency')} disabled={isSubmitting}>
-                {CURRENCIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              {errors.currency && <span className="field-error">{errors.currency.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Due Date</label>
-              <input type="date" {...register('due_date')} disabled={isSubmitting} />
-              {errors.due_date && <span className="field-error">{errors.due_date.message}</span>}
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Description</label>
-            <input {...register('description')} placeholder="Service description" disabled={isSubmitting} />
-            {errors.description && <span className="field-error">{errors.description.message}</span>}
-          </div>
-          <button type="submit" className="btn-primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Bill'}
-          </button>
-        </form>
+            <FormInput<BillingFormData>
+              name="description"
+              label="Description"
+              placeholder="Service description"
+              disabled={form.formState.isSubmitting}
+              required
+            />
+          </FormWrapper>
+        </div>
       )}
 
       <div className="data-table overflow-x-auto">

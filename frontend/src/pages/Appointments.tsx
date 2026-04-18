@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Filter, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAppointments, type AppointmentFilters } from '../hooks';
 import { createAppointmentHandler } from '../handlers';
 import { EMPTY_APPOINTMENT, APPOINTMENT_STATUS_CLASSES } from '../constants';
@@ -10,9 +11,7 @@ import {
   formatDoctorName,
   formatDateTimeSafe,
 } from '../utils';
-import { ErrorState } from '../components/common/ErrorState';
-import { EmptyState } from '../components/common/EmptyState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea } from '../components/common';
 import { appointmentSchema, type AppointmentFormData } from '../validation';
 
 export function Appointments() {
@@ -37,15 +36,14 @@ export function Appointments() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<AppointmentFormData>({
+  const form = useForm<AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: EMPTY_APPOINTMENT,
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
+
+  const { reset } = form;
 
   const hasActiveFilters = filterDoctor || filterStatus;
 
@@ -54,21 +52,48 @@ export function Appointments() {
     setFilterStatus('');
   };
 
-  // Create handler
+  // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
+    // Clear any previous API error
     setApiError('');
-    // Form validation to prevent 422 errors
-    if (!data.patient_id || !data.doctor_id) {
-      setApiError('Please select both patient and doctor');
+
+    // Prevent submission if already submitting (double-click protection)
+    if (form.formState.isSubmitting) {
       return;
     }
+
     try {
       await createAppointmentHandler(data);
+
+      // Success: show toast, reset form, close modal, refresh data
+      toast.success('Appointment scheduled successfully', {
+        duration: 3000,
+        icon: '📅',
+      });
+
       reset();
       setShowForm(false);
       await refetch();
     } catch (err: any) {
-      setApiError(err?.message || 'Failed to create appointment');
+      // Handle different error types
+      let errorMessage = 'Failed to create appointment';
+
+      if (err?.detail) {
+        // Backend validation error (422)
+        errorMessage = err.detail;
+      } else if (err?.message) {
+        // Generic error message
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      // Show error in form for visibility and toast for notification
+      setApiError(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
+
+      // Keep form open so user can correct errors
+      // Don't reset form on error to preserve user input
     }
   };
 
@@ -190,70 +215,54 @@ export function Appointments() {
       )}
 
       {showForm && (
-        <form className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6 mb-6" onSubmit={handleSubmit(onSubmit)}>
-          <h3 className="text-lg font-semibold text-gray-900">New Appointment</h3>
-          {apiError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{apiError}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Patient</label>
-              <select
-                {...register('patient_id', { valueAsNumber: true })}
-                disabled={isSubmitting}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
-              >
-                <option value="">Select patient</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {formatPatientName(p)}
-                  </option>
-                ))}
-              </select>
-              {errors.patient_id && <span className="text-sm text-red-600">{errors.patient_id.message}</span>}
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Doctor</label>
-              <select
-                {...register('doctor_id', { valueAsNumber: true })}
-                disabled={isSubmitting}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
-              >
-                <option value="">Select doctor</option>
-                {doctors.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {formatDoctorName(d)} - {d.specialization || d.specialty || 'General'}
-                  </option>
-                ))}
-              </select>
-              {errors.doctor_id && <span className="text-sm text-red-600">{errors.doctor_id.message}</span>}
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Date & Time</label>
-              <input
-                type="datetime-local"
-                {...register('scheduled_at')}
-                disabled={isSubmitting}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-              />
-              {errors.scheduled_at && <span className="text-sm text-red-600">{errors.scheduled_at.message}</span>}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Notes</label>
-            <textarea
-              {...register('notes')}
-              rows={2}
-              disabled={isSubmitting}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-y"
-            />
-          </div>
-          <button
-            type="submit"
-            className="min-h-[44px] px-6 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
-            disabled={isSubmitting}
+        <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">New Appointment</h3>
+          <FormWrapper
+            form={form}
+            onSubmit={onSubmit}
+            submitLabel="Schedule Appointment"
+            loadingLabel="Scheduling..."
+            apiError={apiError}
           >
-            {isSubmitting ? 'Scheduling...' : 'Schedule Appointment'}
-          </button>
-        </form>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <FormSelect<AppointmentFormData>
+                name="patient_id"
+                label="Patient"
+                placeholder="Select patient"
+                options={patients.map((p) => ({
+                  value: p.id,
+                  label: formatPatientName(p),
+                }))}
+                disabled={form.formState.isSubmitting}
+                required
+              />
+              <FormSelect<AppointmentFormData>
+                name="doctor_id"
+                label="Doctor"
+                placeholder="Select doctor"
+                options={doctors.map((d) => ({
+                  value: d.id,
+                  label: `${formatDoctorName(d)} - ${d.specialization || d.specialty || 'General'}`,
+                }))}
+                disabled={form.formState.isSubmitting}
+                required
+              />
+              <FormInput<AppointmentFormData>
+                name="scheduled_at"
+                label="Date & Time"
+                type="datetime-local"
+                disabled={form.formState.isSubmitting}
+                required
+              />
+            </div>
+            <FormTextarea<AppointmentFormData>
+              name="notes"
+              label="Notes"
+              rows={2}
+              disabled={form.formState.isSubmitting}
+            />
+          </FormWrapper>
+        </div>
       )}
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">

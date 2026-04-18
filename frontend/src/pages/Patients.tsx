@@ -2,13 +2,12 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import debounce from 'lodash.debounce';
+import toast from 'react-hot-toast';
 import { usePatients } from '../hooks';
 import { createPatientHandler } from '../handlers';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
-import { ErrorState } from '../components/common/ErrorState';
-import { EmptyState } from '../components/common/EmptyState';
-import { SkeletonTable } from '../components/common/skeletons';
+import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormDatePicker, FormTextarea } from '../components/common';
 import { patientSchema, type PatientFormData } from '../validation';
 
 export function Patients() {
@@ -28,31 +27,48 @@ export function Patients() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<PatientFormData>({
+  const form = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
     defaultValues: EMPTY_PATIENT,
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
 
-  // Create handler
+  const { reset } = form;
+
+  // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: PatientFormData) => {
     setApiError('');
-    // Form validation to prevent 422 errors
-    if (!data.first_name || !data.last_name) {
-      setApiError('Please enter first and last name');
+
+    // Prevent double submission
+    if (form.formState.isSubmitting) {
       return;
     }
+
     try {
       await createPatientHandler(data);
+
+      toast.success('Patient created successfully', {
+        duration: 3000,
+        icon: '👤',
+      });
+
       reset();
       setShowForm(false);
       await refetch();
     } catch (err: any) {
-      setApiError(err?.message || 'Failed to create patient');
+      let errorMessage = 'Failed to create patient';
+
+      if (err?.detail) {
+        errorMessage = err.detail;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      setApiError(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 
@@ -126,75 +142,57 @@ export function Patients() {
 
           {/* Create Form */}
           {showForm && (
-            <form className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6" onSubmit={handleSubmit(onSubmit)}>
-              <h3 className="text-lg font-semibold text-gray-900">New Patient</h3>
-              {apiError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{apiError}</div>}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">First Name</label>
-                  <input
-                    {...register('first_name')}
-                    disabled={isSubmitting}
-                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                  />
-                  {errors.first_name && <span className="text-sm text-red-600">{errors.first_name.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
-                  <input
-                    {...register('last_name')}
-                    disabled={isSubmitting}
-                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                  />
-                  {errors.last_name && <span className="text-sm text-red-600">{errors.last_name.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <input
-                    type="email"
-                    {...register('email')}
-                    disabled={isSubmitting}
-                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                  />
-                  {errors.email && <span className="text-sm text-red-600">{errors.email.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <input
-                    {...register('phone')}
-                    disabled={isSubmitting}
-                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                  />
-                  {errors.phone && <span className="text-sm text-red-600">{errors.phone.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                  <input
-                    type="date"
-                    {...register('date_of_birth')}
-                    disabled={isSubmitting}
-                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                  />
-                  {errors.date_of_birth && <span className="text-sm text-red-600">{errors.date_of_birth.message}</span>}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Medical History</label>
-                <textarea
-                  {...register('medical_history')}
-                  rows={3}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-y"
-                />
-              </div>
-              <button
-                type="submit"
-                className="min-h-[44px] px-6 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
-                disabled={isSubmitting}
+            <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">New Patient</h3>
+              <FormWrapper
+                form={form}
+                onSubmit={onSubmit}
+                submitLabel="Create Patient"
+                loadingLabel="Creating..."
+                apiError={apiError}
               >
-                {isSubmitting ? 'Creating...' : 'Create Patient'}
-              </button>
-            </form>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <FormInput<PatientFormData>
+                    name="first_name"
+                    label="First Name"
+                    disabled={form.formState.isSubmitting}
+                    required
+                  />
+                  <FormInput<PatientFormData>
+                    name="last_name"
+                    label="Last Name"
+                    disabled={form.formState.isSubmitting}
+                    required
+                  />
+                  <FormInput<PatientFormData>
+                    name="email"
+                    label="Email"
+                    type="email"
+                    disabled={form.formState.isSubmitting}
+                    required
+                  />
+                  <FormInput<PatientFormData>
+                    name="phone"
+                    label="Phone"
+                    type="tel"
+                    disabled={form.formState.isSubmitting}
+                    required
+                  />
+                  <FormDatePicker<PatientFormData>
+                    name="date_of_birth"
+                    label="Date of Birth"
+                    disabled={form.formState.isSubmitting}
+                    required
+                  />
+                </div>
+                <FormTextarea<PatientFormData>
+                  name="medical_history"
+                  label="Medical History"
+                  rows={3}
+                  disabled={form.formState.isSubmitting}
+                />
+              </FormWrapper>
+            </div>
           )}
 
           {/* Table */}
