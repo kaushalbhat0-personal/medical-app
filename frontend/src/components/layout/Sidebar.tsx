@@ -33,10 +33,17 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
           </div>
         </div>
 
-        {/* Collapsed logo (icon only) */}
-        <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
-          <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
-            <span className="text-white text-sm font-bold">H</span>
+        {/* Collapsed logo (centered with tooltip) */}
+        <div className={`flex items-center justify-center flex-1 transition-all duration-300 ${isCollapsed ? 'opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
+          <div className="group relative">
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-xl shadow-sm">
+              <span className="text-white text-lg font-bold">HM</span>
+            </div>
+            {/* Tooltip for brand */}
+            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 top-1/2 -translate-y-1/2">
+              Hospital Management
+              <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+            </div>
           </div>
         </div>
 

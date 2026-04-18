@@ -11,18 +11,28 @@ interface MainLayoutProps {
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
+const SIDEBAR_USER_PREFERENCE_KEY = 'sidebar-user-preference';
+const MD_BREAKPOINT = 768;
+const LG_BREAKPOINT = 1024;
 
 export function MainLayout({ user, onLogout, children }: MainLayoutProps) {
   // Mobile drawer state
   const [mobileOpen, setMobileOpen] = useState(false);
   // Desktop collapse state
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Track if user has manually set a preference
+  const [hasUserPreference, setHasUserPreference] = useState(false);
 
   // Load collapse state from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    const userPref = localStorage.getItem(SIDEBAR_USER_PREFERENCE_KEY);
+
     if (saved !== null) {
       setIsCollapsed(saved === 'true');
+    }
+    if (userPref === 'true') {
+      setHasUserPreference(true);
     }
   }, []);
 
@@ -31,19 +41,43 @@ export function MainLayout({ user, onLogout, children }: MainLayoutProps) {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
   }, [isCollapsed]);
 
-  const toggleCollapse = useCallback(() => {
-    setIsCollapsed(prev => !prev);
-  }, []);
-
-  // Close mobile drawer on resize to desktop
+  // Auto-collapse based on screen size (unless user has manually set preference)
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
+      const width = window.innerWidth;
+
+      // Mobile: always reset drawer
+      if (width >= LG_BREAKPOINT) {
         setMobileOpen(false);
       }
+
+      // Auto-collapse logic (only if no user preference)
+      if (!hasUserPreference) {
+        if (width < LG_BREAKPOINT && width >= MD_BREAKPOINT) {
+          // Medium screens: auto collapse
+          setIsCollapsed(true);
+        } else if (width >= LG_BREAKPOINT) {
+          // Desktop: auto expand
+          setIsCollapsed(false);
+        }
+      }
     };
+
+    // Initial check
+    handleResize();
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, [hasUserPreference]);
+
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed(prev => {
+      const newValue = !prev;
+      // Mark that user has manually set preference
+      setHasUserPreference(true);
+      localStorage.setItem(SIDEBAR_USER_PREFERENCE_KEY, 'true');
+      return newValue;
+    });
   }, []);
 
   return (
