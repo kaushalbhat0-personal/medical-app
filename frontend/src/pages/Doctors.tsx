@@ -29,22 +29,24 @@ export function Doctors() {
           description="There are no doctors to display at the moment."
         />
       )}
-      <div className="page-header">
+      {/* Header */}
+      <div className="mb-6 sm:mb-8">
         {loading ? (
-          <>
-            <div className="h-8 bg-gray-200 rounded w-32 animate-pulse" />
-            <div className="h-4 bg-gray-200 rounded w-48 mt-2 animate-pulse" />
-          </>
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-200 rounded-xl w-32 animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded-lg w-48 animate-pulse" />
+          </div>
         ) : (
           <>
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Doctors</h1>
-            <p className="subtitle">Medical staff directory</p>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Doctors</h1>
+            <p className="text-sm sm:text-base text-gray-500 mt-1">Medical staff directory</p>
           </>
         )}
       </div>
 
+      {/* Grid */}
       {loading && (
-        <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -55,23 +57,26 @@ export function Doctors() {
       )}
 
       {!loading && (
-        <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {doctors.map((doctor) => (
-          <div key={doctor.id} className="doctor-card">
-            <div className="doctor-avatar">{formatDoctorInitials(doctor)}</div>
-            <div className="doctor-info">
-              <h3>{formatDoctorName(doctor)}</h3>
-              <p className="specialty">
-                {doctor.specialization || doctor.specialty || 'General'}
-              </p>
-              <p className="experience">
-                {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
-              </p>
-              <p className="email">{doctor.user?.email || ''}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {doctors.map((doctor) => (
+            <div
+              key={doctor.id}
+              className="flex items-start gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200"
+            >
+              <div className="doctor-avatar flex-shrink-0">{formatDoctorInitials(doctor)}</div>
+              <div className="flex-1 min-w-0 space-y-1">
+                <h3 className="font-semibold text-gray-900 truncate">{formatDoctorName(doctor)}</h3>
+                <p className="text-sm font-medium text-blue-600">
+                  {doctor.specialization || doctor.specialty || 'General'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
+                </p>
+                <p className="text-sm text-gray-400 truncate">{doctor.user?.email || ''}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -18,13 +18,13 @@ export function SkeletonCard({
 }: SkeletonCardProps) {
   return (
     <div
-      className={`flex items-center gap-4 p-5 bg-white border border-gray-200 rounded-xl shadow-sm ${className}`}
+      className={`flex items-center gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm ${className}`}
     >
       {showAvatar && <SkeletonAvatar size={avatarSize} animate={animate} />}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 space-y-2.5">
         <SkeletonText
           lines={lines}
-          lineHeight="h-4"
+          lineHeight="h-4 sm:h-5"
           width={['w-3/4', 'w-1/2', 'w-full']}
           animate={animate}
         />

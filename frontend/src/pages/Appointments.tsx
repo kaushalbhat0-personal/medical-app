@@ -82,23 +82,28 @@ export function Appointments() {
 
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Appointments</h1>
-          <p className="subtitle">Schedule and manage appointments</p>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Appointments</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Schedule and manage appointments</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            className={`btn-secondary ${hasActiveFilters ? 'active' : ''}`}
+            className={`min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 rounded-xl font-medium border transition-all duration-200 ${
+              hasActiveFilters
+                ? 'bg-blue-50 border-blue-500 text-blue-600'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+            } disabled:opacity-50`}
             onClick={() => setShowFilters(!showFilters)}
             disabled={loading || refetching}
           >
-            <Filter className="h-4 w-4 mr-1" />
+            <Filter className="h-4 w-4" />
             Filters {hasActiveFilters && '(Active)'}
           </button>
           <button
-            className="btn-primary"
+            className="min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
             onClick={() => setShowForm(!showForm)}
             disabled={loading || refetching}
           >
@@ -109,7 +114,7 @@ export function Appointments() {
 
       {isLoading && <GlobalLoader />}
       {refetching && (
-        <div className="text-sm text-gray-500 py-2 text-right">Updating...</div>
+        <div className="text-sm text-gray-500 py-2 text-right mb-4">Updating...</div>
       )}
 
       {error && (
@@ -129,14 +134,15 @@ export function Appointments() {
       )}
 
       {showFilters && (
-        <div className="filters-panel">
-          <div className="filters-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="filter-group">
-              <label>Doctor</label>
+        <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Doctor</label>
               <select
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(Number(e.target.value) || '')}
                 disabled={loading || refetching}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
               >
                 <option value="">All Doctors</option>
                 {doctors.map((d) => (
@@ -146,12 +152,13 @@ export function Appointments() {
                 ))}
               </select>
             </div>
-            <div className="filter-group">
-              <label>Status</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Status</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as AppointmentFilters['status'])}
                 disabled={loading || refetching}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
               >
                 <option value="">All Status</option>
                 <option value="scheduled">Scheduled</option>
@@ -160,19 +167,19 @@ export function Appointments() {
               </select>
             </div>
           </div>
-          <div className="filters-actions">
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
             <button
               type="button"
-              className="btn-text"
+              className="min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800 font-medium transition-colors duration-200 disabled:opacity-50"
               onClick={clearFilters}
               disabled={!hasActiveFilters || loading}
             >
-              <X className="h-4 w-4 mr-1" />
+              <X className="h-4 w-4" />
               Clear Filters
             </button>
             <button
               type="button"
-              className="btn-primary"
+              className="min-h-[44px] px-6 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
               onClick={refetch}
               disabled={loading || refetching}
             >
@@ -183,13 +190,17 @@ export function Appointments() {
       )}
 
       {showForm && (
-        <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
-          <h3>New Appointment</h3>
-          {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-group">
-              <label>Patient</label>
-              <select {...register('patient_id', { valueAsNumber: true })} disabled={isSubmitting}>
+        <form className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6 mb-6" onSubmit={handleSubmit(onSubmit)}>
+          <h3 className="text-lg font-semibold text-gray-900">New Appointment</h3>
+          {apiError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{apiError}</div>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Patient</label>
+              <select
+                {...register('patient_id', { valueAsNumber: true })}
+                disabled={isSubmitting}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
+              >
                 <option value="">Select patient</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -197,11 +208,15 @@ export function Appointments() {
                   </option>
                 ))}
               </select>
-              {errors.patient_id && <span className="field-error">{errors.patient_id.message}</span>}
+              {errors.patient_id && <span className="text-sm text-red-600">{errors.patient_id.message}</span>}
             </div>
-            <div className="form-group">
-              <label>Doctor</label>
-              <select {...register('doctor_id', { valueAsNumber: true })} disabled={isSubmitting}>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Doctor</label>
+              <select
+                {...register('doctor_id', { valueAsNumber: true })}
+                disabled={isSubmitting}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 bg-white"
+              >
                 <option value="">Select doctor</option>
                 {doctors.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -209,52 +224,68 @@ export function Appointments() {
                   </option>
                 ))}
               </select>
-              {errors.doctor_id && <span className="field-error">{errors.doctor_id.message}</span>}
+              {errors.doctor_id && <span className="text-sm text-red-600">{errors.doctor_id.message}</span>}
             </div>
-            <div className="form-group">
-              <label>Date & Time</label>
-              <input type="datetime-local" {...register('scheduled_at')} disabled={isSubmitting} />
-              {errors.scheduled_at && <span className="field-error">{errors.scheduled_at.message}</span>}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Date & Time</label>
+              <input
+                type="datetime-local"
+                {...register('scheduled_at')}
+                disabled={isSubmitting}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+              />
+              {errors.scheduled_at && <span className="text-sm text-red-600">{errors.scheduled_at.message}</span>}
             </div>
           </div>
-          <div className="form-group">
-            <label>Notes</label>
-            <textarea {...register('notes')} rows={2} disabled={isSubmitting} />
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea
+              {...register('notes')}
+              rows={2}
+              disabled={isSubmitting}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-y"
+            />
           </div>
-          <button type="submit" className="btn-primary" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="min-h-[44px] px-6 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Scheduling...' : 'Schedule Appointment'}
           </button>
         </form>
       )}
 
-      <div className="data-table overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Doctor</th>
-              <th>Date & Time</th>
-              <th>Status</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {appointments.map((apt) => {
-              const appointmentTime = apt.appointment_time || apt.scheduled_at;
-              return (
-                <tr key={apt.id}>
-                  <td>{formatPatientName(apt.patient)}</td>
-                  <td>{formatDoctorName(apt.doctor)}</td>
-                  <td>{formatDateTimeSafe(appointmentTime)}</td>
-                  <td>
-                    <span className={getStatusBadgeClass(apt.status)}>{apt.status}</span>
-                  </td>
-                  <td>{apt.notes || '-'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {appointments.map((apt) => {
+                const appointmentTime = apt.appointment_time || apt.scheduled_at;
+                return (
+                  <tr key={apt.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-gray-900">{formatPatientName(apt.patient)}</td>
+                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{formatDoctorName(apt.doctor)}</td>
+                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{formatDateTimeSafe(appointmentTime)}</td>
+                    <td className="px-4 sm:px-6 py-4 sm:py-5">
+                      <span className={getStatusBadgeClass(apt.status)}>{apt.status}</span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-500">{apt.notes || '-'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

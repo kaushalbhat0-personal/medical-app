@@ -78,109 +78,155 @@ export function Patients() {
           description="There are no patients to display at the moment."
         />
       )}
-      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
           {loading ? (
-            <>
-              <div className="h-8 bg-gray-200 rounded w-32 animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded w-48 mt-2 animate-pulse" />
-            </>
+            <div className="space-y-2">
+              <div className="h-8 bg-gray-200 rounded-xl w-32 animate-pulse" />
+              <div className="h-4 bg-gray-200 rounded-lg w-48 animate-pulse" />
+            </div>
           ) : (
             <>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Patients</h1>
-              <p className="subtitle">Manage patient records</p>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Patients</h1>
+              <p className="text-sm sm:text-base text-gray-500 mt-1">Manage patient records</p>
             </>
           )}
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 sm:w-auto"
+          onClick={() => setShowForm(!showForm)}
+        >
           {showForm ? 'Cancel' : '+ Add Patient'}
         </button>
       </div>
 
-      {loading && <SkeletonTable rows={5} columns={5} className="mt-4" />}
-
-      {!loading && (
-        <>
-      <div className="search-bar">
-        <input
-          type="text"
-          placeholder="Search patients..."
-          value={searchInput}
-          onChange={(e) => {
-            const value = e.target.value;
-            setSearchInput(value);
-            debouncedSearch(value);
-          }}
-          className="search-input"
-        />
-      </div>
-
-      {showForm && (
-        <form className="create-form" onSubmit={handleSubmit(onSubmit)}>
-          <h3>New Patient</h3>
-          {apiError && <div className="error-message">{apiError}</div>}
-          <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-group">
-              <label>First Name</label>
-              <input {...register('first_name')} disabled={isSubmitting} />
-              {errors.first_name && <span className="field-error">{errors.first_name.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Last Name</label>
-              <input {...register('last_name')} disabled={isSubmitting} />
-              {errors.last_name && <span className="field-error">{errors.last_name.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" {...register('email')} disabled={isSubmitting} />
-              {errors.email && <span className="field-error">{errors.email.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Phone</label>
-              <input {...register('phone')} disabled={isSubmitting} />
-              {errors.phone && <span className="field-error">{errors.phone.message}</span>}
-            </div>
-            <div className="form-group">
-              <label>Date of Birth</label>
-              <input type="date" {...register('date_of_birth')} disabled={isSubmitting} />
-              {errors.date_of_birth && <span className="field-error">{errors.date_of_birth.message}</span>}
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Medical History</label>
-            <textarea {...register('medical_history')} rows={3} disabled={isSubmitting} />
-          </div>
-          <button type="submit" className="btn-primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Patient'}
-          </button>
-        </form>
+      {loading && (
+        <div className="mb-6">
+          <SkeletonTable rows={5} columns={5} />
+        </div>
       )}
 
-      <div className="data-table overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>DOB / Age</th>
-              <th>Registered</th>
-            </tr>
-          </thead>
-          <tbody>
-            {safePatients.map((patient) => (
-              <tr key={patient?.id || Math.random()}>
-                <td><strong>{formatPatientName(patient)}</strong></td>
-                <td>{patient?.email || '-'}</td>
-                <td>{patient?.phone || '-'}</td>
-                <td>{formatPatientDobOrAge(patient)}</td>
-                <td>{formatDateSafe(patient?.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-        </>
+      {!loading && (
+        <div className="space-y-6">
+          {/* Search */}
+          <div className="max-w-md">
+            <input
+              type="text"
+              placeholder="Search patients..."
+              value={searchInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                debouncedSearch(value);
+              }}
+              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+            />
+          </div>
+
+          {/* Create Form */}
+          {showForm && (
+            <form className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6" onSubmit={handleSubmit(onSubmit)}>
+              <h3 className="text-lg font-semibold text-gray-900">New Patient</h3>
+              {apiError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{apiError}</div>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">First Name</label>
+                  <input
+                    {...register('first_name')}
+                    disabled={isSubmitting}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                  />
+                  {errors.first_name && <span className="text-sm text-red-600">{errors.first_name.message}</span>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                  <input
+                    {...register('last_name')}
+                    disabled={isSubmitting}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                  />
+                  {errors.last_name && <span className="text-sm text-red-600">{errors.last_name.message}</span>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    {...register('email')}
+                    disabled={isSubmitting}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                  />
+                  {errors.email && <span className="text-sm text-red-600">{errors.email.message}</span>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    {...register('phone')}
+                    disabled={isSubmitting}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                  />
+                  {errors.phone && <span className="text-sm text-red-600">{errors.phone.message}</span>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <input
+                    type="date"
+                    {...register('date_of_birth')}
+                    disabled={isSubmitting}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                  />
+                  {errors.date_of_birth && <span className="text-sm text-red-600">{errors.date_of_birth.message}</span>}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Medical History</label>
+                <textarea
+                  {...register('medical_history')}
+                  rows={3}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-y"
+                />
+              </div>
+              <button
+                type="submit"
+                className="min-h-[44px] px-6 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Creating...' : 'Create Patient'}
+              </button>
+            </form>
+          )}
+
+          {/* Table */}
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">DOB / Age</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registered</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {safePatients.map((patient) => (
+                    <tr key={patient?.id || Math.random()} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 sm:px-6 py-4 sm:py-5">
+                        <span className="font-semibold text-gray-900">{formatPatientName(patient)}</span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{patient?.email || '-'}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{patient?.phone || '-'}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{formatPatientDobOrAge(patient)}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-500">{formatDateSafe(patient?.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

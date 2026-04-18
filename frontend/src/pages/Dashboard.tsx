@@ -27,12 +27,13 @@ export function Dashboard() {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
+          className="space-y-6 sm:space-y-8"
         >
-          <div className="page-header">
-            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-            <div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-200 rounded-xl w-48 animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded-lg w-64 animate-pulse" />
           </div>
-          <div className="stats-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -59,102 +60,116 @@ export function Dashboard() {
 
       {!error && !showSkeletons && (
         <FadeContent show={!showSkeletons}>
-          <div className="page-header">
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Dashboard</h1>
-            <p className="subtitle">Overview of your hospital's performance</p>
-          </div>
-
-          <motion.div
-            className="stats-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-            variants={staggerContainer}
-            initial="initial"
-            animate="animate"
-          >
-            <motion.div className="stat-card" variants={staggerItem}>
-              <div className="stat-icon">👤</div>
-              <div className="stat-content">
-                <h3>Total Patients</h3>
-                <p className="stat-value">
-                  {(stats?.total_patients ?? 0).toLocaleString()}
-                </p>
-                <span className="stat-label">Registered patients</span>
-              </div>
-            </motion.div>
-
-            <motion.div className="stat-card" variants={staggerItem}>
-              <div className="stat-icon">👨‍⚕️</div>
-              <div className="stat-content">
-                <h3>Total Doctors</h3>
-                <p className="stat-value">
-                  {(stats?.total_doctors ?? 0).toLocaleString()}
-                </p>
-                <span className="stat-label">Available doctors</span>
-              </div>
-            </motion.div>
-
-            <motion.div className="stat-card" variants={staggerItem}>
-              <div className="stat-icon">📅</div>
-              <div className="stat-content">
-                <h3>Today's Appointments</h3>
-                <p className="stat-value">
-                  {stats?.today_appointments ?? 0}
-                </p>
-                <span className="stat-label">{new Date().toLocaleDateString()}</span>
-              </div>
-            </motion.div>
-
-            <motion.div className="stat-card" variants={staggerItem}>
-              <div className="stat-icon">💰</div>
-              <div className="stat-content">
-                <h3>Total Revenue</h3>
-                <p className="stat-value">
-                  ${(stats?.total_revenue ?? 0).toLocaleString()}
-                </p>
-                <span className="stat-label">All time revenue</span>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            className="quick-actions"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <h2>Quick Actions</h2>
-            <div className="action-buttons flex flex-col sm:flex-row gap-2">
-              <motion.a
-                href="/patients/new"
-                className="action-btn"
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-              >
-                <span>👤</span>
-                Add Patient
-              </motion.a>
-              <motion.a
-                href="/appointments/new"
-                className="action-btn"
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-              >
-                <span>📅</span>
-                New Appointment
-              </motion.a>
-              <motion.a
-                href="/billing/new"
-                className="action-btn"
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-              >
-                <span>🧾</span>
-                Create Bill
-              </motion.a>
+          <div className="space-y-6 sm:space-y-8">
+            {/* Header */}
+            <div className="mb-6 sm:mb-8">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Dashboard</h1>
+              <p className="text-sm sm:text-base text-gray-500 mt-1">Overview of your hospital's performance</p>
             </div>
-          </motion.div>
+
+            {/* Stats Grid */}
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
+              <motion.div
+                className="flex items-center gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                variants={staggerItem}
+              >
+                <div className="stat-icon">👤</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-500">Total Patients</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                    {(stats?.total_patients ?? 0).toLocaleString()}
+                  </p>
+                  <span className="text-xs sm:text-sm text-gray-400">Registered patients</span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                className="flex items-center gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                variants={staggerItem}
+              >
+                <div className="stat-icon">👨‍⚕️</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-500">Total Doctors</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                    {(stats?.total_doctors ?? 0).toLocaleString()}
+                  </p>
+                  <span className="text-xs sm:text-sm text-gray-400">Available doctors</span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                className="flex items-center gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                variants={staggerItem}
+              >
+                <div className="stat-icon">📅</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-500">Today's Appointments</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                    {stats?.today_appointments ?? 0}
+                  </p>
+                  <span className="text-xs sm:text-sm text-gray-400">{new Date().toLocaleDateString()}</span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                className="flex items-center gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                variants={staggerItem}
+              >
+                <div className="stat-icon">💰</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-500">Total Revenue</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                    ${(stats?.total_revenue ?? 0).toLocaleString()}
+                  </p>
+                  <span className="text-xs sm:text-sm text-gray-400">All time revenue</span>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="pt-2"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <motion.a
+                  href="/patients/new"
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-lg">👤</span>
+                  Add Patient
+                </motion.a>
+                <motion.a
+                  href="/appointments/new"
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-lg">📅</span>
+                  New Appointment
+                </motion.a>
+                <motion.a
+                  href="/billing/new"
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-lg">🧾</span>
+                  Create Bill
+                </motion.a>
+              </div>
+            </motion.div>
+          </div>
         </FadeContent>
       )}
     </div>

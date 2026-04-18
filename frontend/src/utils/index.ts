@@ -26,3 +26,6 @@ export {
   getInitials,
   formatDoctorInitials,
 } from './data';
+
+// Layout utilities for consistent spacing
+export { layout, spacing } from './layout';
