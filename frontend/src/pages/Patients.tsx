@@ -8,7 +8,7 @@ import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { SkeletonTable } from '../components/common/skeletons';
 import { patientSchema, type PatientFormData } from '../validation';
 
 export function Patients() {
@@ -57,16 +57,11 @@ export function Patients() {
   };
 
   // Safe rendering guards - only show empty after loading completes
-  const isLoading = loading;
   const safePatients = Array.isArray(patients) ? patients : [];
   const isEmpty = !loading && safePatients.length === 0;
 
-  // Debug log
-  console.log('PATIENTS:', patients);
-
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState
@@ -85,14 +80,27 @@ export function Patients() {
       )}
       <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
         <div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Patients</h1>
-          <p className="subtitle">Manage patient records</p>
+          {loading ? (
+            <>
+              <div className="h-8 bg-gray-200 rounded w-32 animate-pulse" />
+              <div className="h-4 bg-gray-200 rounded w-48 mt-2 animate-pulse" />
+            </>
+          ) : (
+            <>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Patients</h1>
+              <p className="subtitle">Manage patient records</p>
+            </>
+          )}
         </div>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : '+ Add Patient'}
         </button>
       </div>
 
+      {loading && <SkeletonTable rows={5} columns={5} className="mt-4" />}
+
+      {!loading && (
+        <>
       <div className="search-bar">
         <input
           type="text"
@@ -160,7 +168,7 @@ export function Patients() {
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(patients) && patients.map((patient) => (
+            {safePatients.map((patient) => (
               <tr key={patient?.id || Math.random()}>
                 <td><strong>{formatPatientName(patient)}</strong></td>
                 <td>{patient?.email || '-'}</td>
@@ -172,6 +180,8 @@ export function Patients() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </div>
   );
 }

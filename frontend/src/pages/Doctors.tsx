@@ -2,19 +2,17 @@ import { useDoctors } from '../hooks';
 import { formatDoctorName, formatDoctorInitials } from '../utils';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { SkeletonCard } from '../components/common/skeletons';
 
 export function Doctors() {
   // Data fetching via hook
   const { doctors, loading, error, refetch } = useDoctors();
 
   // Safe rendering guards - only show empty after loading completes
-  const isLoading = loading;
   const isEmpty = !loading && doctors.length === 0;
 
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {isLoading && <GlobalLoader />}
 
       {error && (
         <ErrorState
@@ -32,11 +30,32 @@ export function Doctors() {
         />
       )}
       <div className="page-header">
-        <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Doctors</h1>
-        <p className="subtitle">Medical staff directory</p>
+        {loading ? (
+          <>
+            <div className="h-8 bg-gray-200 rounded w-32 animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-48 mt-2 animate-pulse" />
+          </>
+        ) : (
+          <>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Doctors</h1>
+            <p className="subtitle">Medical staff directory</p>
+          </>
+        )}
       </div>
 
-      <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {loading && (
+        <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      )}
+
+      {!loading && (
+        <div className="doctors-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {doctors.map((doctor) => (
           <div key={doctor.id} className="doctor-card">
             <div className="doctor-avatar">{formatDoctorInitials(doctor)}</div>
@@ -53,6 +72,7 @@ export function Doctors() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

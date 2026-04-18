@@ -1,15 +1,15 @@
 import { useDashboard } from '../hooks';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import { GlobalLoader } from '../components/common/GlobalLoader';
+import { SkeletonCard } from '../components/common/skeletons';
 
 export function Dashboard() {
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
 
-  // Show loader only during initial data fetch (when still loading and no valid data yet)
+  // Show skeletons only during initial data fetch (when still loading and no valid data yet)
   // Prevents flicker by checking loading state first
-  const showLoader = loading && !error;
+  const showSkeletons = loading && !error;
 
   // Empty state: data loaded successfully but all counts are zero
   const isEmpty =
@@ -20,7 +20,20 @@ export function Dashboard() {
 
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {showLoader && <GlobalLoader />}
+      {showSkeletons && (
+        <>
+          <div className="page-header">
+            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse" />
+          </div>
+          <div className="stats-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </>
+      )}
 
       {error && (
         <ErrorState
@@ -38,7 +51,7 @@ export function Dashboard() {
         />
       )}
 
-      {!error && !loading && (
+      {!error && !showSkeletons && (
         <>
           <div className="page-header">
             <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Dashboard</h1>
