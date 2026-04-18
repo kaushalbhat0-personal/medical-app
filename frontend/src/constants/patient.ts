@@ -9,12 +9,10 @@ export const PATIENT_DEFAULT_PARAMS = {
 };
 
 export const EMPTY_PATIENT = {
-  first_name: '',
-  last_name: '',
-  email: '',
+  name: '',
+  age: '' as unknown as number,
+  gender: '',
   phone: '',
-  date_of_birth: '',
-  medical_history: '',
 };
 
 export const PATIENT_TABLE_COLUMNS = [

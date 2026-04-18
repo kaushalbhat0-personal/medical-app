@@ -9,8 +9,8 @@ export const APPOINTMENT_DEFAULT_PARAMS = {
 };
 
 export const EMPTY_APPOINTMENT = {
-  patient_id: undefined as number | undefined,
-  doctor_id: undefined as number | undefined,
+  patient_id: '' as unknown as number,
+  doctor_id: '' as unknown as number,
   scheduled_at: '',
   notes: '',
 };

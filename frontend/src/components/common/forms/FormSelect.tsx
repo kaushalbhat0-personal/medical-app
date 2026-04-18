@@ -16,9 +16,6 @@ export function FormSelect<TFieldValues extends Record<string, unknown>>({
 
   const error = errors[name];
 
-  // Check if options contain numeric values
-  const hasNumericValues = options.some((opt) => typeof opt.value === 'number');
-
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-700">
@@ -26,7 +23,7 @@ export function FormSelect<TFieldValues extends Record<string, unknown>>({
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <select
-        {...register(name, hasNumericValues ? { valueAsNumber: true } : undefined)}
+        {...register(name)}
         disabled={disabled}
         className={`w-full min-h-[44px] px-4 py-2.5 rounded-xl border transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 bg-white ${
           error

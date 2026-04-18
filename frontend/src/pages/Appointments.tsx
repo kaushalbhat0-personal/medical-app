@@ -54,6 +54,7 @@ export function Appointments() {
 
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
+    console.log('Submitting:', data);
     // Clear any previous API error
     setApiError('');
 

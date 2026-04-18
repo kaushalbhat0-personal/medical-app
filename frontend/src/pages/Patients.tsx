@@ -7,7 +7,7 @@ import { usePatients } from '../hooks';
 import { createPatientHandler } from '../handlers';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
-import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormDatePicker, FormTextarea } from '../components/common';
+import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect } from '../components/common';
 import { patientSchema, type PatientFormData } from '../validation';
 
 export function Patients() {
@@ -146,7 +146,7 @@ export function Patients() {
           {showForm && (
             <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">New Patient</h3>
-              <FormWrapper
+              <FormWrapper<PatientFormData>
                 form={form}
                 onSubmit={onSubmit}
                 submitLabel="Create Patient"
@@ -155,21 +155,27 @@ export function Patients() {
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <FormInput<PatientFormData>
-                    name="first_name"
-                    label="First Name"
+                    name="name"
+                    label="Full Name"
                     disabled={form.formState.isSubmitting}
                     required
                   />
                   <FormInput<PatientFormData>
-                    name="last_name"
-                    label="Last Name"
+                    name="age"
+                    label="Age"
+                    type="number"
                     disabled={form.formState.isSubmitting}
                     required
                   />
-                  <FormInput<PatientFormData>
-                    name="email"
-                    label="Email"
-                    type="email"
+                  <FormSelect<PatientFormData>
+                    name="gender"
+                    label="Gender"
+                    placeholder="Select gender"
+                    options={[
+                      { value: 'male', label: 'Male' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'other', label: 'Other' },
+                    ]}
                     disabled={form.formState.isSubmitting}
                     required
                   />
@@ -180,19 +186,7 @@ export function Patients() {
                     disabled={form.formState.isSubmitting}
                     required
                   />
-                  <FormDatePicker<PatientFormData>
-                    name="date_of_birth"
-                    label="Date of Birth"
-                    disabled={form.formState.isSubmitting}
-                    required
-                  />
                 </div>
-                <FormTextarea<PatientFormData>
-                  name="medical_history"
-                  label="Medical History"
-                  rows={3}
-                  disabled={form.formState.isSubmitting}
-                />
               </FormWrapper>
             </div>
           )}

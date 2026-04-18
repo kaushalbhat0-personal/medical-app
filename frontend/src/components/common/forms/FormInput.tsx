@@ -16,8 +16,11 @@ export function FormInput<TFieldValues extends Record<string, unknown>>({
 
   const error = errors[name];
 
-  // Always register as raw string — Zod schemas handle all coercion via z.any().transform()
-  const registerProps = register(name);
+  // number inputs use valueAsNumber so RHF passes a number to z.number() directly
+  // Select/other numeric fields use z.coerce.number() and stay as raw strings
+  const registerProps = type === 'number'
+    ? register(name, { valueAsNumber: true })
+    : register(name);
 
   return (
     <div className="space-y-2">
