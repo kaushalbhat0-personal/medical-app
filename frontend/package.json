@@ -13,6 +13,7 @@
     "@hookform/resolvers": "^5.2.2",
     "axios": "^1.15.0",
     "dayjs": "^1.11.13",
+    "framer-motion": "^12.38.0",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.468.0",
     "react": "^19.2.4",

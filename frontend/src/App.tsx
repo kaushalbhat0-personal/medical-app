@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './hooks/useAuth';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { AnimatedPage } from './animations';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Patients } from './pages/Patients';
@@ -10,12 +12,13 @@ import { Doctors } from './pages/Doctors';
 import { Appointments } from './pages/Appointments';
 import { Billing } from './pages/Billing';
 
-function App() {
+function AnimatedRoutes() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const location = useLocation();
 
   return (
-    <BrowserRouter>
-      <Routes>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
         <Route 
           path="/login" 
           element={
@@ -28,7 +31,9 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <MainLayout user={user} onLogout={logout}>
-                <Dashboard />
+                <AnimatedPage>
+                  <Dashboard />
+                </AnimatedPage>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -39,7 +44,9 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <MainLayout user={user} onLogout={logout}>
-                <Patients />
+                <AnimatedPage>
+                  <Patients />
+                </AnimatedPage>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -50,7 +57,9 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <MainLayout user={user} onLogout={logout}>
-                <Doctors />
+                <AnimatedPage>
+                  <Doctors />
+                </AnimatedPage>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -61,7 +70,9 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <MainLayout user={user} onLogout={logout}>
-                <Appointments />
+                <AnimatedPage>
+                  <Appointments />
+                </AnimatedPage>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -72,7 +83,9 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <MainLayout user={user} onLogout={logout}>
-                <Billing />
+                <AnimatedPage>
+                  <Billing />
+                </AnimatedPage>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -80,6 +93,14 @@ function App() {
         
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+    </AnimatePresence>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AnimatedRoutes />
       <Toaster 
         position="top-right"
         toastOptions={{

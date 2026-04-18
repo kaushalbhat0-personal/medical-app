@@ -1099,3 +1099,285 @@ button {
     font-size: 1.25rem;
   }
 }
+
+/* ============================================
+   MICRO-INTERACTIONS & ENHANCED ANIMATIONS
+   ============================================ */
+
+/* Button micro-interactions */
+.btn-primary,
+.btn-secondary,
+.btn-text,
+.action-btn,
+.login-btn,
+.logout-btn {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-text:hover,
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-text:active,
+.action-btn:active,
+.login-btn:active,
+.logout-btn:active {
+  transform: scale(0.98) translateY(0);
+  transition: transform 0.1s ease;
+}
+
+/* Card hover effects */
+.stat-card,
+.doctor-card,
+.news-item {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+              0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.doctor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08),
+              0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+.news-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+}
+
+/* Sidebar navigation animations */
+.nav-link {
+  position: relative;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              padding-left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  background: var(--primary);
+  border-radius: 0 2px 2px 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  padding-left: 1.75rem;
+}
+
+.nav-link.active::before {
+  transform: translateY(-50%) scaleY(1);
+}
+
+.nav-link.active {
+  background: rgba(37, 99, 235, 0.15);
+}
+
+/* Table row hover */
+.data-table tbody tr {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.data-table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+/* Form input focus transitions */
+input,
+select,
+textarea,
+.search-input {
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.1s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.search-input:focus {
+  transform: translateY(-1px);
+}
+
+/* Icon buttons */
+.icon-btn {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.15s ease;
+}
+
+.icon-btn:hover {
+  transform: scale(1.05);
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+/* Status badges */
+.status-badge {
+  transition: transform 0.15s ease,
+              box-shadow 0.2s ease;
+}
+
+.status-badge:hover {
+  transform: scale(1.02);
+}
+
+/* Action buttons in quick actions */
+.action-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.2);
+}
+
+.action-btn span {
+  transition: transform 0.2s ease;
+}
+
+.action-btn:hover span {
+  transform: scale(1.1);
+}
+
+/* Smooth page container */
+.page-container {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading transition */
+.skeleton {
+  transition: opacity 0.2s ease;
+}
+
+/* Error and empty states */
+.error-state,
+.empty-state {
+  animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* User avatar hover */
+.user-avatar,
+.doctor-avatar {
+  transition: transform 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.user-avatar:hover,
+.doctor-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Focus visible for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* News items stagger animation helper */
+.news-list .news-item {
+  animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.news-list .news-item:nth-child(1) { animation-delay: 0.05s; }
+.news-list .news-item:nth-child(2) { animation-delay: 0.1s; }
+.news-list .news-item:nth-child(3) { animation-delay: 0.15s; }
+.news-list .news-item:nth-child(4) { animation-delay: 0.2s; }
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Stats grid cards stagger */
+.stats-grid .stat-card {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.stats-grid .stat-card:nth-child(1) { animation-delay: 0.05s; }
+.stats-grid .stat-card:nth-child(2) { animation-delay: 0.1s; }
+.stats-grid .stat-card:nth-child(3) { animation-delay: 0.15s; }
+.stats-grid .stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
