@@ -61,6 +61,10 @@ export function Patients() {
       return;
     }
 
+    if (import.meta.env.DEV) {
+      console.log('[Patients.onSubmit] Submitting:', data);
+    }
+
     try {
       await createPatientHandler(data);
 
@@ -71,10 +75,21 @@ export function Patients() {
 
       reset();
       setShowForm(false);
-      await refetch().catch((err) => {
-        console.error('Refetch failed:', err);
-      });
+
+      // Refetch to update UI
+      if (import.meta.env.DEV) {
+        console.log('[Patients.onSubmit] Refetching data...');
+      }
+      await refetch();
+
+      if (import.meta.env.DEV) {
+        console.log('[Patients.onSubmit] Success - form reset and data refreshed');
+      }
     } catch (err: any) {
+      if (import.meta.env.DEV) {
+        console.error('[Patients.onSubmit] Error:', err);
+      }
+
       let errorMessage = 'Failed to create patient';
 
       if (err?.detail) {

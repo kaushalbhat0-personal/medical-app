@@ -70,13 +70,16 @@ export function Appointments() {
 
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
-    console.log('Submitting:', data);
     // Clear any previous API error
     setApiError('');
 
     // Prevent submission if already submitting (double-click protection)
     if (form.formState.isSubmitting) {
       return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('[Appointments.onSubmit] Submitting:', data);
     }
 
     try {
@@ -90,10 +93,20 @@ export function Appointments() {
 
       reset();
       setShowForm(false);
-      await refetch().catch((err) => {
-        console.error('Refetch failed:', err);
-      });
+
+      if (import.meta.env.DEV) {
+        console.log('[Appointments.onSubmit] Refetching data...');
+      }
+      await refetch();
+
+      if (import.meta.env.DEV) {
+        console.log('[Appointments.onSubmit] Success - form reset and data refreshed');
+      }
     } catch (err: any) {
+      if (import.meta.env.DEV) {
+        console.error('[Appointments.onSubmit] Error:', err);
+      }
+
       // Handle different error types
       let errorMessage = 'Failed to create appointment';
 

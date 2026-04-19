@@ -51,6 +51,10 @@ export function Billing() {
       return;
     }
 
+    if (import.meta.env.DEV) {
+      console.log('[Billing.onSubmit] Submitting:', data);
+    }
+
     try {
       await createBillHandler(data);
 
@@ -61,10 +65,20 @@ export function Billing() {
 
       reset();
       setShowForm(false);
-      await refetch().catch((err) => {
-        console.error('Refetch failed:', err);
-      });
+
+      if (import.meta.env.DEV) {
+        console.log('[Billing.onSubmit] Refetching data...');
+      }
+      await refetch();
+
+      if (import.meta.env.DEV) {
+        console.log('[Billing.onSubmit] Success - form reset and data refreshed');
+      }
     } catch (err: any) {
+      if (import.meta.env.DEV) {
+        console.error('[Billing.onSubmit] Error:', err);
+      }
+
       let errorMessage = 'Failed to create bill';
 
       if (err?.detail) {
