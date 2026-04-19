@@ -48,11 +48,14 @@ export const fetchAppointmentDataHandler = async (
 export const createAppointmentHandler = async (
   data: AppointmentFormData
 ): Promise<void> => {
+  // Convert datetime-local to ISO format for API
+  const scheduledDate = new Date(data.scheduled_at);
+
   // Ensure proper data types and format for API
   const payload = {
     patient_id: Number(data.patient_id),
     doctor_id: Number(data.doctor_id),
-    scheduled_at: data.scheduled_at, // ISO format from datetime-local input
+    scheduled_at: scheduledDate.toISOString(),
     notes: data.notes || undefined,
   };
 

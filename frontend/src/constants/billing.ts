@@ -9,8 +9,8 @@ export const BILLING_DEFAULT_PARAMS = {
 };
 
 export const EMPTY_BILL = {
-  patient_id: 0,
-  amount: 0,
+  patient_id: '',
+  amount: '',
   currency: 'INR' as const,
   description: '',
   due_date: '',

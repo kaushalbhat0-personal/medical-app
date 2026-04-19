@@ -33,13 +33,17 @@ export const fetchBillingDataHandler = async (): Promise<BillingDataResult> => {
  * Create a new bill
  */
 export const createBillHandler = async (data: BillingFormData): Promise<void> => {
+  // Convert date to ISO format for API (or keep as YYYY-MM-DD based on API expectations)
+  // For due_date, typically APIs expect YYYY-MM-DD or full ISO string
+  const dueDate = new Date(data.due_date);
+
   // Ensure proper data types and format for API
   const payload = {
     patient_id: Number(data.patient_id),
     amount: Number(data.amount),
     currency: data.currency,
     description: data.description,
-    due_date: data.due_date,
+    due_date: dueDate.toISOString().split('T')[0], // YYYY-MM-DD format
   };
 
   if (import.meta.env.DEV) {

@@ -159,7 +159,7 @@ export function Billing() {
                 label="Patient"
                 placeholder="Select patient"
                 options={patients.map((p) => ({
-                  value: p.id,
+                  value: String(p.id),
                   label: formatPatientName(p),
                 }))}
                 disabled={form.formState.isSubmitting}

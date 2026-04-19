@@ -249,7 +249,7 @@ export function Appointments() {
                 label="Patient"
                 placeholder="Select patient"
                 options={patients.map((p) => ({
-                  value: p.id,
+                  value: String(p.id),
                   label: formatPatientName(p),
                 }))}
                 disabled={form.formState.isSubmitting}
@@ -260,7 +260,7 @@ export function Appointments() {
                 label="Doctor"
                 placeholder="Select doctor"
                 options={doctors.map((d) => ({
-                  value: d.id,
+                  value: String(d.id),
                   label: `${formatDoctorName(d)} - ${d.specialization || d.specialty || 'General'}`,
                 }))}
                 disabled={form.formState.isSubmitting}
