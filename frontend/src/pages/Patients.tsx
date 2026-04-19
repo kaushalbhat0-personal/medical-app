@@ -52,18 +52,26 @@ export function Patients() {
 
   const { reset } = form;
 
+  // Debug: Log form errors whenever they change
+  if (import.meta.env.DEV) {
+    const errors = form.formState.errors;
+    if (Object.keys(errors).length > 0) {
+      console.log('[Patients] Form errors:', errors);
+    }
+  }
+
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: PatientFormData) => {
+    console.log('SUBMIT TRIGGERED - Patients form');
     setApiError('');
 
     // Prevent double submission
     if (form.formState.isSubmitting) {
+      console.log('SUBMIT BLOCKED - already submitting');
       return;
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[Patients.onSubmit] Submitting:', data);
-    }
+    console.log('[Patients.onSubmit] Submitting:', data);
 
     try {
       await createPatientHandler(data);
@@ -82,13 +90,9 @@ export function Patients() {
       }
       await refetch();
 
-      if (import.meta.env.DEV) {
-        console.log('[Patients.onSubmit] Success - form reset and data refreshed');
-      }
+      console.log('[Patients.onSubmit] Success - form reset and data refreshed');
     } catch (err: any) {
-      if (import.meta.env.DEV) {
-        console.error('[Patients.onSubmit] Error:', err);
-      }
+      console.error('[Patients.onSubmit] Error:', err);
 
       let errorMessage = 'Failed to create patient';
 

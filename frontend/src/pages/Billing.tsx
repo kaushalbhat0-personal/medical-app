@@ -42,18 +42,26 @@ export function Billing() {
 
   const { reset } = form;
 
+  // Debug: Log form errors whenever they change
+  if (import.meta.env.DEV) {
+    const errors = form.formState.errors;
+    if (Object.keys(errors).length > 0) {
+      console.log('[Billing] Form errors:', errors);
+    }
+  }
+
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: BillingFormData) => {
+    console.log('SUBMIT TRIGGERED - Billing form');
     setApiError('');
 
     // Prevent double submission
     if (form.formState.isSubmitting) {
+      console.log('SUBMIT BLOCKED - already submitting');
       return;
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[Billing.onSubmit] Submitting:', data);
-    }
+    console.log('[Billing.onSubmit] Submitting:', data);
 
     try {
       await createBillHandler(data);
@@ -71,13 +79,9 @@ export function Billing() {
       }
       await refetch();
 
-      if (import.meta.env.DEV) {
-        console.log('[Billing.onSubmit] Success - form reset and data refreshed');
-      }
+      console.log('[Billing.onSubmit] Success - form reset and data refreshed');
     } catch (err: any) {
-      if (import.meta.env.DEV) {
-        console.error('[Billing.onSubmit] Error:', err);
-      }
+      console.error('[Billing.onSubmit] Error:', err);
 
       let errorMessage = 'Failed to create bill';
 

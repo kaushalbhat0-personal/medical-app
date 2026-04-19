@@ -68,19 +68,27 @@ export function Appointments() {
     setFilterStatus('');
   };
 
+  // Debug: Log form errors whenever they change
+  if (import.meta.env.DEV) {
+    const errors = form.formState.errors;
+    if (Object.keys(errors).length > 0) {
+      console.log('[Appointments] Form errors:', errors);
+    }
+  }
+
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
+    console.log('SUBMIT TRIGGERED - Appointments form');
     // Clear any previous API error
     setApiError('');
 
     // Prevent submission if already submitting (double-click protection)
     if (form.formState.isSubmitting) {
+      console.log('SUBMIT BLOCKED - already submitting');
       return;
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[Appointments.onSubmit] Submitting:', data);
-    }
+    console.log('[Appointments.onSubmit] Submitting:', data);
 
     try {
       await createAppointmentHandler(data);
@@ -99,13 +107,9 @@ export function Appointments() {
       }
       await refetch();
 
-      if (import.meta.env.DEV) {
-        console.log('[Appointments.onSubmit] Success - form reset and data refreshed');
-      }
+      console.log('[Appointments.onSubmit] Success - form reset and data refreshed');
     } catch (err: any) {
-      if (import.meta.env.DEV) {
-        console.error('[Appointments.onSubmit] Error:', err);
-      }
+      console.error('[Appointments.onSubmit] Error:', err);
 
       // Handle different error types
       let errorMessage = 'Failed to create appointment';

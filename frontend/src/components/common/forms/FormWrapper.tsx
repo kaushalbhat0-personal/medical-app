@@ -18,7 +18,10 @@ export function FormWrapper<TFieldValues extends Record<string, unknown>, TTrans
   return (
     <FormProvider {...form}>
       <form
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={(e) => {
+          console.log('FORM SUBMIT EVENT FIRED');
+          handleSubmit(onSubmit)(e);
+        }}
         className={`space-y-6 ${className}`}
       >
         {apiError && (
