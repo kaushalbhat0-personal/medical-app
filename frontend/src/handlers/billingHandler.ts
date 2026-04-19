@@ -33,7 +33,20 @@ export const fetchBillingDataHandler = async (): Promise<BillingDataResult> => {
  * Create a new bill
  */
 export const createBillHandler = async (data: BillingFormData): Promise<void> => {
-  await billingApi.create(data);
+  // Ensure proper data types and format for API
+  const payload = {
+    patient_id: Number(data.patient_id),
+    amount: Number(data.amount),
+    currency: data.currency,
+    description: data.description,
+    due_date: data.due_date,
+  };
+
+  if (import.meta.env.DEV) {
+    console.log('[createBillHandler] Payload:', payload);
+  }
+
+  await billingApi.create(payload);
 };
 
 /**

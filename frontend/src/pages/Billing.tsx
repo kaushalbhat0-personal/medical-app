@@ -7,7 +7,7 @@ import { createBillHandler, payBillHandler } from '../handlers';
 import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
-import { billingSchema, type BillingFormData } from '../validation';
+import { billingSchema, type BillingFormData, type BillingFormInput } from '../validation';
 
 export function Billing() {
   // Data fetching via hook
@@ -17,7 +17,7 @@ export function Billing() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const form = useForm({
+  const form = useForm<BillingFormInput, any, BillingFormData>({
     resolver: zodResolver(billingSchema),
     defaultValues: EMPTY_BILL,
     mode: 'onBlur',
@@ -130,7 +130,7 @@ export function Billing() {
       {showForm && (
         <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">New Bill</h3>
-          <FormWrapper<BillingFormData>
+          <FormWrapper<BillingFormInput, BillingFormData>
             form={form}
             onSubmit={onSubmit}
             submitLabel="Create Bill"
@@ -138,7 +138,7 @@ export function Billing() {
             apiError={apiError}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <FormSelect<BillingFormData>
+              <FormSelect<BillingFormInput>
                 name="patient_id"
                 label="Patient"
                 placeholder="Select patient"
@@ -149,14 +149,14 @@ export function Billing() {
                 disabled={form.formState.isSubmitting}
                 required
               />
-              <FormInput<BillingFormData>
+              <FormInput<BillingFormInput>
                 name="amount"
                 label="Amount"
                 type="number"
                 disabled={form.formState.isSubmitting}
                 required
               />
-              <FormSelect<BillingFormData>
+              <FormSelect<BillingFormInput>
                 name="currency"
                 label="Currency"
                 options={CURRENCIES.map((c) => ({
@@ -166,7 +166,7 @@ export function Billing() {
                 disabled={form.formState.isSubmitting}
                 required
               />
-              <FormInput<BillingFormData>
+              <FormInput<BillingFormInput>
                 name="due_date"
                 label="Due Date"
                 type="date"
@@ -174,7 +174,7 @@ export function Billing() {
                 required
               />
             </div>
-            <FormInput<BillingFormData>
+            <FormInput<BillingFormInput>
               name="description"
               label="Description"
               placeholder="Service description"

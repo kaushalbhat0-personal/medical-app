@@ -10,7 +10,7 @@ export const PATIENT_DEFAULT_PARAMS = {
 
 export const EMPTY_PATIENT = {
   name: '',
-  age: '' as unknown as number,
+  age: '',
   gender: '',
   phone: '',
 };

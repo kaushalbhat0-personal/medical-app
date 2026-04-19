@@ -59,10 +59,10 @@ export const useAuth = (): UseAuthReturn => {
         localStorage.setItem('token', response.access_token);
         setIsAuthenticated(true);
 
-        // Store user data safely
-        const userData = response.user || {};
+        // Store user data if provided, otherwise use minimal data
+        const userData = response.user || { email: credentials.email } as User;
         localStorage.setItem('user', JSON.stringify(userData));
-        setUser(userData as User);
+        setUser(userData);
 
         return { success: true };
       }

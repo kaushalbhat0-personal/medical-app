@@ -25,5 +25,17 @@ export const fetchPatientsHandler = async (search?: string): Promise<Patient[]> 
  * Create a new patient
  */
 export const createPatientHandler = async (data: PatientFormData): Promise<void> => {
-  await patientsApi.create(data);
-};
+  // Ensure proper data types and format for API
+  const payload = {
+    name: data.name,
+    age: Number(data.age),
+    gender: data.gender,
+    phone: data.phone,
+  };
+
+  if (import.meta.env.DEV) {
+    console.log('[createPatientHandler] Payload:', payload);
+  }
+
+  await patientsApi.create(payload);
+}

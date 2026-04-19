@@ -38,9 +38,9 @@ export interface FormDatePickerProps<TFieldValues extends FieldValues = FieldVal
   max?: string;
 }
 
-export interface FormWrapperProps<TFieldValues extends FieldValues = FieldValues> {
-  form: UseFormReturn<TFieldValues>;
-  onSubmit: (data: TFieldValues) => Promise<void> | void;
+export interface FormWrapperProps<TFieldValues extends FieldValues = FieldValues, TTransformedValues extends FieldValues = TFieldValues> {
+  form: UseFormReturn<TFieldValues, any, TTransformedValues>;
+  onSubmit: (data: TTransformedValues) => Promise<void> | void;
   children: ReactNode;
   submitLabel?: string;
   loadingLabel?: string;

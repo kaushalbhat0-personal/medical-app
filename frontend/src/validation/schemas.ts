@@ -33,7 +33,7 @@ export const patientSchema = z.object({
     .min(1, 'Name is required')
     .min(2, 'Name must be at least 2 characters')
     .max(255, 'Name must be less than 255 characters'),
-  age: z.number({ message: 'Age must be a valid number' }).int().min(0, 'Age must be 0 or greater').max(150, 'Age must be 150 or less'),
+  age: z.coerce.number({ message: 'Age must be a valid number' }).int().min(0, 'Age must be 0 or greater').max(150, 'Age must be 150 or less'),
   gender: z.string().min(1, 'Gender is required'),
   phone: z
     .string()
@@ -79,5 +79,8 @@ export const billingSchema = z.object({
 // Type exports
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type PatientFormData = z.infer<typeof patientSchema>;
+export type PatientFormInput = z.input<typeof patientSchema>;
 export type AppointmentFormData = z.infer<typeof appointmentSchema>;
+export type AppointmentFormInput = z.input<typeof appointmentSchema>;
 export type BillingFormData = z.infer<typeof billingSchema>;
+export type BillingFormInput = z.input<typeof billingSchema>;

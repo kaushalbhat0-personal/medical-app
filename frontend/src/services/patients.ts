@@ -3,12 +3,10 @@ import { safeArray } from '../utils';
 import type { Patient } from '../types';
 
 export interface CreatePatientData {
-  first_name: string;
-  last_name: string;
-  email: string;
+  name: string;
+  age: number;
+  gender: string;
   phone: string;
-  date_of_birth: string;
-  medical_history?: string;
 }
 
 export const patientsApi = {

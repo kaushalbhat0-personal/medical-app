@@ -8,7 +8,7 @@ import { createPatientHandler } from '../handlers';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
 import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect } from '../components/common';
-import { patientSchema, type PatientFormData } from '../validation';
+import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
 export function Patients() {
   // Search state with debounce
@@ -27,7 +27,7 @@ export function Patients() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const form = useForm<PatientFormData>({
+  const form = useForm<PatientFormInput, any, PatientFormData>({
     resolver: zodResolver(patientSchema),
     defaultValues: EMPTY_PATIENT,
     mode: 'onBlur',
@@ -146,7 +146,7 @@ export function Patients() {
           {showForm && (
             <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">New Patient</h3>
-              <FormWrapper<PatientFormData>
+              <FormWrapper<PatientFormInput, PatientFormData>
                 form={form}
                 onSubmit={onSubmit}
                 submitLabel="Create Patient"
@@ -154,20 +154,20 @@ export function Patients() {
                 apiError={apiError}
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  <FormInput<PatientFormData>
+                  <FormInput<PatientFormInput>
                     name="name"
                     label="Full Name"
                     disabled={form.formState.isSubmitting}
                     required
                   />
-                  <FormInput<PatientFormData>
+                  <FormInput<PatientFormInput>
                     name="age"
                     label="Age"
                     type="number"
                     disabled={form.formState.isSubmitting}
                     required
                   />
-                  <FormSelect<PatientFormData>
+                  <FormSelect<PatientFormInput>
                     name="gender"
                     label="Gender"
                     placeholder="Select gender"
@@ -179,7 +179,7 @@ export function Patients() {
                     disabled={form.formState.isSubmitting}
                     required
                   />
-                  <FormInput<PatientFormData>
+                  <FormInput<PatientFormInput>
                     name="phone"
                     label="Phone"
                     type="tel"

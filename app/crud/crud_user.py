@@ -12,7 +12,8 @@ def get_user(db: Session, user_id: UUID) -> User | None:
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    stmt = select(User).where(User.email == email)
+    # Case-insensitive email lookup
+    stmt = select(User).where(User.email.ilike(email))
     return db.scalars(stmt).first()
 
 

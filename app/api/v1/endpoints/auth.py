@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.schemas.auth import Token
-from app.schemas.user import UserCreate, UserLogin, UserResponse
+from app.schemas.user import UserCreate, UserResponse
 from app.services import auth_service
 
 router = APIRouter(tags=["auth"])
@@ -21,12 +22,12 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
     )
 
 
-@router.post("/login", response_model=Token)
-def login(payload: UserLogin, db: Session = Depends(get_db)) -> Token:
-    user = auth_service.authenticate_user(db, payload.email, payload.password)
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # OAuth2PasswordRequestForm uses 'username' field - treat as email
+    user = auth_service.authenticate_user(db, form_data.username, form_data.password)
     access_token = create_access_token({"sub": str(user.id), "type": "access"})
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user)
-    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }

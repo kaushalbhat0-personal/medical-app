@@ -1,7 +1,7 @@
 import { FormProvider } from 'react-hook-form';
 import type { FormWrapperProps } from './types';
 
-export function FormWrapper<TFieldValues extends Record<string, unknown>>({
+export function FormWrapper<TFieldValues extends Record<string, unknown>, TTransformedValues extends Record<string, unknown> = TFieldValues>({
   form,
   onSubmit,
   children,
@@ -9,7 +9,7 @@ export function FormWrapper<TFieldValues extends Record<string, unknown>>({
   loadingLabel = 'Submitting...',
   className = '',
   apiError,
-}: FormWrapperProps<TFieldValues>) {
+}: FormWrapperProps<TFieldValues, TTransformedValues>) {
   const {
     handleSubmit,
     formState: { isSubmitting },

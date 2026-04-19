@@ -48,5 +48,17 @@ export const fetchAppointmentDataHandler = async (
 export const createAppointmentHandler = async (
   data: AppointmentFormData
 ): Promise<void> => {
-  await appointmentsApi.create(data);
+  // Ensure proper data types and format for API
+  const payload = {
+    patient_id: Number(data.patient_id),
+    doctor_id: Number(data.doctor_id),
+    scheduled_at: data.scheduled_at, // ISO format from datetime-local input
+    notes: data.notes || undefined,
+  };
+
+  if (import.meta.env.DEV) {
+    console.log('[createAppointmentHandler] Payload:', payload);
+  }
+
+  await appointmentsApi.create(payload);
 };

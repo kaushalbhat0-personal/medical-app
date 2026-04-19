@@ -73,7 +73,7 @@ export interface LoginCredentials {
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  user: User;
+  user?: User;
 }
 
 export interface DashboardStats {

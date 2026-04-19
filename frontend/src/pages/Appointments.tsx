@@ -12,7 +12,7 @@ import {
   formatDateTimeSafe,
 } from '../utils';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea } from '../components/common';
-import { appointmentSchema, type AppointmentFormData } from '../validation';
+import { appointmentSchema, type AppointmentFormData, type AppointmentFormInput } from '../validation';
 
 export function Appointments() {
   // Filter states
@@ -36,7 +36,7 @@ export function Appointments() {
   const [showForm, setShowForm] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const form = useForm<AppointmentFormData>({
+  const form = useForm<AppointmentFormInput, any, AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: EMPTY_APPOINTMENT,
     mode: 'onBlur',
@@ -220,7 +220,7 @@ export function Appointments() {
       {showForm && (
         <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">New Appointment</h3>
-          <FormWrapper<AppointmentFormData>
+          <FormWrapper<AppointmentFormInput, AppointmentFormData>
             form={form}
             onSubmit={onSubmit}
             submitLabel="Schedule Appointment"
@@ -228,7 +228,7 @@ export function Appointments() {
             apiError={apiError}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <FormSelect<AppointmentFormData>
+              <FormSelect<AppointmentFormInput>
                 name="patient_id"
                 label="Patient"
                 placeholder="Select patient"
@@ -239,7 +239,7 @@ export function Appointments() {
                 disabled={form.formState.isSubmitting}
                 required
               />
-              <FormSelect<AppointmentFormData>
+              <FormSelect<AppointmentFormInput>
                 name="doctor_id"
                 label="Doctor"
                 placeholder="Select doctor"
@@ -250,7 +250,7 @@ export function Appointments() {
                 disabled={form.formState.isSubmitting}
                 required
               />
-              <FormInput<AppointmentFormData>
+              <FormInput<AppointmentFormInput>
                 name="scheduled_at"
                 label="Date & Time"
                 type="datetime-local"
@@ -258,7 +258,7 @@ export function Appointments() {
                 required
               />
             </div>
-            <FormTextarea<AppointmentFormData>
+            <FormTextarea<AppointmentFormInput>
               name="notes"
               label="Notes"
               rows={2}
