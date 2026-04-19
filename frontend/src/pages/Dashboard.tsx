@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../hooks';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
@@ -6,8 +7,15 @@ import { SkeletonCard } from '../components/common/skeletons';
 import { FadeContent, staggerContainer, staggerItem } from '../animations';
 
 export function Dashboard() {
+  const navigate = useNavigate();
+
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
+
+  // Quick action navigation handlers
+  const handleAddPatient = () => navigate('/patients', { state: { showForm: true } });
+  const handleNewAppointment = () => navigate('/appointments', { state: { showForm: true } });
+  const handleCreateBill = () => navigate('/billing', { state: { showForm: true } });
 
   // Show skeletons only during initial data fetch (when still loading and no valid data yet)
   // Prevents flicker by checking loading state first
@@ -140,33 +148,33 @@ export function Dashboard() {
             >
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <motion.a
-                  href="/patients/new"
-                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                <motion.button
+                  onClick={handleAddPatient}
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200 cursor-pointer"
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <span className="text-lg">👤</span>
                   Add Patient
-                </motion.a>
-                <motion.a
-                  href="/appointments/new"
-                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                </motion.button>
+                <motion.button
+                  onClick={handleNewAppointment}
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200 cursor-pointer"
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <span className="text-lg">📅</span>
                   New Appointment
-                </motion.a>
-                <motion.a
-                  href="/billing/new"
-                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                </motion.button>
+                <motion.button
+                  onClick={handleCreateBill}
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200 cursor-pointer"
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <span className="text-lg">🧾</span>
                   Create Bill
-                </motion.a>
+                </motion.button>
               </div>
             </motion.div>
           </div>

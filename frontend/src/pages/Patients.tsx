@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useLocation } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import toast from 'react-hot-toast';
 import { usePatients } from '../hooks';
@@ -11,6 +12,8 @@ import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSele
 import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
 export function Patients() {
+  const location = useLocation();
+
   // Search state with debounce
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -23,9 +26,22 @@ export function Patients() {
   // Data fetching via hook
   const { patients, loading, error, refetch } = usePatients(search);
 
-  // Form state
-  const [showForm, setShowForm] = useState(false);
+  // Form state - auto-show if navigated from Quick Actions
+  const [showForm, setShowForm] = useState(() => (location.state as { showForm?: boolean })?.showForm ?? false);
   const [apiError, setApiError] = useState('');
+
+  // Scroll to form when shown via Quick Actions
+  useEffect(() => {
+    if (showForm && (location.state as { showForm?: boolean })?.showForm) {
+      // Clear the state to prevent re-triggering on refresh
+      window.history.replaceState({}, document.title);
+      // Scroll to form with smooth animation
+      setTimeout(() => {
+        const formElement = document.getElementById('patient-form');
+        formElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [showForm, location.state]);
 
   const form = useForm<PatientFormInput, any, PatientFormData>({
     resolver: zodResolver(patientSchema),
@@ -144,7 +160,7 @@ export function Patients() {
 
           {/* Create Form */}
           {showForm && (
-            <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <div id="patient-form" className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">New Patient</h3>
               <FormWrapper<PatientFormInput, PatientFormData>
                 form={form}

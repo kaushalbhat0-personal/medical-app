@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useLocation } from 'react-router-dom';
 import { Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppointments, type AppointmentFilters } from '../hooks';
@@ -15,6 +16,8 @@ import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInpu
 import { appointmentSchema, type AppointmentFormData, type AppointmentFormInput } from '../validation';
 
 export function Appointments() {
+  const location = useLocation();
+
   // Filter states
   const [filterDoctor, setFilterDoctor] = useState<number | ''>('');
   const [filterStatus, setFilterStatus] = useState<AppointmentFilters['status'] | ''>('');
@@ -32,9 +35,22 @@ export function Appointments() {
   // Data fetching via hook
   const { appointments, patients, doctors, loading, refetching, error, refetch } = useAppointments(filters);
 
-  // Form state
-  const [showForm, setShowForm] = useState(false);
+  // Form state - auto-show if navigated from Quick Actions
+  const [showForm, setShowForm] = useState(() => (location.state as { showForm?: boolean })?.showForm ?? false);
   const [apiError, setApiError] = useState('');
+
+  // Scroll to form when shown via Quick Actions
+  useEffect(() => {
+    if (showForm && (location.state as { showForm?: boolean })?.showForm) {
+      // Clear the state to prevent re-triggering on refresh
+      window.history.replaceState({}, document.title);
+      // Scroll to form with smooth animation
+      setTimeout(() => {
+        const formElement = document.getElementById('appointment-form');
+        formElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [showForm, location.state]);
 
   const form = useForm<AppointmentFormInput, any, AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
@@ -218,7 +234,7 @@ export function Appointments() {
       )}
 
       {showForm && (
-        <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
+        <div id="appointment-form" className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">New Appointment</h3>
           <FormWrapper<AppointmentFormInput, AppointmentFormData>
             form={form}
