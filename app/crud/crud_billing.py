@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.billing import Billing, BillingEvent, BillingStatus
 
@@ -17,7 +17,11 @@ def create_bill(db: Session, billing_data: dict[str, Any]) -> Billing:
 
 
 def get_bill(db: Session, bill_id: UUID) -> Billing | None:
-    stmt = select(Billing).where(Billing.id == bill_id, Billing.is_deleted == False)
+    stmt = (
+        select(Billing)
+        .where(Billing.id == bill_id, Billing.is_deleted == False)
+        .options(joinedload(Billing.patient))
+    )
     return db.scalars(stmt).first()
 
 
@@ -47,7 +51,11 @@ def get_bills(
     created_by: UUID | None = None,
     include_deleted: bool = False,
 ) -> list[Billing]:
-    stmt = select(Billing).order_by(Billing.created_at.desc())
+    stmt = (
+        select(Billing)
+        .order_by(Billing.created_at.desc())
+        .options(joinedload(Billing.patient))
+    )
 
     if not include_deleted:
         stmt = stmt.where(Billing.is_deleted == False)
@@ -61,7 +69,7 @@ def get_bills(
         stmt = stmt.where(Billing.created_by == created_by)
 
     stmt = stmt.offset(skip).limit(limit)
-    return list(db.scalars(stmt).all())
+    return list(db.scalars(stmt).unique().all())
 
 
 def update_bill(

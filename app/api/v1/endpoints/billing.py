@@ -88,3 +88,20 @@ def get_pending_payments(
     current_user: User = Depends(get_current_user),
 ) -> dict[str, int | float]:
     return billing_service.get_pending_payments(db, current_user.id)
+
+
+@router.post("/{bill_id}/pay", response_model=BillingRead)
+def pay_bill(
+    bill_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BillingRead:
+    """Mark a bill as paid."""
+    from app.schemas.billing import BillingUpdate
+    from app.models.billing import BillingStatus
+
+    bill = billing_service.get_bill_or_404(db, bill_id)
+    billing_service.validate_ownership(bill, current_user.id)
+
+    update_data = BillingUpdate(status=BillingStatus.paid)
+    return billing_service.update_bill(db, bill_id, update_data, current_user.id)

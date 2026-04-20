@@ -77,7 +77,44 @@ def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
     appointment = crud_appointment.get_appointment(db, appointment_id)
     if appointment is None:
         raise NotFoundError("Appointment not found")
+
+    # Auto-update status if appointment time has passed
+    now = datetime.now(timezone.utc)
+    if (
+        appointment.status == AppointmentStatus.scheduled
+        and appointment.appointment_time < now
+    ):
+        appointment.status = AppointmentStatus.completed
+        db.add(appointment)
+        db.commit()
+        db.refresh(appointment)
+
     return appointment
+
+
+def _update_status_for_past_appointments(
+    db: Session,
+    appointments: list[Appointment],
+) -> list[Appointment]:
+    """Auto-update status to completed for past scheduled appointments."""
+    now = datetime.now(timezone.utc)
+    updated = []
+
+    for apt in appointments:
+        if (
+            apt.status == AppointmentStatus.scheduled
+            and apt.appointment_time < now
+        ):
+            apt.status = AppointmentStatus.completed
+            db.add(apt)
+            updated.append(apt)
+
+    if updated:
+        db.commit()
+        for apt in updated:
+            db.refresh(apt)
+
+    return appointments
 
 
 def get_appointments(
@@ -88,12 +125,13 @@ def get_appointments(
     patient_id: UUID | None = None,
     created_by: UUID | None = None,
 ) -> list[Appointment]:
-    return crud_appointment.get_appointments(
+    appointments = crud_appointment.get_appointments(
         db, skip=skip, limit=limit,
         doctor_id=doctor_id,
         patient_id=patient_id,
         created_by=created_by,
     )
+    return _update_status_for_past_appointments(db, appointments)
 
 
 def validate_ownership(appointment: Appointment, current_user_id: UUID) -> None:

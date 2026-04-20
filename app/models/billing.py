@@ -68,6 +68,10 @@ class Billing(Base):
         nullable=False,
         default="INR",
     )
+    description: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
     idempotency_key: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
