@@ -79,14 +79,7 @@ export function Appointments() {
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
     console.log('SUBMIT TRIGGERED - Appointments form');
-    // Clear any previous API error
     setApiError('');
-
-    // Prevent submission if already submitting (double-click protection)
-    if (form.formState.isSubmitting) {
-      console.log('SUBMIT BLOCKED - already submitting');
-      return;
-    }
 
     console.log('[Appointments.onSubmit] Submitting:', data);
 

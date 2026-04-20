@@ -65,12 +65,6 @@ export function Patients() {
     console.log('SUBMIT TRIGGERED - Patients form');
     setApiError('');
 
-    // Prevent double submission
-    if (form.formState.isSubmitting) {
-      console.log('SUBMIT BLOCKED - already submitting');
-      return;
-    }
-
     console.log('[Patients.onSubmit] Submitting:', data);
 
     try {

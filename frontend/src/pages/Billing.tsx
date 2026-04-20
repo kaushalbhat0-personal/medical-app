@@ -55,12 +55,6 @@ export function Billing() {
     console.log('SUBMIT TRIGGERED - Billing form');
     setApiError('');
 
-    // Prevent double submission
-    if (form.formState.isSubmitting) {
-      console.log('SUBMIT BLOCKED - already submitting');
-      return;
-    }
-
     console.log('[Billing.onSubmit] Submitting:', data);
 
     try {
