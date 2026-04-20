@@ -5,7 +5,7 @@ import type { Appointment } from '../types';
 export interface CreateAppointmentData {
   patient_id: number;
   doctor_id: number;
-  scheduled_at: string;
+  appointment_time: string;
   notes?: string;
 }
 

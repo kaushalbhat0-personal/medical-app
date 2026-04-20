@@ -55,7 +55,7 @@ export const createAppointmentHandler = async (
   const payload = {
     patient_id: Number(data.patient_id),
     doctor_id: Number(data.doctor_id),
-    scheduled_at: scheduledDate.toISOString(),
+    appointment_time: scheduledDate.toISOString(),
     notes: data.notes || undefined,
   };
 
