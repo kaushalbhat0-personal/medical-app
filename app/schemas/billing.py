@@ -9,15 +9,19 @@ from app.schemas.patient import PatientRead
 
 
 def _parse_date(v: str | datetime | None) -> datetime | None:
-    """Parse date from string (YYYY-MM-DD) or datetime object."""
+    """Parse date from string (YYYY-MM-DD, DD-MM-YYYY) or datetime object."""
     if v is None:
         return None
     if isinstance(v, datetime):
         return v
     if isinstance(v, str):
+        v = v.strip()
         # Handle YYYY-MM-DD format from frontend date input
         if len(v) == 10 and v[4] == '-' and v[7] == '-':
             return datetime.strptime(v, "%Y-%m-%d")
+        # Handle DD-MM-YYYY format (e.g., "20-04-2026")
+        if len(v) == 10 and v[2] == '-' and v[5] == '-':
+            return datetime.strptime(v, "%d-%m-%Y")
         # Try ISO format
         try:
             return datetime.fromisoformat(v.replace('Z', '+00:00'))
@@ -53,10 +57,11 @@ class BillingRead(BaseModel):
 
     id: UUID
     patient_id: UUID
-    appointment_id: UUID
+    appointment_id: UUID | None
     amount: Decimal
     status: BillingStatus
     description: str | None
+    due_date: datetime | None
     paid_at: datetime | None
     payment_id: str | None
     payment_method: str | None

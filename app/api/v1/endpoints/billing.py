@@ -19,7 +19,14 @@ def create_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BillingRead:
-    return billing_service.create_bill(db, payload, current_user.id)
+    print("[BILLING API] Incoming payload:", payload.model_dump())
+    try:
+        result = billing_service.create_bill(db, payload, current_user.id)
+        print("[BILLING API] Bill created successfully:", result.id)
+        return result
+    except Exception as e:
+        print("[BILLING API] ERROR:", str(e))
+        raise
 
 
 @router.get("", response_model=list[BillingRead])

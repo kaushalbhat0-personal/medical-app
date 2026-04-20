@@ -73,6 +73,10 @@ class Billing(Base):
         String(500),
         nullable=True,
     )
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     idempotency_key: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,

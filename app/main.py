@@ -84,9 +84,11 @@ def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
 @app.exception_handler(Exception)
 def handle_generic_exception(_: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception occurred")
+    # TEMP DEBUG: Return actual error details for troubleshooting
+    error_msg = str(exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred. Please try again later."},
+        content={"detail": f"Internal error: {error_msg}"},
     )
 
 
