@@ -9,7 +9,7 @@ import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
 import { billingSchema, type BillingFormData, type BillingFormInput } from '../validation';
-import type { Appointment } from '../types';
+import type { Appointment, Bill } from '../types';
 
 export function Billing() {
   const location = useLocation();
@@ -163,6 +163,16 @@ export function Billing() {
     return BILLING_STATUS_CLASSES[status] || 'status-badge';
   };
 
+  // Helper to get patient name from bill (uses nested patient or falls back to patients list)
+  const getPatientName = (bill: Bill): string => {
+    if (bill.patient) {
+      return formatPatientName(bill.patient);
+    }
+    // Fallback: look up patient from patients list
+    const patient = patients.find((p) => p.id === bill.patient_id);
+    return formatPatientName(patient);
+  };
+
   // Safe rendering guards - only show empty after loading completes
   const isLoading = loading;
   const isEmpty = !loading && bills.length === 0;
@@ -288,7 +298,7 @@ export function Billing() {
           <tbody>
             {bills.map((bill) => (
               <tr key={bill.id}>
-                <td>{formatPatientName(bill.patient)}</td>
+                <td>{getPatientName(bill)}</td>
                 <td>{bill.description || '-'}</td>
                 <td className="amount">{formatCurrency(bill.amount, bill.currency)}</td>
                 <td>{formatDateSafe(bill.due_date)}</td>
