@@ -40,7 +40,28 @@ export function Billing() {
     reValidateMode: 'onChange',
   });
 
-  const { reset } = form;
+  const { reset, watch, setValue } = form;
+
+  // Watch patient selection to filter appointments
+  const selectedPatientId = watch('patient_id');
+  const selectedAppointmentId = watch('appointment_id');
+
+  // Filter appointments by selected patient
+  const filteredAppointments = selectedPatientId
+    ? appointments.filter((a) => a.patient_id === selectedPatientId)
+    : appointments;
+
+  // Clear appointment when patient changes (if appointment doesn't belong to new patient)
+  useEffect(() => {
+    if (selectedPatientId && selectedAppointmentId) {
+      const appointmentStillValid = filteredAppointments.some(
+        (a) => a.id === selectedAppointmentId
+      );
+      if (!appointmentStillValid) {
+        setValue('appointment_id', '');
+      }
+    }
+  }, [selectedPatientId, selectedAppointmentId, filteredAppointments, setValue]);
 
   // Debug: Log form errors whenever they change
   if (import.meta.env.DEV) {
@@ -180,12 +201,12 @@ export function Billing() {
               <FormSelect<BillingFormInput>
                 name="appointment_id"
                 label="Appointment"
-                placeholder="Select appointment"
-                options={appointments.map((a) => ({
+                placeholder={selectedPatientId ? 'Select appointment' : 'Select patient first'}
+                options={filteredAppointments.map((a) => ({
                   value: a.id,
                   label: `${a.patient?.name || 'Unknown'} - ${a.scheduled_at || a.appointment_time || 'No date'}`,
                 }))}
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || !selectedPatientId}
                 required
               />
               <FormInput<BillingFormInput>

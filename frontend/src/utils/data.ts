@@ -109,10 +109,11 @@ export const formatPatientDobOrAge = (patient?: Patient | null): string => {
  * Format currency amount with symbol
  */
 export const formatCurrency = (
-  amount?: number | null,
+  amount?: number | string | null,
   currency = 'USD'
 ): string => {
-  const safeAmount = amount ?? 0;
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const safeAmount = Number(numericAmount ?? 0);
   return `$${safeAmount.toFixed(2)} ${currency}`;
 };
 
