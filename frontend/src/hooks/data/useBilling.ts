@@ -1,12 +1,11 @@
 import { useFetch } from './useFetch';
 import { fetchBillingDataHandler } from '../../handlers';
 import { safeArray } from '../../utils';
-import type { Bill, Patient, Appointment } from '../../types';
+import type { Bill, Patient } from '../../types';
 
 interface BillingData {
   bills: Bill[];
   patients: Patient[];
-  appointments: Appointment[];
 }
 
 export function useBilling() {
@@ -15,7 +14,6 @@ export function useBilling() {
   return {
     bills: safeArray<Bill>(data?.bills),
     patients: safeArray<Patient>(data?.patients),
-    appointments: safeArray<Appointment>(data?.appointments),
     loading,
     error,
     refetch,

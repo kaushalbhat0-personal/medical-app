@@ -4,21 +4,24 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useBilling } from '../hooks';
-import { createBillHandler, payBillHandler } from '../handlers';
+import { createBillHandler, payBillHandler, fetchPatientAppointmentsHandler } from '../handlers';
 import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
 import { billingSchema, type BillingFormData, type BillingFormInput } from '../validation';
+import type { Appointment } from '../types';
 
 export function Billing() {
   const location = useLocation();
 
   // Data fetching via hook
-  const { bills, patients, appointments, loading, error, refetch } = useBilling();
+  const { bills, patients, loading, error, refetch } = useBilling();
 
   // Form state - auto-show if navigated from Quick Actions
   const [showForm, setShowForm] = useState(() => (location.state as { showForm?: boolean })?.showForm ?? false);
   const [apiError, setApiError] = useState('');
+  const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
 
   // Scroll to form when shown via Quick Actions
   useEffect(() => {
@@ -46,22 +49,39 @@ export function Billing() {
   const selectedPatientId = watch('patient_id');
   const selectedAppointmentId = watch('appointment_id');
 
-  // Filter appointments by selected patient
-  const filteredAppointments = selectedPatientId
-    ? appointments.filter((a) => a.patient_id === selectedPatientId)
-    : appointments;
+  // Fetch patient-specific appointments when patient changes
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setPatientAppointments([]);
+      return;
+    }
+
+    setLoadingAppointments(true);
+    fetchPatientAppointmentsHandler(selectedPatientId)
+      .then((appointments) => {
+        setPatientAppointments(appointments);
+      })
+      .catch((err) => {
+        console.error('[Billing] Failed to load appointments:', err);
+        toast.error('Failed to load appointments');
+        setPatientAppointments([]);
+      })
+      .finally(() => {
+        setLoadingAppointments(false);
+      });
+  }, [selectedPatientId]);
 
   // Clear appointment when patient changes (if appointment doesn't belong to new patient)
   useEffect(() => {
     if (selectedPatientId && selectedAppointmentId) {
-      const appointmentStillValid = filteredAppointments.some(
+      const appointmentStillValid = patientAppointments.some(
         (a) => a.id === selectedAppointmentId
       );
       if (!appointmentStillValid) {
         setValue('appointment_id', '');
       }
     }
-  }, [selectedPatientId, selectedAppointmentId, filteredAppointments, setValue]);
+  }, [selectedPatientId, selectedAppointmentId, patientAppointments, setValue]);
 
   // Debug: Log form errors whenever they change
   if (import.meta.env.DEV) {
@@ -201,12 +221,20 @@ export function Billing() {
               <FormSelect<BillingFormInput>
                 name="appointment_id"
                 label="Appointment"
-                placeholder={selectedPatientId ? 'Select appointment' : 'Select patient first'}
-                options={filteredAppointments.map((a) => ({
+                placeholder={
+                  !selectedPatientId
+                    ? 'Select patient first'
+                    : loadingAppointments
+                    ? 'Loading...'
+                    : patientAppointments.length === 0
+                    ? 'No appointments found'
+                    : 'Select appointment'
+                }
+                options={patientAppointments.map((a) => ({
                   value: a.id,
                   label: `${a.patient?.name || 'Unknown'} - ${a.scheduled_at || a.appointment_time || 'No date'}`,
                 }))}
-                disabled={form.formState.isSubmitting || !selectedPatientId}
+                disabled={form.formState.isSubmitting || !selectedPatientId || loadingAppointments}
                 required
               />
               <FormInput<BillingFormInput>

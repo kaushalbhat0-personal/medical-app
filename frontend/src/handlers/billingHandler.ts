@@ -12,23 +12,21 @@ import type { BillingFormData } from '../validation';
 export interface BillingDataResult {
   bills: Bill[];
   patients: Patient[];
-  appointments: Appointment[];
 }
 
 /**
- * Fetch bills, patients, and appointments for dropdown
+ * Fetch bills and patients for dropdown
+ * Appointments are fetched dynamically per-patient
  */
 export const fetchBillingDataHandler = async (): Promise<BillingDataResult> => {
-  const [billsData, patientsData, appointmentsData] = await Promise.all([
+  const [billsData, patientsData] = await Promise.all([
     billingApi.getAll(BILLING_DEFAULT_PARAMS),
     patientsApi.getAll(),
-    appointmentsApi.getAll(),
   ]);
 
   return {
     bills: safeArray<Bill>(billsData),
     patients: safeArray<Patient>(patientsData),
-    appointments: safeArray<Appointment>(appointmentsData),
   };
 };
 
@@ -63,4 +61,12 @@ export const createBillHandler = async (data: BillingFormData): Promise<void> =>
  */
 export const payBillHandler = async (billId: string): Promise<void> => {
   await billingApi.pay(billId);
+};
+
+/**
+ * Fetch appointments for a specific patient
+ */
+export const fetchPatientAppointmentsHandler = async (patientId: string): Promise<Appointment[]> => {
+  const appointments = await appointmentsApi.getAll({ patient_id: patientId });
+  return safeArray<Appointment>(appointments);
 };
