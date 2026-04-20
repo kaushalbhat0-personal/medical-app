@@ -24,8 +24,13 @@ export const patientsApi = {
       throw error;
     }
   },
-  create: async (patient: CreatePatientData) => {
-    const response = await api.post('/patients', patient);
-    return response.data;
+  create: async (patient: CreatePatientData): Promise<Patient> => {
+    try {
+      const response = await api.post('/patients', patient);
+      return response.data;
+    } catch (error) {
+      console.error('[patientsApi.create] Error:', error);
+      throw error;
+    }
   },
 };

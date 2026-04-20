@@ -58,7 +58,7 @@ export const billingApi = {
       return safeArray<Bill>(response.data);
     } catch (error) {
       console.error('[billingApi.getAll] Error:', error);
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
   create: async (bill: CreateBillData) => {
@@ -67,7 +67,7 @@ export const billingApi = {
       return response.data;
     } catch (error) {
       console.error('[billingApi.create] Error:', error);
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
   pay: async (billId: string) => {
@@ -76,7 +76,7 @@ export const billingApi = {
       return response.data;
     } catch (error) {
       console.error('[billingApi.pay] Error:', error);
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 };

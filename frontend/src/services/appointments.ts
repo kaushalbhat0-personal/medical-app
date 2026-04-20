@@ -38,8 +38,13 @@ export const appointmentsApi = {
       throw error;
     }
   },
-  create: async (appointment: CreateAppointmentData) => {
-    const response = await api.post('/appointments', appointment);
-    return response.data;
+  create: async (appointment: CreateAppointmentData): Promise<Appointment> => {
+    try {
+      const response = await api.post('/appointments', appointment);
+      return response.data;
+    } catch (error) {
+      console.error('[appointmentsApi.create] Error:', error);
+      throw error;
+    }
   },
 };
