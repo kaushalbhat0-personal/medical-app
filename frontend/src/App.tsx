@@ -4,6 +4,28 @@ import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './hooks/useAuth';
 import { setNavigator } from './utils/navigation';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Warm up backend on app load to reduce cold start latency
+const warmUpBackend = async () => {
+  try {
+    // Use a timeout to prevent hanging if backend is down
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    console.log('[App] Backend warmed up successfully');
+  } catch (err) {
+    // Silently fail - this is just a warmup call
+    console.log('[App] Backend warmup call failed (may be cold starting):', err);
+  }
+};
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AnimatedPage } from './animations';
@@ -105,6 +127,11 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    // Warm up backend on app load (helps with Render cold start)
+    warmUpBackend();
+  }, []);
+
   return (
     <BrowserRouter>
       <AnimatedRoutes />

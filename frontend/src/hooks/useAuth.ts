@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User, LoginCredentials, LoginResponse } from '../types';
-import { authApi } from '../services';
+import { authApi, formatLoginError } from '../services';
 
 interface UseAuthReturn {
   user: User | null;
@@ -68,7 +68,7 @@ export const useAuth = (): UseAuthReturn => {
       }
       return { success: false, error: 'No access token received' };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      const errorMessage = formatLoginError(error);
       if (import.meta.env.DEV) {
         console.error('[useAuth] Login error:', error);
       }

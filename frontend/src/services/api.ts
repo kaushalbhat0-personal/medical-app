@@ -65,6 +65,22 @@ api.interceptors.response.use(
     // Debug: Log error details
     console.error('API ERROR:', error.response?.data || error.message);
 
+    // Handle network errors (no response) - CRITICAL: Do NOT logout on network errors
+    if (error.request && !error.response) {
+      // This is likely a Render cold start or network issue, NOT an auth failure
+      const isColdStart = error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !navigator.onLine;
+      if (isColdStart) {
+        console.log('[API] Cold start or network issue detected, not logging out');
+      }
+      // Return special error object that components can detect
+      return Promise.reject({
+        __networkError: true,
+        __coldStart: isColdStart,
+        message: 'Server is waking up, please wait...',
+        originalError: error,
+      });
+    }
+
     // Extract error message from response
     const data = error.response?.data as { detail?: string; message?: string; errors?: string[] } | undefined;
     const message =
@@ -105,11 +121,6 @@ api.interceptors.response.use(
       toast.error('Server error. Please try again later.');
     }
 
-    // Handle network errors (no response)
-    else if (error.request && !error.response) {
-      toast.error('Network error. Please check your connection.');
-    }
-
     // Generic fallback for other errors
     else if (![400, 409].includes(error.response?.status || 0)) {
       toast.error(message);
@@ -119,3 +130,35 @@ api.interceptors.response.use(
     return Promise.reject(error.response?.data || error);
   }
 );
+
+// Retry utility for handling Render cold starts
+export const retryRequest = async <T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 2000
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err: any) {
+    // Only retry on network errors (cold start), not on 4xx/5xx responses
+    const isNetworkError = err?.__networkError || (!err?.response && err?.request);
+
+    if (retries > 0 && isNetworkError) {
+      console.log(`[API] Retrying request, ${retries} attempts left...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return retryRequest(fn, retries - 1, delay);
+    }
+
+    throw err;
+  }
+};
+
+// Helper to check if error is a network/cold start error
+export const isNetworkError = (error: any): boolean => {
+  return error?.__networkError === true || (!error?.response && error?.request);
+};
+
+// Helper to check if error is a cold start error
+export const isColdStartError = (error: any): boolean => {
+  return error?.__coldStart === true || error?.code === 'ECONNABORTED';
+};
