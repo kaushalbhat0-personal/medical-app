@@ -9,7 +9,7 @@ import { createPatientHandler } from '../handlers';
 import { patientsApi } from '../services';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
-import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect } from '../components/common';
+import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card, Input } from '../components/common';
 import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
 export function Patients() {
@@ -146,22 +146,22 @@ export function Patients() {
         <div>
           {loading ? (
             <div className="space-y-2">
-              <div className="h-8 bg-gray-200 rounded-xl w-32 animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded-lg w-48 animate-pulse" />
+              <div className="h-8 bg-surface rounded-xl w-32 animate-pulse" />
+              <div className="h-4 bg-surface rounded-lg w-48 animate-pulse" />
             </div>
           ) : (
             <>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Patients</h1>
-              <p className="text-sm sm:text-base text-gray-500 mt-1">Manage patient records</p>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Patients</h1>
+              <p className="text-sm sm:text-base text-text-secondary mt-1">Manage patient records</p>
             </>
           )}
         </div>
-        <button
-          className="min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 sm:w-auto"
+        <Button
+          variant={showForm ? 'ghost' : 'primary'}
           onClick={() => setShowForm(!showForm)}
         >
           {showForm ? 'Cancel' : '+ Add Patient'}
-        </button>
+        </Button>
       </div>
 
       {loading && (
@@ -174,7 +174,7 @@ export function Patients() {
         <div className="space-y-6">
           {/* Search */}
           <div className="max-w-md">
-            <input
+            <Input
               type="text"
               placeholder="Search patients..."
               value={searchInput}
@@ -183,14 +183,13 @@ export function Patients() {
                 setSearchInput(value);
                 debouncedSearch(value);
               }}
-              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
             />
           </div>
 
           {/* Create Form */}
           {showForm && (
-            <div id="patient-form" className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">New Patient</h3>
+            <Card id="patient-form">
+              <h3 className="text-lg font-semibold text-text-primary mb-6">New Patient</h3>
               <FormWrapper<PatientFormInput, PatientFormData>
                 form={form}
                 onSubmit={onSubmit}
@@ -233,48 +232,49 @@ export function Patients() {
                   />
                 </div>
               </FormWrapper>
-            </div>
+            </Card>
           )}
 
           {/* Table */}
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <Card padding="none" className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
-                <thead className="bg-gray-50">
+                <thead className="bg-surface-hover">
                   <tr>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">DOB / Age</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registered</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Name</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Email</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Phone</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">DOB / Age</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Registered</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {safePatients.map((patient) => (
-                    <tr key={patient?.id || Math.random()} className="hover:bg-gray-50 transition-colors">
+                    <tr key={patient?.id || Math.random()} className="hover:bg-surface-hover transition-colors">
                       <td className="px-4 sm:px-6 py-4 sm:py-5">
-                        <span className="font-semibold text-gray-900">{formatPatientName(patient)}</span>
+                        <span className="font-semibold text-text-primary">{formatPatientName(patient)}</span>
                       </td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{patient?.email || '-'}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{patient?.phone || '-'}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{formatPatientDobOrAge(patient)}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-500">{formatDateSafe(patient?.created_at)}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{patient?.email || '-'}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{patient?.phone || '-'}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatPatientDobOrAge(patient)}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-muted">{formatDateSafe(patient?.created_at)}</td>
                       <td className="px-4 sm:px-6 py-4 sm:py-5">
-                        <button
+                        <Button
+                          variant="danger"
+                          size="sm"
                           onClick={() => handleDelete(String(patient.id))}
                           disabled={loading}
-                          className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

@@ -6,8 +6,7 @@ import toast from 'react-hot-toast';
 import { useDoctors } from '../hooks';
 import { doctorsApi } from '../services';
 import { formatDoctorName, formatDoctorInitials } from '../utils';
-import { ErrorState } from '../components/common/ErrorState';
-import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState, EmptyState, Button, Card } from '../components/common';
 import { SkeletonCard } from '../components/common/skeletons';
 import { FormWrapper, FormInput } from '../components/common';
 import { doctorSchema, type DoctorFormData, type DoctorFormInput } from '../validation';
@@ -129,27 +128,27 @@ export function Doctors() {
         <div>
           {loading ? (
             <div className="space-y-2">
-              <div className="h-8 bg-gray-200 rounded-xl w-32 animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded-lg w-48 animate-pulse" />
+              <div className="h-8 bg-surface rounded-xl w-32 animate-pulse" />
+              <div className="h-4 bg-surface rounded-lg w-48 animate-pulse" />
             </div>
           ) : (
             <>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">Doctors</h1>
-              <p className="text-sm sm:text-base text-gray-500 mt-1">Medical staff directory</p>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Doctors</h1>
+              <p className="text-sm sm:text-base text-text-secondary mt-1">Medical staff directory</p>
             </>
           )}
         </div>
-        <button
-          className="min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 sm:w-auto"
+        <Button
+          variant={showForm ? 'ghost' : 'primary'}
           onClick={() => setShowForm(!showForm)}
         >
           {showForm ? 'Cancel' : '+ Add Doctor'}
-        </button>
+        </Button>
       </div>
 
       {showForm && (
-        <div id="doctor-form" className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">New Doctor</h3>
+        <Card id="doctor-form" className="mb-6">
+          <h3 className="text-lg font-semibold text-text-primary mb-6">New Doctor</h3>
           <FormWrapper<DoctorFormInput, DoctorFormData>
             form={form}
             onSubmit={onSubmit}
@@ -185,7 +184,7 @@ export function Doctors() {
               />
             </div>
           </FormWrapper>
-        </div>
+        </Card>
       )}
 
       {/* Grid */}
@@ -203,29 +202,33 @@ export function Doctors() {
       {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {doctors.map((doctor) => (
-            <div
+            <Card
               key={doctor.id}
-              className="flex items-start gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200"
+              padding="md"
+              className="flex items-start gap-4"
             >
-              <div className="doctor-avatar flex-shrink-0">{formatDoctorInitials(doctor)}</div>
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
+                {formatDoctorInitials(doctor)}
+              </div>
               <div className="flex-1 min-w-0 space-y-1">
-                <h3 className="font-semibold text-gray-900 truncate">{formatDoctorName(doctor)}</h3>
-                <p className="text-sm font-medium text-blue-600">
+                <h3 className="font-semibold text-text-primary truncate">{formatDoctorName(doctor)}</h3>
+                <p className="text-sm font-medium text-primary">
                   {doctor.specialization || doctor.specialty || 'General'}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-text-secondary">
                   {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
                 </p>
-                <p className="text-sm text-gray-400 truncate">{doctor.user?.email || ''}</p>
+                <p className="text-sm text-text-muted truncate">{doctor.user?.email || ''}</p>
               </div>
-              <button
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => handleDelete(String(doctor.id))}
                 disabled={loading}
-                className="flex-shrink-0 inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete
-              </button>
-            </div>
+              </Button>
+            </Card>
           ))}
         </div>
       )}

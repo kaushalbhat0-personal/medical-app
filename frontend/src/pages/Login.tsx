@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
 import type { LoginCredentials } from '../types';
 import { loginSchema, type LoginFormData } from '../validation';
+import { Button, Card, Input } from '../components/common';
 
 interface LoginPageProps {
   onLogin: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
@@ -52,69 +53,57 @@ export function Login({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-header">
-          <div className="logo-large">🏥</div>
-          <h1>Hospital Management System</h1>
-          <p>Sign in to access your dashboard</p>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card padding="lg" className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-4">🏥</div>
+          <h1 className="text-2xl font-bold text-text-primary mb-2">Hospital Management System</h1>
+          <p className="text-text-secondary">Sign in to access your dashboard</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="login-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {apiError && (
-            <div className="error-message">
+            <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-danger text-sm">
               ⚠️ {apiError}
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              {...register('email')}
-              placeholder="admin@hospital.com"
-              disabled={isSubmitting}
-            />
-            {errors.email && (
-              <span className="field-error">{errors.email.message}</span>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              {...register('password')}
-              placeholder="Enter your password"
-              disabled={isSubmitting}
-            />
-            {errors.password && (
-              <span className="field-error">{errors.password.message}</span>
-            )}
-          </div>
-
-          <button 
-            type="submit" 
-            className="login-btn"
+          <Input
+            label="Email"
+            type="email"
+            placeholder="admin@hospital.com"
+            error={errors.email?.message}
             disabled={isSubmitting}
+            {...register('email')}
+          />
+
+          <Input
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            error={errors.password?.message}
+            disabled={isSubmitting}
+            {...register('password')}
+          />
+
+          <Button 
+            type="submit" 
+            variant="primary"
+            size="lg"
+            isLoading={isSubmitting}
+            className="w-full mt-2"
           >
-            {isSubmitting ? (
-              <>
-                <span className="spinner-small" /> Signing in...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
+            Sign In
+          </Button>
         </form>
 
-        <div className="login-footer">
-          <p>Demo credentials:</p>
-          <code>admin@hospital.com / admin123</code>
+        <div className="mt-8 pt-6 border-t border-border text-center">
+          <p className="text-sm text-text-muted mb-2">Demo credentials:</p>
+          <code className="text-xs bg-surface-hover px-3 py-1.5 rounded-md text-text-secondary">
+            admin@hospital.com / admin123
+          </code>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

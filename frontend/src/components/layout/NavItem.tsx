@@ -21,15 +21,15 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
         className={({ isActive: navIsActive }) =>
           `group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative overflow-hidden ${
             navIsActive || isActive
-              ? 'bg-blue-50 text-blue-600 font-medium'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
           }`
         }
       >
         {/* Active indicator bar */}
         <div
           className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full transition-all duration-200 ${
-            isActive ? 'bg-blue-600 opacity-100' : 'bg-blue-600 opacity-0'
+            isActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0'
           }`}
         />
 
@@ -37,7 +37,7 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
         <Icon
           className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${
             isCollapsed ? 'mx-auto' : ''
-          } ${isActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-gray-700'}`}
+          } ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-secondary'}`}
         />
 
         {/* Label */}
@@ -53,9 +53,9 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
 
         {/* Tooltip for collapsed state */}
         {isCollapsed && (
-          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
+          <div className="absolute left-full ml-2 px-2 py-1 bg-background text-text-primary text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 border border-border shadow-lg">
             {label}
-            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-background" />
           </div>
         )}
       </NavLink>

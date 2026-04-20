@@ -2,33 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hospital Management System - Global Styles */
+/* Hospital Management System - Dark SaaS Design System */
 
 :root {
-  /* Colors */
+  /* Primary Colors */
   --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --primary-light: #dbeafe;
-  --success: #10b981;
+  --primary-hover: #1d4ed8;
+  --primary-light: #3b82f6;
+
+  /* Semantic Colors */
+  --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
   --info: #06b6d4;
-  
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  
-  --bg: #ffffff;
-  --text: var(--gray-700);
-  --text-light: var(--gray-500);
-  --text-dark: var(--gray-900);
+
+  /* Dark Theme - Slate Scale */
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+
+  /* Dark Theme Backgrounds */
+  --bg: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-hover: #334155;
+  --text: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);

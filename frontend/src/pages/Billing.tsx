@@ -8,7 +8,7 @@ import { createBillHandler, payBillHandler, fetchPatientAppointmentsHandler } fr
 import { billingApi } from '../services';
 import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
-import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
+import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, Button, Card } from '../components/common';
 import { billingSchema, type BillingFormData, type BillingFormInput } from '../validation';
 import type { Appointment, Bill } from '../types';
 
@@ -217,19 +217,22 @@ export function Billing() {
           description="There are no bills to display at the moment."
         />
       )}
-      <div className="page-header with-actions flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">Billing</h1>
-          <p className="subtitle">Manage invoices and payments</p>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Billing</h1>
+          <p className="text-sm sm:text-base text-text-secondary mt-1">Manage invoices and payments</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+        <Button
+          variant={showForm ? 'ghost' : 'primary'}
+          onClick={() => setShowForm(!showForm)}
+        >
           {showForm ? 'Cancel' : '+ Create Bill'}
-        </button>
+        </Button>
       </div>
 
       {showForm && (
-        <div id="billing-form" className="p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-sm mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">New Bill</h3>
+        <Card id="billing-form" className="mb-6">
+          <h3 className="text-lg font-semibold text-text-primary mb-6">New Bill</h3>
           <FormWrapper<BillingFormInput, BillingFormData>
             form={form}
             onSubmit={onSubmit}
@@ -313,56 +316,60 @@ export function Billing() {
               required
             />
           </FormWrapper>
-        </div>
+        </Card>
       )}
 
-      <div className="data-table overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Due Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bills.map((bill) => (
-              <tr key={bill.id}>
-                <td>{getPatientName(bill)}</td>
-                <td>{bill.description || '-'}</td>
-                <td className="amount">{formatCurrency(bill.amount, bill.currency)}</td>
-                <td>{formatDateSafe(bill.due_date)}</td>
-                <td>
-                  <span className={getStatusBadgeClass(bill.status)}>{bill.status}</span>
-                </td>
-                <td>
-                  <div className="flex gap-2">
-                    {bill.status === 'pending' && (
-                      <button
-                        className="inline-flex items-center justify-center px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors duration-200"
-                        onClick={() => handlePay(bill.id)}
+      <Card padding="none" className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead className="bg-surface-hover">
+              <tr>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Patient</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Description</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Amount</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Due Date</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {bills.map((bill) => (
+                <tr key={bill.id} className="hover:bg-surface-hover transition-colors">
+                  <td className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-text-primary">{getPatientName(bill)}</td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{bill.description || '-'}</td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary font-mono">{formatCurrency(bill.amount, bill.currency)}</td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatDateSafe(bill.due_date)}</td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-5">
+                    <span className={getStatusBadgeClass(bill.status)}>{bill.status}</span>
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-5">
+                    <div className="flex gap-2">
+                      {bill.status === 'pending' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handlePay(bill.id)}
+                          disabled={loading}
+                        >
+                          Pay
+                        </Button>
+                      )}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(bill.id)}
                         disabled={loading}
                       >
-                        Pay
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(bill.id)}
-                      disabled={loading}
-                      className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
