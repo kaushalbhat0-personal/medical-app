@@ -15,15 +15,14 @@ export function FormWrapper<TFieldValues extends Record<string, unknown>, TTrans
     formState: { isSubmitting },
   } = form;
 
+  const onFormSubmit = handleSubmit(async (data) => {
+    console.log('SUBMIT TRIGGERED');
+    await onSubmit(data);
+  });
+
   return (
     <FormProvider {...form}>
-      <form
-        onSubmit={(e) => {
-          console.log('FORM SUBMIT EVENT FIRED');
-          handleSubmit(onSubmit)(e);
-        }}
-        className={`space-y-6 ${className}`}
-      >
+      <form onSubmit={onFormSubmit} className={`space-y-6 ${className}`}>
         {apiError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
             {apiError}
