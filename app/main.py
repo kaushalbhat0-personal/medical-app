@@ -36,6 +36,18 @@ app.add_middleware(
 )
 
 
+# Debug: Log incoming Origin header for CORS troubleshooting
+@app.middleware("http")
+async def debug_cors_origin(request: Request, call_next):
+    origin = request.headers.get("origin")
+    logger.info(f"CORS Debug - Origin: {origin}, Method: {request.method}, Path: {request.url.path}")
+    response = await call_next(request)
+    # Log response CORS headers
+    cors_header = response.headers.get("access-control-allow-origin")
+    logger.info(f"CORS Debug - Response Access-Control-Allow-Origin: {cors_header}")
+    return response
+
+
 # Request timing and logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -76,6 +88,16 @@ def handle_generic_exception(_: Request, exc: Exception) -> JSONResponse:
         status_code=500,
         content={"detail": "An unexpected error occurred. Please try again later."},
     )
+
+
+@app.get("/health/cors")
+def health_cors():
+    """Health check endpoint to verify CORS configuration"""
+    return {
+        "cors_origins": settings.cors_origins,
+        "allowed_origins_raw": settings.ALLOWED_ORIGINS,
+        "environment": settings.ENVIRONMENT,
+    }
 
 
 app.include_router(api_router, prefix="/api/v1")

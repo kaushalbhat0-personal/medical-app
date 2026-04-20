@@ -15,9 +15,22 @@ class Settings(BaseSettings):
     
     @property
     def cors_origins(self) -> list[str]:
+        if not self.ALLOWED_ORIGINS:
+            # Fallback for production if env var is not set
+            if self.ENVIRONMENT == "production":
+                return ["https://hospital-management-system-nine-topaz.vercel.app"]
+            return ["http://localhost:5173", "http://127.0.0.1:5173"]
+        
         origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
         # Filter out wildcards - FastAPI CORSMiddleware requires explicit origins
         explicit_origins = [o for o in origins if "*" not in o]
+        
+        # Ensure production frontend is always included in production
+        if self.ENVIRONMENT == "production":
+            prod_origin = "https://hospital-management-system-nine-topaz.vercel.app"
+            if prod_origin not in explicit_origins:
+                explicit_origins.append(prod_origin)
+        
         return explicit_origins if explicit_origins else ["*"]  # Fallback to allow all if no valid origins
 
     model_config = SettingsConfigDict(
