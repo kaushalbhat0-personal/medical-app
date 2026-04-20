@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useBilling } from '../hooks';
 import { createBillHandler, payBillHandler, fetchPatientAppointmentsHandler } from '../handlers';
+import { billingApi } from '../services';
 import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput } from '../components/common';
@@ -129,6 +130,21 @@ export function Billing() {
       }
 
       setApiError(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
+    }
+  };
+
+  // Delete handler
+  const handleDelete = async (billId: string) => {
+    if (!confirm('Are you sure you want to delete this bill?')) return;
+
+    try {
+      await billingApi.delete(billId);
+      toast.success('Bill deleted successfully');
+      await refetch();
+    } catch (err: any) {
+      console.error('[Billing.handleDelete] Error:', err);
+      const errorMessage = err?.detail || err?.message || 'Failed to delete bill';
       toast.error(errorMessage, { duration: 5000 });
     }
   };
@@ -323,11 +339,24 @@ export function Billing() {
                   <span className={getStatusBadgeClass(bill.status)}>{bill.status}</span>
                 </td>
                 <td>
-                  {bill.status === 'pending' && (
-                    <button className="btn-small btn-pay" onClick={() => handlePay(bill.id)}>
-                      Pay
+                  <div className="flex gap-2">
+                    {bill.status === 'pending' && (
+                      <button
+                        className="inline-flex items-center justify-center px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors duration-200"
+                        onClick={() => handlePay(bill.id)}
+                        disabled={loading}
+                      >
+                        Pay
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(bill.id)}
+                      disabled={loading}
+                      className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Delete
                     </button>
-                  )}
+                  </div>
                 </td>
               </tr>
             ))}

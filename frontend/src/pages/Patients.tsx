@@ -6,6 +6,7 @@ import debounce from 'lodash.debounce';
 import toast from 'react-hot-toast';
 import { usePatients } from '../hooks';
 import { createPatientHandler } from '../handlers';
+import { patientsApi } from '../services';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
 import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect } from '../components/common';
@@ -59,6 +60,21 @@ export function Patients() {
       console.log('[Patients] Form errors:', errors);
     }
   }
+
+  // Delete handler
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this patient?')) return;
+
+    try {
+      await patientsApi.delete(id);
+      toast.success('Patient deleted successfully');
+      await refetch();
+    } catch (err: any) {
+      console.error('[Patients.handleDelete] Error:', err);
+      const errorMessage = err?.detail || err?.message || 'Failed to delete patient';
+      toast.error(errorMessage, { duration: 5000 });
+    }
+  };
 
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: PatientFormData) => {
@@ -231,6 +247,7 @@ export function Patients() {
                     <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
                     <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">DOB / Age</th>
                     <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registered</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -243,6 +260,15 @@ export function Patients() {
                       <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{patient?.phone || '-'}</td>
                       <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-600">{formatPatientDobOrAge(patient)}</td>
                       <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-500">{formatDateSafe(patient?.created_at)}</td>
+                      <td className="px-4 sm:px-6 py-4 sm:py-5">
+                        <button
+                          onClick={() => handleDelete(String(patient.id))}
+                          disabled={loading}
+                          className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

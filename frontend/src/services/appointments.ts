@@ -47,4 +47,12 @@ export const appointmentsApi = {
       throw error;
     }
   },
+  delete: async (id: string): Promise<void> => {
+    try {
+      await api.delete(`/appointments/${id}`);
+    } catch (error) {
+      console.error('[appointmentsApi.delete] Error:', error);
+      throw error;
+    }
+  },
 };

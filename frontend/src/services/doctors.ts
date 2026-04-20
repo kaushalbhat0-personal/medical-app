@@ -2,6 +2,14 @@ import { api } from './api';
 import { safeArray } from '../utils';
 import type { Doctor } from '../types';
 
+export interface CreateDoctorData {
+  name: string;
+  specialty?: string;
+  specialization?: string;
+  license_number?: string;
+  experience_years?: number;
+}
+
 export const doctorsApi = {
   getAll: async (params?: { search?: string; skip?: number; limit?: number }): Promise<Doctor[]> => {
     try {
@@ -14,6 +22,23 @@ export const doctorsApi = {
       return safeArray<Doctor>(response.data);
     } catch (error) {
       console.error('[doctorsApi.getAll] Error:', error);
+      throw error;
+    }
+  },
+  create: async (doctor: CreateDoctorData): Promise<Doctor> => {
+    try {
+      const response = await api.post('/doctors', doctor);
+      return response.data;
+    } catch (error) {
+      console.error('[doctorsApi.create] Error:', error);
+      throw error;
+    }
+  },
+  delete: async (id: string): Promise<void> => {
+    try {
+      await api.delete(`/doctors/${id}`);
+    } catch (error) {
+      console.error('[doctorsApi.delete] Error:', error);
       throw error;
     }
   },

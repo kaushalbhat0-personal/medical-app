@@ -46,3 +46,8 @@ def update_doctor(
     if not update_data:
         return doctor
     return crud_doctor.update_doctor(db, doctor, update_data)
+
+
+def delete_doctor(db: Session, doctor_id: UUID) -> None:
+    doctor = get_doctor_or_404(db, doctor_id)
+    crud_doctor.delete_doctor(db, doctor)

@@ -77,6 +77,18 @@ export const billingSchema = z.object({
     .refine(isValidDate, 'Please enter a valid due date'),
 });
 
+// Doctor form validation
+export const doctorSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters'),
+  specialization: z.string().optional(),
+  license_number: z.string().optional(),
+  experience_years: z.coerce.number().min(0, 'Experience must be 0 or greater').max(100, 'Experience must be 100 or less').optional(),
+});
+
 // Type exports
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type PatientFormData = z.infer<typeof patientSchema>;
@@ -85,3 +97,5 @@ export type AppointmentFormData = z.infer<typeof appointmentSchema>;
 export type AppointmentFormInput = z.input<typeof appointmentSchema>;
 export type BillingFormData = z.infer<typeof billingSchema>;
 export type BillingFormInput = z.input<typeof billingSchema>;
+export type DoctorFormData = z.infer<typeof doctorSchema>;
+export type DoctorFormInput = z.input<typeof doctorSchema>;

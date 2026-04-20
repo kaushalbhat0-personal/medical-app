@@ -6,6 +6,7 @@ import { Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppointments, type AppointmentFilters } from '../hooks';
 import { createAppointmentHandler } from '../handlers';
+import { appointmentsApi } from '../services';
 import { EMPTY_APPOINTMENT, APPOINTMENT_STATUS_CLASSES } from '../constants';
 import {
   formatPatientName,
@@ -75,6 +76,21 @@ export function Appointments() {
       console.log('[Appointments] Form errors:', errors);
     }
   }
+
+  // Delete handler
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this appointment?')) return;
+
+    try {
+      await appointmentsApi.delete(id);
+      toast.success('Appointment deleted successfully');
+      await refetch();
+    } catch (err: any) {
+      console.error('[Appointments.handleDelete] Error:', err);
+      const errorMessage = err?.detail || err?.message || 'Failed to delete appointment';
+      toast.error(errorMessage, { duration: 5000 });
+    }
+  };
 
   // Create handler with robust error handling and toast notifications
   const onSubmit = async (data: AppointmentFormData) => {
@@ -304,6 +320,7 @@ export function Appointments() {
                 <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
                 <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -318,6 +335,15 @@ export function Appointments() {
                       <span className={getStatusBadgeClass(apt.status)}>{apt.status}</span>
                     </td>
                     <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-gray-500">{apt.notes || '-'}</td>
+                    <td className="px-4 sm:px-6 py-4 sm:py-5">
+                      <button
+                        onClick={() => handleDelete(String(apt.id))}
+                        disabled={loading || refetching}
+                        className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 );
               })}

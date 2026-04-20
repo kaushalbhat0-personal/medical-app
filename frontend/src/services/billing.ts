@@ -79,4 +79,13 @@ export const billingApi = {
       throw handleApiError(error);
     }
   },
+  delete: async (billId: string) => {
+    try {
+      const response = await api.delete(`/bills/${billId}`);
+      return response.data;
+    } catch (error) {
+      console.error('[billingApi.delete] Error:', error);
+      throw handleApiError(error);
+    }
+  },
 };

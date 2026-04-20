@@ -33,4 +33,12 @@ export const patientsApi = {
       throw error;
     }
   },
+  delete: async (id: string): Promise<void> => {
+    try {
+      await api.delete(`/patients/${id}`);
+    } catch (error) {
+      console.error('[patientsApi.delete] Error:', error);
+      throw error;
+    }
+  },
 };

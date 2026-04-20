@@ -14,6 +14,7 @@ export function Dashboard() {
 
   // Quick action navigation handlers
   const handleAddPatient = () => navigate('/patients', { state: { showForm: true } });
+  const handleAddDoctor = () => navigate('/doctors', { state: { showForm: true } });
   const handleNewAppointment = () => navigate('/appointments', { state: { showForm: true } });
   const handleCreateBill = () => navigate('/billing', { state: { showForm: true } });
 
@@ -156,6 +157,15 @@ export function Dashboard() {
                 >
                   <span className="text-lg">👤</span>
                   Add Patient
+                </motion.button>
+                <motion.button
+                  onClick={handleAddDoctor}
+                  className="min-h-[44px] px-4 py-3 inline-flex items-center justify-center sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all duration-200 cursor-pointer"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-lg">👨‍⚕️</span>
+                  Add Doctor
                 </motion.button>
                 <motion.button
                   onClick={handleNewAppointment}

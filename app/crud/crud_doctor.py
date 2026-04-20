@@ -44,3 +44,8 @@ def update_doctor(
     db.commit()
     db.refresh(doctor)
     return doctor
+
+
+def delete_doctor(db: Session, doctor: Doctor) -> None:
+    db.delete(doctor)
+    db.commit()

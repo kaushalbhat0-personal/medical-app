@@ -3,6 +3,7 @@ export {
   patientSchema,
   appointmentSchema,
   billingSchema,
+  doctorSchema,
   type LoginFormData,
   type PatientFormData,
   type PatientFormInput,
@@ -10,4 +11,6 @@ export {
   type AppointmentFormInput,
   type BillingFormData,
   type BillingFormInput,
+  type DoctorFormData,
+  type DoctorFormInput,
 } from './schemas';

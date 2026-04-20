@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -112,3 +112,14 @@ def pay_bill(
 
     update_data = BillingUpdate(status=BillingStatus.paid)
     return billing_service.update_bill(db, bill_id, update_data, current_user.id)
+
+
+@router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bill(
+    bill_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Soft delete a bill."""
+    billing_service.soft_delete_bill(db, bill_id, current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

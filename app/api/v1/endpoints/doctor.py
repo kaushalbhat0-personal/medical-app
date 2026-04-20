@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -49,3 +49,13 @@ def update_doctor(
     _: User = Depends(get_current_user),
 ) -> DoctorRead:
     return doctor_service.update_doctor(db, doctor_id, payload)
+
+
+@router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_doctor(
+    doctor_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> Response:
+    doctor_service.delete_doctor(db, doctor_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
