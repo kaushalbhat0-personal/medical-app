@@ -8,6 +8,24 @@ from app.models.billing import BillingStatus
 from app.schemas.patient import PatientRead
 
 
+def _parse_date(v: str | datetime | None) -> datetime | None:
+    """Parse date from string (YYYY-MM-DD) or datetime object."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, str):
+        # Handle YYYY-MM-DD format from frontend date input
+        if len(v) == 10 and v[4] == '-' and v[7] == '-':
+            return datetime.strptime(v, "%Y-%m-%d")
+        # Try ISO format
+        try:
+            return datetime.fromisoformat(v.replace('Z', '+00:00'))
+        except ValueError:
+            pass
+    return None
+
+
 class BillingCreate(BaseModel):
     patient_id: UUID
     appointment_id: UUID | None = None
@@ -16,7 +34,12 @@ class BillingCreate(BaseModel):
     currency: str = "INR"
     idempotency_key: str | None = None
     description: str | None = None
-    due_date: datetime | None = None
+    due_date: datetime | str | None = None
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def parse_due_date(cls, v: str | datetime | None) -> datetime | None:
+        return _parse_date(v)
 
     @field_validator("appointment_id")
     @classmethod

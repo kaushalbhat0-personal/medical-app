@@ -64,14 +64,16 @@ def create_bill(
     billing_in: BillingCreate,
     created_by: UUID,
 ) -> Billing:
-    _validate_appointment_exists(db, billing_in.appointment_id)
-    _validate_appointment_not_cancelled(db, billing_in.appointment_id)
-    _validate_no_duplicate_bill(db, billing_in.appointment_id)
-    _validate_patient_matches_appointment(
-        db,
-        patient_id=billing_in.patient_id,
-        appointment_id=billing_in.appointment_id,
-    )
+    # Only validate appointment if provided (optional field)
+    if billing_in.appointment_id is not None:
+        _validate_appointment_exists(db, billing_in.appointment_id)
+        _validate_appointment_not_cancelled(db, billing_in.appointment_id)
+        _validate_no_duplicate_bill(db, billing_in.appointment_id)
+        _validate_patient_matches_appointment(
+            db,
+            patient_id=billing_in.patient_id,
+            appointment_id=billing_in.appointment_id,
+        )
     _validate_idempotency_key(db, billing_in.idempotency_key)
 
     billing_data = billing_in.model_dump()

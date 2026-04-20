@@ -19,7 +19,8 @@ class Billing(Base):
     __tablename__ = "billings"
 
     __table_args__ = (
-        UniqueConstraint("appointment_id", name="uq_billing_appointment"),
+        # Use unique index with partial condition instead of UniqueConstraint
+        Index("uq_billing_appointment", "appointment_id", unique=True, postgresql_where=text("appointment_id IS NOT NULL")),
         UniqueConstraint("idempotency_key", name="uq_billing_idempotency_key"),
         Index("idx_billing_created_by", "created_by"),
         Index("idx_billing_status_paid_at", "status", "paid_at"),
@@ -37,10 +38,10 @@ class Billing(Base):
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
     )
-    appointment_id: Mapped[uuid.UUID] = mapped_column(
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("appointments.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     amount: Mapped[float] = mapped_column(
         Numeric(10, 2),

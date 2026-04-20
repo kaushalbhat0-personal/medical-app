@@ -165,12 +165,17 @@ export function Billing() {
 
   // Helper to get patient name from bill (uses nested patient or falls back to patients list)
   const getPatientName = (bill: Bill): string => {
-    if (bill.patient) {
-      return formatPatientName(bill.patient);
+    // First try nested patient object from backend
+    if (bill.patient?.name) {
+      return bill.patient.name;
     }
     // Fallback: look up patient from patients list
     const patient = patients.find((p) => p.id === bill.patient_id);
-    return formatPatientName(patient);
+    if (patient?.name) {
+      return patient.name;
+    }
+    // Final fallback - show ID if nothing else works
+    return `Patient #${String(bill.patient_id).slice(0, 8)}`;
   };
 
   // Safe rendering guards - only show empty after loading completes
@@ -230,7 +235,7 @@ export function Billing() {
               />
               <FormSelect<BillingFormInput>
                 name="appointment_id"
-                label="Appointment"
+                label="Appointment (Optional)"
                 placeholder={
                   !selectedPatientId
                     ? 'Select patient first'
@@ -238,14 +243,26 @@ export function Billing() {
                     ? 'Loading...'
                     : patientAppointments.length === 0
                     ? 'No appointments found'
-                    : 'Select appointment'
+                    : 'Select appointment (optional)'
                 }
-                options={patientAppointments.map((a) => ({
-                  value: a.id,
-                  label: `${a.patient?.name || 'Unknown'} - ${a.scheduled_at || a.appointment_time || 'No date'}`,
-                }))}
+                options={patientAppointments.map((a) => {
+                  // Format date nicely
+                  const dateStr = a.scheduled_at || a.appointment_time || '';
+                  const formattedDate = dateStr 
+                    ? new Date(dateStr).toLocaleDateString('en-IN', { 
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : 'No date';
+                  return {
+                    value: a.id,
+                    label: `Appt #${String(a.id).slice(0, 8)} - ${formattedDate}`,
+                  };
+                })}
                 disabled={form.formState.isSubmitting || !selectedPatientId || loadingAppointments}
-                required
               />
               <FormInput<BillingFormInput>
                 name="amount"
