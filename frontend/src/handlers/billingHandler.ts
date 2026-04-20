@@ -3,29 +3,32 @@
  * Business logic for billing operations
  */
 
-import { billingApi, patientsApi } from '../services';
+import { billingApi, patientsApi, appointmentsApi } from '../services';
 import { BILLING_DEFAULT_PARAMS } from '../constants';
 import { safeArray } from '../utils';
-import type { Bill, Patient } from '../types';
+import type { Bill, Patient, Appointment } from '../types';
 import type { BillingFormData } from '../validation';
 
 export interface BillingDataResult {
   bills: Bill[];
   patients: Patient[];
+  appointments: Appointment[];
 }
 
 /**
- * Fetch bills and patients for dropdown
+ * Fetch bills, patients, and appointments for dropdown
  */
 export const fetchBillingDataHandler = async (): Promise<BillingDataResult> => {
-  const [billsData, patientsData] = await Promise.all([
+  const [billsData, patientsData, appointmentsData] = await Promise.all([
     billingApi.getAll(BILLING_DEFAULT_PARAMS),
     patientsApi.getAll(),
+    appointmentsApi.getAll(),
   ]);
 
   return {
     bills: safeArray<Bill>(billsData),
     patients: safeArray<Patient>(patientsData),
+    appointments: safeArray<Appointment>(appointmentsData),
   };
 };
 
@@ -38,9 +41,10 @@ export const createBillHandler = async (data: BillingFormData): Promise<void> =>
   const dueDate = new Date(data.due_date);
 
   // Ensure proper data types and format for API
-  // patient_id is UUID string, keep as-is
+  // patient_id and appointment_id are UUID strings, keep as-is
   const payload = {
     patient_id: data.patient_id,
+    appointment_id: data.appointment_id,
     amount: Number(data.amount),
     currency: data.currency,
     description: data.description,
@@ -57,6 +61,6 @@ export const createBillHandler = async (data: BillingFormData): Promise<void> =>
 /**
  * Pay a bill
  */
-export const payBillHandler = async (billId: number): Promise<void> => {
+export const payBillHandler = async (billId: string): Promise<void> => {
   await billingApi.pay(billId);
 };

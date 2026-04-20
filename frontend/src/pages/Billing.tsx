@@ -14,7 +14,7 @@ export function Billing() {
   const location = useLocation();
 
   // Data fetching via hook
-  const { bills, patients, loading, error, refetch } = useBilling();
+  const { bills, patients, appointments, loading, error, refetch } = useBilling();
 
   // Form state - auto-show if navigated from Quick Actions
   const [showForm, setShowForm] = useState(() => (location.state as { showForm?: boolean })?.showForm ?? false);
@@ -93,7 +93,7 @@ export function Billing() {
   };
 
   // Pay handler with toast notifications
-  const handlePay = async (billId: number) => {
+  const handlePay = async (billId: string) => {
     try {
       await payBillHandler(billId);
 
@@ -173,6 +173,17 @@ export function Billing() {
                 options={patients.map((p) => ({
                   value: p.id,
                   label: formatPatientName(p),
+                }))}
+                disabled={form.formState.isSubmitting}
+                required
+              />
+              <FormSelect<BillingFormInput>
+                name="appointment_id"
+                label="Appointment"
+                placeholder="Select appointment"
+                options={appointments.map((a) => ({
+                  value: a.id,
+                  label: `${a.patient?.name || 'Unknown'} - ${a.scheduled_at || a.appointment_time || 'No date'}`,
                 }))}
                 disabled={form.formState.isSubmitting}
                 required

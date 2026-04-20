@@ -10,6 +10,7 @@ export const BILLING_DEFAULT_PARAMS = {
 
 export const EMPTY_BILL = {
   patient_id: '',
+  appointment_id: '',
   amount: '',
   currency: 'INR' as const,
   description: '',
@@ -26,8 +27,7 @@ export const BILLING_STATUSES = [
 export const BILLING_STATUS_CLASSES: Record<string, string> = {
   pending: 'status-badge pending',
   paid: 'status-badge paid',
-  cancelled: 'status-badge cancelled',
-  refunded: 'status-badge refunded',
+  failed: 'status-badge cancelled',
 };
 
 export const CURRENCIES = [

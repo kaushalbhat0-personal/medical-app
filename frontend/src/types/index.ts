@@ -54,15 +54,20 @@ export interface Appointment {
 }
 
 export interface Bill {
-  id: number;
-  patient_id: number;
+  id: string;
+  patient_id: string;
+  appointment_id?: string;
   amount: number;
   currency: string;
-  status: 'pending' | 'paid' | 'cancelled' | 'refunded';
-  description: string;
-  due_date: string;
-  patient: Patient;
+  status: 'pending' | 'paid' | 'failed';
+  description?: string;
+  due_date?: string;
+  paid_at?: string;
+  payment_id?: string;
+  payment_method?: string;
+  patient?: Patient;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface LoginCredentials {
