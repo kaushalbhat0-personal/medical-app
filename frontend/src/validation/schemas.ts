@@ -47,8 +47,8 @@ export const patientSchema = z.object({
 
 // Appointment form validation
 export const appointmentSchema = z.object({
-  patient_id: z.coerce.number().min(1, 'Please select a patient'),
-  doctor_id: z.coerce.number().min(1, 'Please select a doctor'),
+  patient_id: z.string().min(1, 'Please select a patient'),
+  doctor_id: z.string().min(1, 'Please select a doctor'),
   scheduled_at: z
     .string()
     .min(1, 'Date and time is required')
@@ -62,7 +62,7 @@ export const appointmentSchema = z.object({
 
 // Billing form validation
 export const billingSchema = z.object({
-  patient_id: z.coerce.number().min(1, 'Please select a patient'),
+  patient_id: z.string().min(1, 'Please select a patient'),
   amount: z.coerce.number().positive('Amount must be greater than 0').max(999999999.99, 'Amount is too large'),
   currency: z.literal('INR'),
   description: z

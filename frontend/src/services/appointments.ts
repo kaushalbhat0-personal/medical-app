@@ -3,8 +3,8 @@ import { safeArray } from '../utils';
 import type { Appointment } from '../types';
 
 export interface CreateAppointmentData {
-  patient_id: number;
-  doctor_id: number;
+  patient_id: string;
+  doctor_id: string;
   appointment_time: string;
   notes?: string;
 }

@@ -3,7 +3,7 @@ import { safeArray } from '../utils';
 import type { Bill } from '../types';
 
 export interface CreateBillData {
-  patient_id: number;
+  patient_id: string;
   amount: number;
   currency: string;
   description: string;

@@ -52,9 +52,10 @@ export const createAppointmentHandler = async (
   const scheduledDate = new Date(data.scheduled_at);
 
   // Ensure proper data types and format for API
+  // IDs are UUID strings, keep as-is
   const payload = {
-    patient_id: Number(data.patient_id),
-    doctor_id: Number(data.doctor_id),
+    patient_id: data.patient_id,
+    doctor_id: data.doctor_id,
     appointment_time: scheduledDate.toISOString(),
     notes: data.notes || undefined,
   };

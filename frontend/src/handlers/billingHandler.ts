@@ -38,8 +38,9 @@ export const createBillHandler = async (data: BillingFormData): Promise<void> =>
   const dueDate = new Date(data.due_date);
 
   // Ensure proper data types and format for API
+  // patient_id is UUID string, keep as-is
   const payload = {
-    patient_id: Number(data.patient_id),
+    patient_id: data.patient_id,
     amount: Number(data.amount),
     currency: data.currency,
     description: data.description,
