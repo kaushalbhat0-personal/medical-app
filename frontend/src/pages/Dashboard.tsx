@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { Users, Stethoscope, Calendar, DollarSign } from 'lucide-react';
 import { useDashboard } from '../hooks';
-import { ErrorState, EmptyState, Button, Card } from '../components/common';
+import { ErrorState, EmptyState, Button } from '../components/common';
 import { SkeletonCard } from '../components/common/skeletons';
 import { FadeContent, staggerContainer, staggerItem } from '../animations';
+import { Card, CardContent } from '@/components/ui/card';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -68,77 +70,75 @@ export function Dashboard() {
 
       {!error && !showSkeletons && (
         <FadeContent show={!showSkeletons}>
-          <div className="space-y-6 sm:space-y-8">
+          <div className="space-y-6">
             {/* Header */}
-            <div className="mb-6 sm:mb-8">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Dashboard</h1>
-              <p className="text-sm sm:text-base text-text-secondary mt-1">Overview of your hospital's performance</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-semibold">Dashboard</h1>
+                <p className="text-sm text-muted-foreground mt-1">Overview of your hospital's performance</p>
+              </div>
             </div>
 
             {/* Stats Grid */}
             <motion.div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
               variants={staggerContainer}
               initial="initial"
               animate="animate"
             >
               <motion.div variants={staggerItem}>
-                <Card padding="md" className="flex items-center gap-4 hover:border-border-light transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl flex-shrink-0">
-                    👤
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-text-secondary">Total Patients</h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-text-primary mt-1">
-                      {(stats?.total_patients ?? 0).toLocaleString()}
-                    </p>
-                    <span className="text-xs sm:text-sm text-text-muted">Registered patients</span>
-                  </div>
+                <Card>
+                  <CardContent className="flex items-center gap-4 p-6">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">Total Patients</p>
+                      <p className="text-2xl font-bold">{(stats?.total_patients ?? 0).toLocaleString()}</p>
+                    </div>
+                  </CardContent>
                 </Card>
               </motion.div>
 
               <motion.div variants={staggerItem}>
-                <Card padding="md" className="flex items-center gap-4 hover:border-border-light transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl flex-shrink-0">
-                    👨‍⚕️
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-text-secondary">Total Doctors</h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-text-primary mt-1">
-                      {(stats?.total_doctors ?? 0).toLocaleString()}
-                    </p>
-                    <span className="text-xs sm:text-sm text-text-muted">Available doctors</span>
-                  </div>
+                <Card>
+                  <CardContent className="flex items-center gap-4 p-6">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Stethoscope className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">Total Doctors</p>
+                      <p className="text-2xl font-bold">{(stats?.total_doctors ?? 0).toLocaleString()}</p>
+                    </div>
+                  </CardContent>
                 </Card>
               </motion.div>
 
               <motion.div variants={staggerItem}>
-                <Card padding="md" className="flex items-center gap-4 hover:border-border-light transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl flex-shrink-0">
-                    📅
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-text-secondary">Today's Appointments</h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-text-primary mt-1">
-                      {stats?.today_appointments ?? 0}
-                    </p>
-                    <span className="text-xs sm:text-sm text-text-muted">{new Date().toLocaleDateString()}</span>
-                  </div>
+                <Card>
+                  <CardContent className="flex items-center gap-4 p-6">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">Today's Appointments</p>
+                      <p className="text-2xl font-bold">{stats?.today_appointments ?? 0}</p>
+                    </div>
+                  </CardContent>
                 </Card>
               </motion.div>
 
               <motion.div variants={staggerItem}>
-                <Card padding="md" className="flex items-center gap-4 hover:border-border-light transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl flex-shrink-0">
-                    💰
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-text-secondary">Total Revenue</h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-text-primary mt-1">
-                      ${(stats?.total_revenue ?? 0).toLocaleString()}
-                    </p>
-                    <span className="text-xs sm:text-sm text-text-muted">All time revenue</span>
-                  </div>
+                <Card>
+                  <CardContent className="flex items-center gap-4 p-6">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <DollarSign className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">Total Revenue</p>
+                      <p className="text-2xl font-bold">${(stats?.total_revenue ?? 0).toLocaleString()}</p>
+                    </div>
+                  </CardContent>
                 </Card>
               </motion.div>
             </motion.div>
@@ -148,36 +148,19 @@ export function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="pt-2"
             >
-              <h2 className="text-lg font-semibold text-text-primary mb-4">Quick Actions</h2>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Button
-                  variant="secondary"
-                  onClick={handleAddPatient}
-                  leftIcon={<span className="text-lg">👤</span>}
-                >
+              <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="secondary" onClick={handleAddPatient}>
                   Add Patient
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleAddDoctor}
-                  leftIcon={<span className="text-lg">👨‍⚕️</span>}
-                >
+                <Button variant="secondary" onClick={handleAddDoctor}>
                   Add Doctor
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleNewAppointment}
-                  leftIcon={<span className="text-lg">📅</span>}
-                >
+                <Button variant="secondary" onClick={handleNewAppointment}>
                   New Appointment
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleCreateBill}
-                  leftIcon={<span className="text-lg">🧾</span>}
-                >
+                <Button variant="secondary" onClick={handleCreateBill}>
                   Create Bill
                 </Button>
               </div>

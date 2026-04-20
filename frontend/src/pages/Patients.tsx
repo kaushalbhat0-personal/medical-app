@@ -9,7 +9,9 @@ import { createPatientHandler } from '../handlers';
 import { patientsApi } from '../services';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
-import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card, Input } from '../components/common';
+import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card as CommonCard, Input } from '../components/common';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
 export function Patients() {
@@ -142,19 +144,10 @@ export function Patients() {
         />
       )}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          {loading ? (
-            <div className="space-y-2">
-              <div className="h-8 bg-surface rounded-xl w-32 animate-pulse" />
-              <div className="h-4 bg-surface rounded-lg w-48 animate-pulse" />
-            </div>
-          ) : (
-            <>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Patients</h1>
-              <p className="text-sm sm:text-base text-text-secondary mt-1">Manage patient records</p>
-            </>
-          )}
+          <h1 className="text-2xl font-semibold">Patients</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage patient records</p>
         </div>
         <Button
           variant={showForm ? 'ghost' : 'primary'}
@@ -188,8 +181,8 @@ export function Patients() {
 
           {/* Create Form */}
           {showForm && (
-            <Card id="patient-form">
-              <h3 className="text-lg font-semibold text-text-primary mb-6">New Patient</h3>
+            <CommonCard id="patient-form">
+              <h3 className="text-lg font-semibold mb-6">New Patient</h3>
               <FormWrapper<PatientFormInput, PatientFormData>
                 form={form}
                 onSubmit={onSubmit}
@@ -197,7 +190,7 @@ export function Patients() {
                 loadingLabel="Creating..."
                 apiError={apiError}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormInput<PatientFormInput>
                     name="name"
                     label="Full Name"
@@ -232,34 +225,32 @@ export function Patients() {
                   />
                 </div>
               </FormWrapper>
-            </Card>
+            </CommonCard>
           )}
 
           {/* Table */}
-          <Card padding="none" className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
-                <thead className="bg-surface-hover">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Name</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Email</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Phone</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">DOB / Age</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Registered</th>
-                    <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>DOB / Age</TableHead>
+                    <TableHead>Registered</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {safePatients.map((patient) => (
-                    <tr key={patient?.id || Math.random()} className="hover:bg-surface-hover transition-colors">
-                      <td className="px-4 sm:px-6 py-4 sm:py-5">
-                        <span className="font-semibold text-text-primary">{formatPatientName(patient)}</span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{patient?.email || '-'}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{patient?.phone || '-'}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatPatientDobOrAge(patient)}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-muted">{formatDateSafe(patient?.created_at)}</td>
-                      <td className="px-4 sm:px-6 py-4 sm:py-5">
+                    <TableRow key={patient?.id || Math.random()}>
+                      <TableCell className="font-medium">{formatPatientName(patient)}</TableCell>
+                      <TableCell className="text-muted-foreground">{patient?.email || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">{patient?.phone || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatPatientDobOrAge(patient)}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDateSafe(patient?.created_at)}</TableCell>
+                      <TableCell className="text-right">
                         <Button
                           variant="danger"
                           size="sm"
@@ -268,12 +259,12 @@ export function Patients() {
                         >
                           Delete
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </CardContent>
           </Card>
         </div>
       )}

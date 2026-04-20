@@ -7,13 +7,16 @@ import toast from 'react-hot-toast';
 import { useAppointments, type AppointmentFilters } from '../hooks';
 import { createAppointmentHandler } from '../handlers';
 import { appointmentsApi } from '../services';
-import { EMPTY_APPOINTMENT, APPOINTMENT_STATUS_CLASSES } from '../constants';
+import { EMPTY_APPOINTMENT } from '../constants';
 import {
   formatPatientName,
   formatDoctorName,
   formatDateTimeSafe,
 } from '../utils';
-import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea, Button, Card } from '../components/common';
+import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea, Button, Card as CommonCard } from '../components/common';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { appointmentSchema, type AppointmentFormData, type AppointmentFormInput } from '../validation';
 
 export function Appointments() {
@@ -142,8 +145,13 @@ export function Appointments() {
     }
   };
 
-  const getStatusBadgeClass = (status: string): string => {
-    return APPOINTMENT_STATUS_CLASSES[status] || 'status-badge';
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'completed': return 'default';
+      case 'scheduled': return 'secondary';
+      case 'cancelled': return 'destructive';
+      default: return 'secondary';
+    }
   };
 
   // Safe rendering guards - only show empty after loading completes
@@ -153,10 +161,10 @@ export function Appointments() {
   return (
     <div className="page-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Appointments</h1>
-          <p className="text-sm sm:text-base text-text-secondary mt-1">Schedule and manage appointments</p>
+          <h1 className="text-2xl font-semibold">Appointments</h1>
+          <p className="text-sm text-muted-foreground mt-1">Schedule and manage appointments</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
@@ -199,15 +207,15 @@ export function Appointments() {
       )}
 
       {showFilters && (
-        <Card className="space-y-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <CommonCard className="space-y-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary">Doctor</label>
+              <label className="block text-sm font-medium">Doctor</label>
               <select
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(Number(e.target.value) || '')}
                 disabled={loading || refetching}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 bg-surface text-text-primary"
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
               >
                 <option value="">All Doctors</option>
                 {doctors.map((d) => (
@@ -218,12 +226,12 @@ export function Appointments() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary">Status</label>
+              <label className="block text-sm font-medium">Status</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as AppointmentFilters['status'])}
                 disabled={loading || refetching}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 bg-surface text-text-primary"
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
               >
                 <option value="">All Status</option>
                 <option value="scheduled">Scheduled</option>
@@ -250,12 +258,12 @@ export function Appointments() {
               {refetching ? 'Updating...' : 'Apply Filters'}
             </Button>
           </div>
-        </Card>
+        </CommonCard>
       )}
 
       {showForm && (
-        <Card id="appointment-form" className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-6">New Appointment</h3>
+        <CommonCard id="appointment-form" className="mb-6">
+          <h3 className="text-lg font-semibold mb-6">New Appointment</h3>
           <FormWrapper<AppointmentFormInput, AppointmentFormData>
             form={form}
             onSubmit={onSubmit}
@@ -263,7 +271,7 @@ export function Appointments() {
             loadingLabel="Scheduling..."
             apiError={apiError}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormSelect<AppointmentFormInput>
                 name="patient_id"
                 label="Patient"
@@ -301,35 +309,35 @@ export function Appointments() {
               disabled={form.formState.isSubmitting}
             />
           </FormWrapper>
-        </Card>
+        </CommonCard>
       )}
 
-      <Card padding="none" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead className="bg-surface-hover">
-              <tr>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Patient</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Doctor</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Date & Time</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Notes</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Patient</TableHead>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Date & Time</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {appointments.map((apt) => {
                 const appointmentTime = apt.appointment_time || apt.scheduled_at;
                 return (
-                  <tr key={apt.id} className="hover:bg-surface-hover transition-colors">
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-text-primary">{formatPatientName(apt.patient)}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatDoctorName(apt.doctor)}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatDateTimeSafe(appointmentTime)}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5">
-                      <span className={getStatusBadgeClass(apt.status)}>{apt.status}</span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-muted">{apt.notes || '-'}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5">
+                  <TableRow key={apt.id}>
+                    <TableCell className="font-medium">{formatPatientName(apt.patient)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatDoctorName(apt.doctor)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatDateTimeSafe(appointmentTime)}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(apt.status)}>{apt.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{apt.notes || '-'}</TableCell>
+                    <TableCell className="text-right">
                       <Button
                         variant="danger"
                         size="sm"
@@ -338,13 +346,13 @@ export function Appointments() {
                       >
                         Delete
                       </Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </CardContent>
       </Card>
     </div>
   );

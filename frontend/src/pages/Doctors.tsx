@@ -6,7 +6,8 @@ import toast from 'react-hot-toast';
 import { useDoctors } from '../hooks';
 import { doctorsApi } from '../services';
 import { formatDoctorName, formatDoctorInitials } from '../utils';
-import { ErrorState, EmptyState, Button, Card } from '../components/common';
+import { ErrorState, EmptyState, Button, Card as CommonCard } from '../components/common';
+import { Card, CardContent } from '@/components/ui/card';
 import { SkeletonCard } from '../components/common/skeletons';
 import { FormWrapper, FormInput } from '../components/common';
 import { doctorSchema, type DoctorFormData, type DoctorFormInput } from '../validation';
@@ -124,19 +125,10 @@ export function Doctors() {
         />
       )}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          {loading ? (
-            <div className="space-y-2">
-              <div className="h-8 bg-surface rounded-xl w-32 animate-pulse" />
-              <div className="h-4 bg-surface rounded-lg w-48 animate-pulse" />
-            </div>
-          ) : (
-            <>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Doctors</h1>
-              <p className="text-sm sm:text-base text-text-secondary mt-1">Medical staff directory</p>
-            </>
-          )}
+          <h1 className="text-2xl font-semibold">Doctors</h1>
+          <p className="text-sm text-muted-foreground mt-1">Medical staff directory</p>
         </div>
         <Button
           variant={showForm ? 'ghost' : 'primary'}
@@ -147,8 +139,8 @@ export function Doctors() {
       </div>
 
       {showForm && (
-        <Card id="doctor-form" className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-6">New Doctor</h3>
+        <CommonCard id="doctor-form" className="mb-6">
+          <h3 className="text-lg font-semibold mb-6">New Doctor</h3>
           <FormWrapper<DoctorFormInput, DoctorFormData>
             form={form}
             onSubmit={onSubmit}
@@ -156,7 +148,7 @@ export function Doctors() {
             loadingLabel="Creating..."
             apiError={apiError}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormInput<DoctorFormInput>
                 name="name"
                 label="Full Name"
@@ -184,12 +176,12 @@ export function Doctors() {
               />
             </div>
           </FormWrapper>
-        </Card>
+        </CommonCard>
       )}
 
       {/* Grid */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -200,34 +192,32 @@ export function Doctors() {
       )}
 
       {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {doctors.map((doctor) => (
-            <Card
-              key={doctor.id}
-              padding="md"
-              className="flex items-start gap-4"
-            >
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
-                {formatDoctorInitials(doctor)}
-              </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <h3 className="font-semibold text-text-primary truncate">{formatDoctorName(doctor)}</h3>
-                <p className="text-sm font-medium text-primary">
-                  {doctor.specialization || doctor.specialty || 'General'}
-                </p>
-                <p className="text-sm text-text-secondary">
-                  {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
-                </p>
-                <p className="text-sm text-text-muted truncate">{doctor.user?.email || ''}</p>
-              </div>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => handleDelete(String(doctor.id))}
-                disabled={loading}
-              >
-                Delete
-              </Button>
+            <Card key={doctor.id}>
+              <CardContent className="flex items-start gap-4 p-6">
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold flex-shrink-0">
+                  {formatDoctorInitials(doctor)}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h3 className="font-semibold truncate">{formatDoctorName(doctor)}</h3>
+                  <p className="text-sm font-medium text-primary">
+                    {doctor.specialization || doctor.specialty || 'General'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
+                  </p>
+                  <p className="text-sm text-muted-foreground truncate">{doctor.user?.email || ''}</p>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDelete(String(doctor.id))}
+                  disabled={loading}
+                >
+                  Delete
+                </Button>
+              </CardContent>
             </Card>
           ))}
         </div>

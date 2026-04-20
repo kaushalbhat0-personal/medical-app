@@ -7,19 +7,42 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: "#2563eb",
-          hover: "#1d4ed8",
-          light: "#3b82f6",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
+        },
+        primary: {
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
+        },
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
+        },
+        accent: {
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
+        },
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
+        },
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
         surface: {
           DEFAULT: "#1e293b",
           hover: "#334155",
-          light: "#475569",
-        },
-        background: "#0f172a",
-        border: {
-          DEFAULT: "#334155",
           light: "#475569",
         },
         text: {

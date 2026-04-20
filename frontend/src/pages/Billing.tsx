@@ -6,9 +6,12 @@ import toast from 'react-hot-toast';
 import { useBilling } from '../hooks';
 import { createBillHandler, payBillHandler, fetchPatientAppointmentsHandler } from '../handlers';
 import { billingApi } from '../services';
-import { BILLING_STATUS_CLASSES, CURRENCIES, EMPTY_BILL } from '../constants';
+import { CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
-import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, Button, Card } from '../components/common';
+import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, Button, Card as CommonCard } from '../components/common';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { billingSchema, type BillingFormData, type BillingFormInput } from '../validation';
 import type { Appointment, Bill } from '../types';
 
@@ -175,8 +178,13 @@ export function Billing() {
     }
   };
 
-  const getStatusBadgeClass = (status: string): string => {
-    return BILLING_STATUS_CLASSES[status] || 'status-badge';
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'paid': return 'default';
+      case 'pending': return 'secondary';
+      case 'overdue': return 'destructive';
+      default: return 'secondary';
+    }
   };
 
   // Helper to get patient name from bill (uses nested patient or falls back to patients list)
@@ -217,10 +225,10 @@ export function Billing() {
           description="There are no bills to display at the moment."
         />
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-text-primary">Billing</h1>
-          <p className="text-sm sm:text-base text-text-secondary mt-1">Manage invoices and payments</p>
+          <h1 className="text-2xl font-semibold">Billing</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage invoices and payments</p>
         </div>
         <Button
           variant={showForm ? 'ghost' : 'primary'}
@@ -231,8 +239,8 @@ export function Billing() {
       </div>
 
       {showForm && (
-        <Card id="billing-form" className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-6">New Bill</h3>
+        <CommonCard id="billing-form" className="mb-6">
+          <h3 className="text-lg font-semibold mb-6">New Bill</h3>
           <FormWrapper<BillingFormInput, BillingFormData>
             form={form}
             onSubmit={onSubmit}
@@ -240,7 +248,7 @@ export function Billing() {
             loadingLabel="Creating..."
             apiError={apiError}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormSelect<BillingFormInput>
                 name="patient_id"
                 label="Patient"
@@ -316,34 +324,34 @@ export function Billing() {
               required
             />
           </FormWrapper>
-        </Card>
+        </CommonCard>
       )}
 
-      <Card padding="none" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead className="bg-surface-hover">
-              <tr>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Patient</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Description</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Amount</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Due Date</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
-                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Patient</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {bills.map((bill) => (
-                <tr key={bill.id} className="hover:bg-surface-hover transition-colors">
-                  <td className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-text-primary">{getPatientName(bill)}</td>
-                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{bill.description || '-'}</td>
-                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary font-mono">{formatCurrency(bill.amount, bill.currency)}</td>
-                  <td className="px-4 sm:px-6 py-4 sm:py-5 text-sm text-text-secondary">{formatDateSafe(bill.due_date)}</td>
-                  <td className="px-4 sm:px-6 py-4 sm:py-5">
-                    <span className={getStatusBadgeClass(bill.status)}>{bill.status}</span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 sm:py-5">
-                    <div className="flex gap-2">
+                <TableRow key={bill.id}>
+                  <TableCell className="font-medium">{getPatientName(bill)}</TableCell>
+                  <TableCell className="text-muted-foreground">{bill.description || '-'}</TableCell>
+                  <TableCell className="font-mono">{formatCurrency(bill.amount, bill.currency)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDateSafe(bill.due_date)}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(bill.status)}>{bill.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex gap-2 justify-end">
                       {bill.status === 'pending' && (
                         <Button
                           variant="primary"
@@ -363,12 +371,12 @@ export function Billing() {
                         Delete
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </CardContent>
       </Card>
     </div>
   );

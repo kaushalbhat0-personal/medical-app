@@ -26,7 +26,7 @@ const warmUpBackend = async () => {
     console.log('[App] Backend warmup call failed (may be cold starting):', err);
   }
 };
-import { MainLayout } from './layouts/MainLayout';
+import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AnimatedPage } from './animations';
 import { Login } from './pages/Login';
@@ -59,11 +59,11 @@ function AnimatedRoutes() {
           path="/dashboard"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <MainLayout user={user} onLogout={logout}>
+              <AppLayout user={user} onLogout={logout}>
                 <AnimatedPage>
                   <Dashboard />
                 </AnimatedPage>
-              </MainLayout>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -72,11 +72,11 @@ function AnimatedRoutes() {
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <MainLayout user={user} onLogout={logout}>
+              <AppLayout user={user} onLogout={logout}>
                 <AnimatedPage>
                   <Patients />
                 </AnimatedPage>
-              </MainLayout>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -85,11 +85,11 @@ function AnimatedRoutes() {
           path="/doctors"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <MainLayout user={user} onLogout={logout}>
+              <AppLayout user={user} onLogout={logout}>
                 <AnimatedPage>
                   <Doctors />
                 </AnimatedPage>
-              </MainLayout>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -98,11 +98,11 @@ function AnimatedRoutes() {
           path="/appointments"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <MainLayout user={user} onLogout={logout}>
+              <AppLayout user={user} onLogout={logout}>
                 <AnimatedPage>
                   <Appointments />
                 </AnimatedPage>
-              </MainLayout>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -111,11 +111,11 @@ function AnimatedRoutes() {
           path="/billing"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <MainLayout user={user} onLogout={logout}>
+              <AppLayout user={user} onLogout={logout}>
                 <AnimatedPage>
                   <Billing />
                 </AnimatedPage>
-              </MainLayout>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
