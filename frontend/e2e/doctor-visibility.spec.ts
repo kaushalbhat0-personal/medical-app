@@ -29,15 +29,18 @@ test.describe('Doctor RBAC visibility', () => {
     await expect(page).toHaveURL(/\/doctor\/home/, { timeout: 25_000 });
 
     const apptList = page.waitForResponse(
-      (r) => r.url().includes('/api/v1/appointments') && r.status() === 200
+      (r) =>
+        r.url().includes('/appointments') &&
+        r.request().method() === 'GET' &&
+        r.status() === 200
     );
     await page.getByRole('link', { name: 'Appointments', exact: true }).click();
     await apptList;
     await expect(page.getByRole('heading', { name: 'Appointments' })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText(/11:30/)).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('2035-06-15 11:00')).toHaveCount(0);
+    await expect(page.getByText('11:30')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('11:00')).not.toBeVisible();
 
     await page.getByRole('link', { name: 'Patients', exact: true }).click();
     await expect(page).toHaveURL(/\/doctor\/patients/, { timeout: 15_000 });

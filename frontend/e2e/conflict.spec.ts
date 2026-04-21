@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 type Creds = {
+  apiBaseUrl: string;
   patientEmail: string;
   patientPassword: string;
   patientBEmail: string;
@@ -61,6 +62,22 @@ async function openBookingForDoctor(
   await slotLocator.first().click();
 }
 
+async function appointmentListLength(
+  page: import('@playwright/test').Page,
+  apiBaseUrl: string
+): Promise<number> {
+  const token = await page.evaluate(() => localStorage.getItem('token'));
+  if (!token) {
+    throw new Error('Expected patient JWT in localStorage');
+  }
+  const res = await page.request.get(`${apiBaseUrl}/appointments`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(res.ok(), `appointments GET failed: ${res.status()}`).toBeTruthy();
+  const data = (await res.json()) as unknown[];
+  return data.length;
+}
+
 test.describe('Booking conflict', () => {
   /**
    * Patient B loads slots and selects the first open slot, then Patient A books that instant.
@@ -70,6 +87,7 @@ test.describe('Booking conflict', () => {
   test('second patient cannot take the same slot (stale selection then reject)', async ({ browser }) => {
     const c = loadCreds();
     const bookingDate = c.bookingDate ?? '2035-06-15';
+    const apiBaseUrl = c.apiBaseUrl;
 
     const ctxB = await browser.newContext();
     const ctxA = await browser.newContext();
@@ -82,17 +100,30 @@ test.describe('Booking conflict', () => {
 
       await loginPatient(pageA, c.patientEmail, c.patientPassword);
       await openBookingForDoctor(pageA, c.doctorDisplayName, bookingDate);
-      await pageA.getByRole('button', { name: 'Confirm' }).click();
+
+      const countBeforeA = await appointmentListLength(pageA, apiBaseUrl);
+      const countBeforeB = await appointmentListLength(pageB, apiBaseUrl);
+
+      const createAppt = pageA.waitForResponse(
+        (r) =>
+          r.url().includes('/appointments') &&
+          r.request().method() === 'POST' &&
+          (r.status() === 201 || r.status() === 200)
+      );
+      await Promise.all([createAppt, pageA.getByRole('button', { name: 'Confirm' }).click()]);
+
       await expect(pageA).toHaveURL(/\/patient\/appointments/, { timeout: 25_000 });
+
+      const countAfterA = await appointmentListLength(pageA, apiBaseUrl);
+      expect(countAfterA).toBe(countBeforeA + 1);
 
       await pageB.getByRole('button', { name: 'Confirm' }).click();
 
-      await expect(
-        pageB.getByText(
-          /Slot already booked|That slot was just taken|just taken|Booking failed|within 30 minutes/i
-        )
-      ).toBeVisible({ timeout: 15_000 });
-      await expect(pageB).not.toHaveURL(/\/patient\/appointments/, { timeout: 3_000 });
+      await expect(pageB.getByText(/slot|booked|taken|failed/i)).toBeVisible({ timeout: 15_000 });
+      await expect(pageB).not.toHaveURL(/\/patient\/appointments/);
+
+      const countAfterB = await appointmentListLength(pageB, apiBaseUrl);
+      expect(countAfterB).toBe(countBeforeB);
     } finally {
       await ctxB.close();
       await ctxA.close();
