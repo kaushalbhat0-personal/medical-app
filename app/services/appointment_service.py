@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
 from app.services import doctor_service, patient_service
@@ -56,6 +57,7 @@ def create_appointment(
     db: Session,
     appointment_in: AppointmentCreate,
     created_by: UUID,
+    tenant_id: UUID | None = None,
 ) -> Appointment:
     _validate_patient_and_doctor_exist(
         db,
@@ -70,6 +72,7 @@ def create_appointment(
     _validate_appointment_time_in_future(appointment_in.appointment_time)
     appointment_data = appointment_in.model_dump()
     appointment_data["created_by"] = created_by
+    appointment_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
     return crud_appointment.create_appointment(db, appointment_data)
 
 

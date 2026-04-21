@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
 from app.models.patient import Patient
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -17,10 +18,12 @@ def create_patient(
     db: Session,
     patient_in: PatientCreate,
     created_by: UUID,
+    tenant_id: UUID | None = None,
 ) -> Patient:
     _validate_age(patient_in.age)
     patient_data = patient_in.model_dump()
     patient_data["created_by"] = created_by
+    patient_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
     return crud_patient.create_patient(db, patient_data)
 
 

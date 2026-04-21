@@ -3,7 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import TokenPayload
+from app.api.deps import get_current_auth_context, get_current_user
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
@@ -16,9 +17,14 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 def create_patient(
     payload: PatientCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth_ctx: TokenPayload = Depends(get_current_auth_context),
 ) -> PatientRead:
-    return patient_service.create_patient(db, payload, current_user.id)
+    return patient_service.create_patient(
+        db,
+        payload,
+        created_by=auth_ctx.user_id,
+        tenant_id=auth_ctx.tenant_id,
+    )
 
 
 @router.get("", response_model=list[PatientRead])

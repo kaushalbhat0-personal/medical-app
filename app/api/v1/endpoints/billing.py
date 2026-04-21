@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
 from app.core.database import get_db
 from app.models.billing import BillingStatus
 from app.models.user import User
@@ -17,11 +17,16 @@ router = APIRouter(prefix="/bills", tags=["bills"])
 def create_bill(
     payload: BillingCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth_ctx: TokenPayload = Depends(get_current_auth_context),
 ) -> BillingRead:
     print("[BILLING API] Incoming payload:", payload.model_dump())
     try:
-        result = billing_service.create_bill(db, payload, current_user.id)
+        result = billing_service.create_bill(
+            db,
+            payload,
+            created_by=auth_ctx.user_id,
+            tenant_id=auth_ctx.tenant_id,
+        )
         print("[BILLING API] Bill created successfully:", result.id)
         return result
     except Exception as e:

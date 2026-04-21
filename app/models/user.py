@@ -4,14 +4,17 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 
 class UserRole(str, enum.Enum):
+    super_admin = "super_admin"
     admin = "admin"
     staff = "staff"
+    doctor = "doctor"
+    patient = "patient"
 
 
 class User(Base):
@@ -46,3 +49,5 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    tenant_associations = relationship("UserTenant", back_populates="user")

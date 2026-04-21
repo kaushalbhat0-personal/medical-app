@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.doctor import DoctorCreate, DoctorRead, DoctorUpdate
@@ -16,9 +16,9 @@ router = APIRouter(prefix="/doctors", tags=["doctors"])
 def create_doctor(
     payload: DoctorCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    auth_ctx: TokenPayload = Depends(get_current_auth_context),
 ) -> DoctorRead:
-    return doctor_service.create_doctor(db, payload)
+    return doctor_service.create_doctor(db, payload, tenant_id=auth_ctx.tenant_id)
 
 
 @router.get("", response_model=list[DoctorRead])

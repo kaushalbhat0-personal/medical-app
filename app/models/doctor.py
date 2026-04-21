@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,11 @@ class Doctor(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     specialization: Mapped[str] = mapped_column(String(255), nullable=False)
     experience_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -26,3 +31,4 @@ class Doctor(Base):
     )
 
     appointments = relationship("Appointment", back_populates="doctor")
+    tenant = relationship("Tenant")

@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_billing
 from app.models.appointment import AppointmentStatus
 from app.models.billing import Billing, BillingStatus
@@ -63,6 +64,7 @@ def create_bill(
     db: Session,
     billing_in: BillingCreate,
     created_by: UUID,
+    tenant_id: UUID | None = None,
 ) -> Billing:
     print("[BILLING SERVICE] Creating bill with data:", billing_in.model_dump())
 
@@ -89,6 +91,7 @@ def create_bill(
 
     billing_data = billing_in.model_dump()
     billing_data["created_by"] = created_by
+    billing_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
     print("[BILLING SERVICE] Creating bill in DB with data:", billing_data)
 
     try:

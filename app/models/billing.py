@@ -2,7 +2,8 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Numeric, String, UniqueConstraint, func, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, func, text
+from sqlalchemy import Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +42,11 @@ class Billing(Base):
     appointment_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="SET NULL"),
         nullable=True,
     )
     amount: Mapped[float] = mapped_column(
@@ -106,6 +112,7 @@ class Billing(Base):
 
     patient = relationship("Patient", back_populates="billings")
     appointment = relationship("Appointment", back_populates="billing")
+    tenant = relationship("Tenant")
     events = relationship("BillingEvent", back_populates="billing", cascade="all, delete-orphan")
 
 

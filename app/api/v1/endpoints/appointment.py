@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
@@ -16,9 +16,14 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 def create_appointment(
     payload: AppointmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    auth_ctx: TokenPayload = Depends(get_current_auth_context),
 ) -> AppointmentRead:
-    return appointment_service.create_appointment(db, payload, current_user.id)
+    return appointment_service.create_appointment(
+        db,
+        payload,
+        created_by=auth_ctx.user_id,
+        tenant_id=auth_ctx.tenant_id,
+    )
 
 
 @router.get("", response_model=list[AppointmentRead])

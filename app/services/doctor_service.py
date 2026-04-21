@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_doctor
 from app.models.doctor import Doctor
 from app.schemas.doctor import DoctorCreate, DoctorUpdate
@@ -13,9 +14,10 @@ def _validate_experience_years(experience_years: int | None) -> None:
         raise ValidationError("Experience years must be greater than or equal to 0")
 
 
-def create_doctor(db: Session, doctor_in: DoctorCreate) -> Doctor:
+def create_doctor(db: Session, doctor_in: DoctorCreate, tenant_id: UUID | None = None) -> Doctor:
     _validate_experience_years(doctor_in.experience_years)
     doctor_data = doctor_in.model_dump()
+    doctor_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
     return crud_doctor.create_doctor(db, doctor_data)
 
 

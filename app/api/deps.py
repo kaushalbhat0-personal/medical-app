@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends
@@ -16,7 +17,14 @@ from app.models.user import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 
 
-def _user_id_from_access_token(token: str) -> UUID:
+@dataclass
+class TokenPayload:
+    user_id: UUID
+    role: str
+    tenant_id: UUID | None
+
+
+def _parse_access_token(token: str) -> TokenPayload:
     payload = decode_access_token(token)
     if payload is None:
         raise unauthorized_credentials_exception()
@@ -26,9 +34,30 @@ def _user_id_from_access_token(token: str) -> UUID:
     if sub is None or not isinstance(sub, str):
         raise unauthorized_credentials_exception()
     try:
-        return UUID(sub)
+        user_id = UUID(sub)
     except ValueError:
         raise unauthorized_credentials_exception()
+
+    # Backward-compatible: legacy tokens may not contain role/tenant_id
+    role = payload.get("role")
+    if not role or not isinstance(role, str):
+        role = "admin"
+
+    tenant_id = payload.get("tenant_id")
+    if tenant_id and isinstance(tenant_id, str):
+        try:
+            tenant_id = UUID(tenant_id)
+        except ValueError:
+            tenant_id = None
+    else:
+        tenant_id = None
+
+    return TokenPayload(user_id=user_id, role=role, tenant_id=tenant_id)
+
+
+def _user_id_from_access_token(token: str) -> UUID:
+    # Kept for backward compatibility with existing code
+    return _parse_access_token(token).user_id
 
 
 def get_current_user(
@@ -48,3 +77,16 @@ def get_current_active_user(
     if not current_user.is_active:
         raise inactive_user_exception()
     return current_user
+
+
+def get_current_auth_context(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> TokenPayload:
+    auth_ctx = _parse_access_token(token)
+    user = crud_user.get_user(db, auth_ctx.user_id)
+    if user is None:
+        raise unauthorized_credentials_exception()
+    if not user.is_active:
+        raise inactive_user_exception()
+    return auth_ctx
