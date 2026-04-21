@@ -24,6 +24,8 @@ def create_user(db: Session, user_data: dict[str, Any]) -> User:
     )
     if "role" in user_data and user_data["role"] is not None:
         user.role = user_data["role"]
+    if user_data.get("force_password_reset") is True:
+        user.force_password_reset = True
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -40,6 +42,8 @@ def create_user_tx(db: Session, user_data: dict[str, Any]) -> User:
     )
     if "role" in user_data and user_data["role"] is not None:
         user.role = user_data["role"]
+    if user_data.get("force_password_reset") is True:
+        user.force_password_reset = True
     db.add(user)
     db.flush()
     db.refresh(user)

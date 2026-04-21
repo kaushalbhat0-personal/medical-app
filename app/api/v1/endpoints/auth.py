@@ -1,14 +1,19 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.security import create_access_token
-from app.schemas.auth import Token
+from app.models.user import User
+from app.schemas.auth import ResetPasswordRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services import auth_service
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def _build_token_payload(user) -> dict:
@@ -42,6 +47,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     # OAuth2PasswordRequestForm uses 'username' field - treat as email
     user = auth_service.authenticate_user(db, form_data.username, form_data.password)
+    if user.force_password_reset:
+        logger.warning("[PASSWORD RESET REQUIRED] user_id=%s", user.id)
     token_payload = _build_token_payload(user)
     access_token = create_access_token(token_payload)
     return {
@@ -49,4 +56,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "token_type": "bearer",
         "role": token_payload["role"],
         "tenant_id": token_payload["tenant_id"],
+        "force_password_reset": user.force_password_reset,
     }
+
+
+@router.post("/auth/reset-password")
+def reset_password(
+    body: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, str]:
+    auth_service.reset_password(db, current_user, body.old_password, body.new_password)
+    return {"detail": "Password updated"}

@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.user import User, UserRole
-from app.services import doctor_service, patient_service
+from app.services import doctor_service, doctor_slot_service, patient_service
+from app.utils.appointment_datetime import normalize_appointment_time_utc
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
     assert_authorized,
@@ -58,6 +59,7 @@ def _validate_doctor_availability(
 ) -> None:
     from datetime import timedelta
 
+    appointment_time = normalize_appointment_time_utc(appointment_time)
     start_buffer = appointment_time - timedelta(minutes=30)
     end_buffer = appointment_time + timedelta(minutes=30)
 
@@ -73,13 +75,27 @@ def _validate_doctor_availability(
     for booked in booked_appointments:
         if existing_appointment_id is not None and booked.id == existing_appointment_id:
             continue
-        if abs((booked.appointment_time - appointment_time).total_seconds()) < 1800:
+        booked_t = normalize_appointment_time_utc(booked.appointment_time)
+        if abs((booked_t - appointment_time).total_seconds()) < 1800:
             raise ConflictError("Doctor already has an appointment within 30 minutes of this time slot")
 
 
 def _validate_appointment_time_in_future(appointment_time: datetime) -> None:
     if appointment_time < datetime.now(timezone.utc):
         raise ValidationError("Cannot book appointment in the past")
+
+
+def _validate_slot_not_double_booked(
+    db: Session,
+    doctor_id: UUID,
+    appointment_time: datetime,
+    *,
+    exclude_appointment_id: UUID | None = None,
+) -> None:
+    if crud_appointment.doctor_has_non_cancelled_appointment_at(
+        db, doctor_id, appointment_time, exclude_appointment_id=exclude_appointment_id
+    ):
+        raise ValidationError("Slot already booked")
 
 
 def authorize_appointment_create(
@@ -157,18 +173,22 @@ def create_appointment(
         patient_id=appointment_in.patient_id,
         doctor_id=appointment_in.doctor_id,
     )
+    doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
+    if doctor.tenant_id is None:
+        logger.error("[TENANT INTEGRITY] doctor.tenant_id is None for doctor_id=%s", doctor.id)
+        raise ValidationError("Doctor tenant is not set")
+    doctor_slot_service.assert_appointment_time_matches_doctor_slots(
+        db, doctor, appointment_in.appointment_time
+    )
     _validate_doctor_availability(
         db,
         doctor_id=appointment_in.doctor_id,
         appointment_time=appointment_in.appointment_time,
     )
+    _validate_slot_not_double_booked(db, appointment_in.doctor_id, appointment_in.appointment_time)
     _validate_appointment_time_in_future(appointment_in.appointment_time)
     appointment_data = appointment_in.model_dump()
     appointment_data["created_by"] = current_user.id
-    doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
-    if doctor.tenant_id is None:
-        logger.error("[TENANT INTEGRITY] doctor.tenant_id is None for doctor_id=%s", doctor.id)
-        raise ValidationError("Doctor tenant is not set")
     appointment_data["tenant_id"] = doctor.tenant_id
 
     try:
@@ -183,7 +203,8 @@ def create_appointment(
             )
         db.commit()
         db.refresh(appointment)
-    except IntegrityError:
+        doctor_slot_service.invalidate_slots_cache_for_appointment(db, doctor, appointment.appointment_time)
+    except IntegrityError as e:
         db.rollback()
         if idempotency_key:
             existing = crud_appointment.get_appointment_idempotency_record(
@@ -191,6 +212,9 @@ def create_appointment(
             )
             if existing is not None and existing.request_hash == body_hash:
                 return get_appointment_or_404(db, existing.appointment_id)
+        msg = str(getattr(e, "orig", e))
+        if "uq_appointments_doctor_time_active" in msg or "uq_doctor_time" in msg:
+            raise ValidationError("Slot already booked") from e
         raise
 
     log_audit_mutation(
@@ -365,17 +389,35 @@ def update_appointment(
     patient_id = update_data.get("patient_id", appointment.patient_id)
     doctor_id = update_data.get("doctor_id", appointment.doctor_id)
     appointment_time = update_data.get("appointment_time", appointment.appointment_time)
+    prev_doctor_id = appointment.doctor_id
+    prev_appointment_time = appointment.appointment_time
 
     _validate_patient_and_doctor_exist(db, patient_id=patient_id, doctor_id=doctor_id)
+    doctor_for_slot = doctor_service.get_doctor_or_404(db, doctor_id)
+    if appointment_time != prev_appointment_time or doctor_id != prev_doctor_id:
+        doctor_slot_service.assert_appointment_time_matches_doctor_slots(
+            db, doctor_for_slot, appointment_time
+        )
     _validate_doctor_availability(
         db,
         doctor_id=doctor_id,
         appointment_time=appointment_time,
         existing_appointment_id=appointment.id,
     )
+    if appointment_time != prev_appointment_time or doctor_id != prev_doctor_id:
+        _validate_slot_not_double_booked(
+            db,
+            doctor_id,
+            appointment_time,
+            exclude_appointment_id=appointment.id,
+        )
     if "appointment_time" in update_data:
         _validate_appointment_time_in_future(appointment_time)
     updated = crud_appointment.update_appointment(db, appointment, update_data)
+    if appointment_time != prev_appointment_time or doctor_id != prev_doctor_id:
+        doctor_slot_service.invalidate_slots_cache_for_appointment(db, doctor_for_slot, appointment_time)
+        prev_doctor = doctor_service.get_doctor_or_404(db, prev_doctor_id)
+        doctor_slot_service.invalidate_slots_cache_for_appointment(db, prev_doctor, prev_appointment_time)
     log_audit_mutation(
         "update",
         current_user,
@@ -398,7 +440,10 @@ def delete_appointment(
     if appointment.status == AppointmentStatus.completed:
         raise ValidationError("Completed appointment cannot be deleted")
 
+    slot_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
+    slot_time = appointment.appointment_time
     deleted = crud_appointment.soft_delete_appointment(db, appointment)
+    doctor_slot_service.invalidate_slots_cache_for_appointment(db, slot_doctor, slot_time)
     log_audit_mutation(
         "delete",
         current_user,

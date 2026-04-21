@@ -19,7 +19,6 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     __table_args__ = (
-        UniqueConstraint("doctor_id", "appointment_time", name="uq_doctor_time"),
         Index("idx_user_doctor_time", "created_by", "doctor_id", "appointment_time"),
         Index(
             "ix_appointments_tenant_patient_created",
@@ -27,6 +26,13 @@ class Appointment(Base):
             "patient_id",
             desc("created_at"),
             postgresql_where=text("is_deleted = false"),
+        ),
+        Index(
+            "uq_appointments_doctor_time_active",
+            "doctor_id",
+            "appointment_time",
+            unique=True,
+            postgresql_where=text("is_deleted = false AND status <> 'cancelled'::appointmentstatus"),
         ),
     )
 

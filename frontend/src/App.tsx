@@ -2,15 +2,42 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
-import { useAuth } from './hooks/useAuth';
+import { useAuth, AuthProvider } from './hooks/useAuth';
 import { setNavigator } from './utils/navigation';
+import { postLoginHomePath } from './utils/roles';
+import { roleFromToken } from './utils/jwtPayload';
+import AppLayout from './components/layout/AppLayout';
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { StaffRoute } from './components/layout/StaffRoute';
+import { PatientRoute } from './components/layout/PatientRoute';
+import { PatientLayout } from './components/layout/PatientLayout';
+import { DoctorLayout } from './components/layout/DoctorLayout';
+import { DoctorRoute } from './components/layout/DoctorRoute';
+import { AnimatedPage } from './animations';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { Patients } from './pages/Patients';
+import { Doctors } from './pages/Doctors';
+import { Appointments } from './pages/Appointments';
+import { Billing } from './pages/Billing';
+import { PatientHome } from './pages/patient/PatientHome';
+import { PatientDoctors } from './pages/patient/PatientDoctors';
+import { PatientAppointments } from './pages/patient/PatientAppointments';
+import { PatientBills } from './pages/patient/PatientBills';
+import { DoctorHome } from './pages/doctor/DoctorHome';
+import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
+import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
+import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
+import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
+import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
+import { SignupPatient } from './pages/SignupPatient';
+import { SignupDoctor } from './pages/SignupDoctor';
+import { ResetPassword } from './pages/ResetPassword';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Warm up backend on app load to reduce cold start latency
 const warmUpBackend = async () => {
   try {
-    // Use a timeout to prevent hanging if backend is down
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -22,19 +49,9 @@ const warmUpBackend = async () => {
     clearTimeout(timeoutId);
     console.log('[App] Backend warmed up successfully');
   } catch (err) {
-    // Silently fail - this is just a warmup call
     console.log('[App] Backend warmup call failed (may be cold starting):', err);
   }
 };
-import AppLayout from './components/layout/AppLayout';
-import { ProtectedRoute } from './components/layout/ProtectedRoute';
-import { AnimatedPage } from './animations';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Patients } from './pages/Patients';
-import { Doctors } from './pages/Doctors';
-import { Appointments } from './pages/Appointments';
-import { Billing } from './pages/Billing';
 
 function AnimatedRoutes() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
@@ -45,82 +62,277 @@ function AnimatedRoutes() {
     setNavigator(navigate);
   }, [navigate]);
 
+  const effectiveRole = user?.role ?? roleFromToken(localStorage.getItem('token'));
+  const needsPasswordReset = user?.force_password_reset === true;
+  const loginRedirect = needsPasswordReset ? '/reset-password' : postLoginHomePath(effectiveRole);
+
+  if (
+    !isLoading &&
+    isAuthenticated &&
+    needsPasswordReset &&
+    location.pathname !== '/reset-password'
+  ) {
+    return <Navigate to="/reset-password" replace />;
+  }
+
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login onLogin={login} />
-          } 
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : isAuthenticated ? (
+              <Navigate to={loginRedirect} replace />
+            ) : (
+              <Login onLogin={login} />
+            )
+          }
         />
-        
+
+        <Route
+          path="/signup/patient"
+          element={
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : isAuthenticated ? (
+              <Navigate to={loginRedirect} replace />
+            ) : (
+              <SignupPatient />
+            )
+          }
+        />
+
+        <Route
+          path="/signup/doctor"
+          element={
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : isAuthenticated ? (
+              <Navigate to={loginRedirect} replace />
+            ) : (
+              <SignupDoctor />
+            )
+          }
+        />
+
+        <Route
+          path="/reset-password"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              {isAuthenticated && !needsPasswordReset ? (
+                <Navigate to={postLoginHomePath(effectiveRole)} replace />
+              ) : (
+                <ResetPassword />
+              )}
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <AppLayout user={user} onLogout={logout}>
-                <AnimatedPage>
-                  <Dashboard />
-                </AnimatedPage>
-              </AppLayout>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <Dashboard />
+                  </AnimatedPage>
+                </AppLayout>
+              </StaffRoute>
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <AppLayout user={user} onLogout={logout}>
-                <AnimatedPage>
-                  <Patients />
-                </AnimatedPage>
-              </AppLayout>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <Patients />
+                  </AnimatedPage>
+                </AppLayout>
+              </StaffRoute>
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/doctors"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <AppLayout user={user} onLogout={logout}>
-                <AnimatedPage>
-                  <Doctors />
-                </AnimatedPage>
-              </AppLayout>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <Doctors />
+                  </AnimatedPage>
+                </AppLayout>
+              </StaffRoute>
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/appointments"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <AppLayout user={user} onLogout={logout}>
-                <AnimatedPage>
-                  <Appointments />
-                </AnimatedPage>
-              </AppLayout>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <Appointments />
+                  </AnimatedPage>
+                </AppLayout>
+              </StaffRoute>
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/billing"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <AppLayout user={user} onLogout={logout}>
-                <AnimatedPage>
-                  <Billing />
-                </AnimatedPage>
-              </AppLayout>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <Billing />
+                  </AnimatedPage>
+                </AppLayout>
+              </StaffRoute>
             </ProtectedRoute>
           }
         />
-        
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+        <Route
+          path="/doctor"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <DoctorRoute user={user}>
+                <DoctorLayout />
+              </DoctorRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="home" replace />} />
+          <Route
+            path="home"
+            element={
+              <AnimatedPage>
+                <DoctorHome />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="doctors"
+            element={
+              <AnimatedPage>
+                <DoctorDoctorsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="patients"
+            element={
+              <AnimatedPage>
+                <DoctorPatientsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="appointments"
+            element={
+              <AnimatedPage>
+                <DoctorAppointmentsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="bills"
+            element={
+              <AnimatedPage>
+                <DoctorBillsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="availability"
+            element={
+              <AnimatedPage>
+                <DoctorAvailabilityPage />
+              </AnimatedPage>
+            }
+          />
+        </Route>
+
+        <Route
+          path="/patient"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <PatientRoute user={user}>
+                <PatientLayout />
+              </PatientRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="home" replace />} />
+          <Route
+            path="home"
+            element={
+              <AnimatedPage>
+                <PatientHome />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="doctors"
+            element={
+              <AnimatedPage>
+                <PatientDoctors />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="appointments"
+            element={
+              <AnimatedPage>
+                <PatientAppointments />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="bills"
+            element={
+              <AnimatedPage>
+                <PatientBills />
+              </AnimatedPage>
+            }
+          />
+        </Route>
+
+        <Route
+          path="/"
+          element={
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : (
+              <Navigate to={isAuthenticated ? loginRedirect : '/login'} replace />
+            )
+          }
+        />
       </Routes>
     </AnimatePresence>
   );
@@ -128,37 +340,38 @@ function AnimatedRoutes() {
 
 function App() {
   useEffect(() => {
-    // Warm up backend on app load (helps with Render cold start)
     warmUpBackend();
   }, []);
 
   return (
     <BrowserRouter>
-      <AnimatedRoutes />
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10B981',
-              secondary: 'white',
+      <AuthProvider>
+        <AnimatedRoutes />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
             },
-          },
-          error: {
-            duration: 5000,
-            iconTheme: {
-              primary: '#EF4444',
-              secondary: 'white',
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#10B981',
+                secondary: 'white',
+              },
             },
-          },
-        }}
-      />
+            error: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: 'white',
+              },
+            },
+          }}
+        />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

@@ -2,11 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.appointment import Appointment, AppointmentCreationIdempotency, AppointmentStatus
 from app.models.patient import Patient
+from app.utils.appointment_datetime import normalize_appointment_time_utc
 
 
 def add_appointment(db: Session, appointment_data: dict[str, Any]) -> Appointment:
@@ -114,6 +115,7 @@ def get_doctor_appointment_at_time(
     doctor_id: UUID,
     appointment_time: datetime,
 ) -> Appointment | None:
+    appointment_time = normalize_appointment_time_utc(appointment_time)
     stmt = select(Appointment).where(
         Appointment.doctor_id == doctor_id,
         Appointment.appointment_time == appointment_time,
@@ -121,6 +123,49 @@ def get_doctor_appointment_at_time(
         Appointment.is_deleted == False,
     )
     return db.scalars(stmt).first()
+
+
+def doctor_has_non_cancelled_appointment_at(
+    db: Session,
+    doctor_id: UUID,
+    appointment_time: datetime,
+    exclude_appointment_id: UUID | None = None,
+) -> bool:
+    """True if an active (non-deleted, non-cancelled) appointment exists at this exact start time."""
+    appointment_time = normalize_appointment_time_utc(appointment_time)
+    stmt = select(Appointment.id).where(
+        Appointment.doctor_id == doctor_id,
+        Appointment.appointment_time == appointment_time,
+        Appointment.is_deleted == False,
+        Appointment.status != AppointmentStatus.cancelled,
+    )
+    if exclude_appointment_id is not None:
+        stmt = stmt.where(Appointment.id != exclude_appointment_id)
+    return db.scalar(stmt.limit(1)) is not None
+
+
+def list_doctor_busy_slot_starts_for_day(
+    db: Session,
+    doctor_id: UUID,
+    day_start_utc: datetime,
+    day_end_utc: datetime,
+) -> set[datetime]:
+    """Appointment start times on [day_start, day_end) that block a slot (scheduled or completed)."""
+    stmt = select(Appointment.appointment_time).where(
+        and_(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_time >= day_start_utc,
+            Appointment.appointment_time < day_end_utc,
+            Appointment.is_deleted == False,
+            Appointment.status != AppointmentStatus.cancelled,
+        )
+    )
+    rows = db.scalars(stmt).all()
+    out: set[datetime] = set()
+    for t in rows:
+        out.add(normalize_appointment_time_utc(t))
+    return out
+
 
 
 def update_appointment(

@@ -14,4 +14,6 @@ export const EMPTY_DOCTOR = {
   specialization: '',
   license_number: '',
   experience_years: 0,
+  account_email: '',
+  account_password: '',
 };

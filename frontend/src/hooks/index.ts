@@ -1,3 +1,5 @@
-export { useAuth } from './useAuth';
+export { useAuth, AuthProvider } from './useAuth';
 export { useLoading } from './useLoading';
+export { useLinkedPatient } from './useLinkedPatient';
+export { useModalFocusTrap } from './useModalFocusTrap';
 export * from './data';

@@ -1,5 +1,6 @@
-import { X, PanelLeft, LayoutDashboard, Users, Stethoscope, Calendar, CreditCard } from 'lucide-react';
+import { X, PanelLeft, LayoutDashboard, Users, Stethoscope, Calendar, CreditCard, Home, Receipt } from 'lucide-react';
 import type { User } from '../../types';
+import { isPatientRole } from '../../utils/roles';
 import { NavItem } from './NavItem';
 
 interface SidebarProps {
@@ -9,7 +10,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-const navItems = [
+const staffNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/patients', label: 'Patients', icon: Users },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope },
@@ -17,7 +18,15 @@ const navItems = [
   { path: '/billing', label: 'Billing', icon: CreditCard },
 ];
 
+const patientFallbackNavItems = [
+  { path: '/patient/home', label: 'Home', icon: Home },
+  { path: '/patient/doctors', label: 'Doctors', icon: Stethoscope },
+  { path: '/patient/appointments', label: 'Appointments', icon: Calendar },
+  { path: '/patient/bills', label: 'Bills', icon: Receipt },
+];
+
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
+  const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;
   return (
     <div className="h-screen overflow-hidden bg-surface border-r border-border flex flex-col w-full">
       {/* Header */}

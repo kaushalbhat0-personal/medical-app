@@ -8,7 +8,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
-    
+
+    # Doctor slots: optional time-off clamp to weekly availability (local wall-clock intersection).
+    DOCTOR_SLOT_CLIP_PARTIAL_TIME_OFF_TO_AVAILABILITY: bool = False
+
+    # Slot read cache: disable for debugging; backend "memory" is default (Redis reserved for future).
+    DOCTOR_SLOT_CACHE_ENABLED: bool = True
+    DOCTOR_SLOT_CACHE_BACKEND: str = "memory"
+
     # CORS settings - EXPLICIT ORIGINS ONLY (FastAPI CORSMiddleware doesn't support wildcards)
     # For Vercel preview URLs, add them explicitly or set ALLOWED_ORIGINS=* in .env for development only
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"

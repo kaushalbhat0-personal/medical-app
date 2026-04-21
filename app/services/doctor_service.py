@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-
-
 import logging
-
 from uuid import UUID
-
-
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.orm import Session
 
-
-
-from app.crud import crud_doctor, crud_tenant
+from app.core.security import hash_password
+from app.crud import crud_doctor, crud_doctor_availability, crud_tenant, crud_user
 
 from app.models.doctor import Doctor
 
@@ -39,6 +34,23 @@ from app.services.security_audit import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_timezone_string(tz: str) -> str:
+    stripped = tz.strip()
+    if not stripped:
+        raise ValidationError("timezone must be a non-empty IANA name")
+    try:
+        ZoneInfo(stripped)
+    except ZoneInfoNotFoundError as e:
+        raise ValidationError(f"Unknown IANA timezone: {stripped!r}") from e
+    return stripped
+
+
+def hydrate_doctor_availability_flags(db: Session, doctors: list[Doctor]) -> None:
+    if not doctors:
+        return
+    counts = crud_doctor_availability.count_availability_windows_by_doctor_ids(db, [d.id for d in doctors])
+    for d in doctors:
+        setattr(d, "has_availability_windows", counts.get(d.id, 0) > 0)
 
 
 
@@ -221,8 +233,14 @@ def create_doctor(
     _validate_experience_years(doctor_in.experience_years)
 
     doctor_data = doctor_in.model_dump()
+    account_email = doctor_data.pop("account_email", None)
+    account_password = doctor_data.pop("account_password", None)
     doctor_data.pop("tenant_id", None)
     doctor_data.pop("user_id", None)
+    if doctor_data.get("timezone") is None:
+        doctor_data.pop("timezone", None)
+    else:
+        doctor_data["timezone"] = _normalize_timezone_string(doctor_data["timezone"])
 
     if tenant_id is None and user_id is not None:
 
@@ -258,6 +276,13 @@ def create_doctor(
 
         doctor = crud_doctor.create_doctor_tx(db, doctor_data)
 
+        logger.info(
+            "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s",
+            user_id,
+            doctor.id,
+            doctor.tenant_id,
+        )
+
         if current_user is not None:
 
             log_audit_mutation(
@@ -286,11 +311,64 @@ def create_doctor(
 
     doctor_data["tenant_id"] = tenant_id
 
-    if user_id is not None:
+    resolved_user_id = user_id
+    if (
+        resolved_user_id is None
+        and tenant_id is not None
+        and current_user is not None
+        and current_user.role in (UserRole.admin, UserRole.super_admin)
+    ):
+        if not account_email or not str(account_email).strip() or not account_password:
+            raise ValidationError(
+                "account_email and account_password are required to create a doctor with a login"
+            )
+        pwd = str(account_password)
+        if len(pwd) < 8:
+            raise ValidationError("account_password must be at least 8 characters")
+        email_normalized = str(account_email).lower().strip()
+        if crud_user.get_user_by_email(db, email_normalized):
+            raise ValidationError("Email already registered")
+        hashed = hash_password(pwd)
+        new_user = crud_user.create_user_tx(
+            db,
+            {
+                "email": email_normalized,
+                "hashed_password": hashed,
+                "role": UserRole.doctor,
+                "force_password_reset": True,
+            },
+        )
+        crud_tenant.create_user_tenant_tx(
+            db,
+            user_id=new_user.id,
+            tenant_id=tenant_id,
+            role="doctor",
+            is_primary=True,
+        )
+        resolved_user_id = new_user.id
+        logger.info(
+            "[DOCTOR ACCOUNT] user_id=%s force_password_reset=true; change password on first login",
+            new_user.id,
+        )
 
-        doctor_data["user_id"] = user_id
+    if resolved_user_id is not None:
+        doctor_data["user_id"] = resolved_user_id
 
     doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+
+    if doctor.user_id is None:
+        logger.warning(
+            "[DOCTOR ACCOUNT] Doctor created without user_id (doctor_id=%s tenant_id=%s)",
+            doctor.id,
+            doctor.tenant_id,
+        )
+
+    logger.info(
+        "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s",
+        doctor.user_id if doctor.user_id is not None else "-",
+        doctor.id,
+        doctor.tenant_id,
+    )
 
     if current_user is not None:
 
@@ -345,7 +423,7 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
-
+    """Resolve the doctor row by doctors.user_id only (no legacy id == user.id fallback)."""
     doctor = crud_doctor.get_doctor_by_user_id(db, user_id)
 
     if doctor is None:
@@ -389,10 +467,17 @@ def get_doctors(
 
 
     if current_user is not None and current_user.role == UserRole.doctor:
+        try:
+            self_doctor = get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            logger.warning(
+                "[RBAC] doctor user has no doctor profile user_id=%s; returning empty doctor list",
+                current_user.id,
+            )
+            return []
 
-        user_id_filter = current_user.id
-
-        eff_tenant_id = None
+        eff_tenant_id = self_doctor.tenant_id
+        user_id_filter = None
 
     elif current_user is not None and current_user.role == UserRole.patient:
 
@@ -420,6 +505,8 @@ def get_doctors(
 
     )
 
+    hydrate_doctor_availability_flags(db, doctors)
+
     for d in doctors:
 
         tenant = getattr(d, "tenant", None)
@@ -429,6 +516,9 @@ def get_doctors(
             setattr(d, "tenant_name", tenant.name)
 
             setattr(d, "tenant_type", tenant.type)
+
+        u = getattr(d, "user", None)
+        setattr(d, "linked_user_email", u.email if u is not None else None)
 
     return doctors
 
@@ -461,6 +551,9 @@ def update_doctor(
     if not update_data:
 
         return doctor
+
+    if "timezone" in update_data and update_data["timezone"] is not None:
+        update_data["timezone"] = _normalize_timezone_string(update_data["timezone"])
 
     if "tenant_id" in update_data and update_data["tenant_id"] is None:
 
@@ -499,6 +592,8 @@ def update_doctor(
         updated.tenant_id,
 
     )
+
+    hydrate_doctor_availability_flags(db, [updated])
 
     return updated
 

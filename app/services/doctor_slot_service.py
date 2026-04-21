@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Iterator
+from datetime import date, datetime, time, timedelta, timezone
+from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.crud import crud_appointment, crud_doctor_availability
+from app.models.doctor import Doctor
+from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
+from app.models.user import User
+from app.schemas.doctor import DoctorSlotRead
+from app.services import doctor_service
+from app.services.exceptions import ValidationError
+from app.services.slot_read_cache import SlotReadCacheBackend, get_default_in_memory_slot_cache
+from app.utils.appointment_datetime import normalize_appointment_time_utc
+
+logger = logging.getLogger(__name__)
+
+_SLOTS_CACHE_TTL_SEC = 30.0
+
+_slot_cache_backend: SlotReadCacheBackend | None = None
+
+
+def _resolve_slot_cache_backend() -> SlotReadCacheBackend | None:
+    """Return cache backend or None when caching disabled."""
+    if not settings.DOCTOR_SLOT_CACHE_ENABLED:
+        return None
+    backend = (settings.DOCTOR_SLOT_CACHE_BACKEND or "memory").strip().lower()
+    if backend != "memory":
+        logger.warning(
+            "DOCTOR_SLOT_CACHE_BACKEND=%r not implemented; using in-memory slot cache",
+            settings.DOCTOR_SLOT_CACHE_BACKEND,
+        )
+    global _slot_cache_backend
+    if _slot_cache_backend is None:
+        _slot_cache_backend = get_default_in_memory_slot_cache()
+    return _slot_cache_backend
+
+
+def set_slot_read_cache_backend(backend: SlotReadCacheBackend | None) -> None:
+    """Test hook or process startup: plug a Redis-backed implementation without changing call sites."""
+    global _slot_cache_backend
+    _slot_cache_backend = backend
+
+
+def _doctor_zoneinfo(doctor: Doctor) -> ZoneInfo:
+    tz_name = (doctor.timezone or "UTC").strip() or "UTC"
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        logger.warning("Unknown doctor timezone %r for doctor_id=%s; using UTC", tz_name, doctor.id)
+        return ZoneInfo("UTC")
+
+
+def _utc_naive(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _slot_compare_key(dt: datetime) -> datetime:
+    return normalize_appointment_time_utc(dt)
+
+
+def _local_day_bounds_utc(doctor_tz: ZoneInfo, target_date: date) -> tuple[datetime, datetime]:
+    """UTC instants covering [00:00, next day) for target_date in doctor_tz."""
+    day_start_local = datetime.combine(target_date, time(0, 0), tzinfo=doctor_tz)
+    day_end_local = day_start_local + timedelta(days=1)
+    return day_start_local.astimezone(timezone.utc), day_end_local.astimezone(timezone.utc)
+
+
+def _safe_combine_local(doctor_tz: ZoneInfo, target_date: date, t: time) -> datetime | None:
+    """Wall-clock local instant; None if the clock time does not exist on that calendar day (DST gap)."""
+    try:
+        return datetime.combine(target_date, t.replace(tzinfo=None), tzinfo=doctor_tz)
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+def _utc_round_trip_consistent_with_local_wall(cur: datetime, doctor_tz: ZoneInfo, target_date: date) -> bool:
+    """True if this UTC instant's local wall clock re-resolves to the same UTC (DST-safe, fold-safe)."""
+    if cur.tzinfo is None:
+        cur = cur.replace(tzinfo=timezone.utc)
+    loc = cur.astimezone(doctor_tz)
+    if loc.date() != target_date:
+        return False
+    try:
+        reb = datetime(
+            loc.year,
+            loc.month,
+            loc.day,
+            loc.hour,
+            loc.minute,
+            loc.second,
+            loc.microsecond,
+            tzinfo=doctor_tz,
+            fold=getattr(loc, "fold", 0),
+        )
+    except (ValueError, OverflowError, OSError):
+        return False
+    return _slot_compare_key(reb) == _slot_compare_key(cur)
+
+
+def _iter_slot_starts_utc(
+    target_date: date,
+    start_t: time,
+    end_t: time,
+    slot_minutes: int,
+    doctor_tz: ZoneInfo,
+) -> Iterator[datetime]:
+    window_start = _safe_combine_local(doctor_tz, target_date, start_t)
+    window_end = _safe_combine_local(doctor_tz, target_date, end_t)
+    if window_start is None or window_end is None:
+        logger.debug(
+            "Skipping availability window with nonexistent local boundary on %s in %s",
+            target_date,
+            getattr(doctor_tz, "key", doctor_tz),
+        )
+        return
+    if slot_minutes <= 0 or window_start >= window_end:
+        return
+    if not _utc_round_trip_consistent_with_local_wall(window_start, doctor_tz, target_date):
+        return
+    step = timedelta(minutes=slot_minutes)
+    cur = window_start
+    while cur < window_end:
+        slot_end = cur + step
+        if slot_end > window_end:
+            break
+        if not _utc_round_trip_consistent_with_local_wall(cur, doctor_tz, target_date):
+            cur += step
+            continue
+        yield _slot_compare_key(cur)
+        cur += step
+
+
+def _time_off_blocks_full_day(rows: list[DoctorTimeOff]) -> bool:
+    for row in rows:
+        st = getattr(row, "start_time", None)
+        et = getattr(row, "end_time", None)
+        if st is None and et is None:
+            return True
+        if (st is None) ^ (et is None):
+            return True
+    return False
+
+
+def _partial_time_off_local_ranges(rows: list[DoctorTimeOff]) -> list[tuple[time, time]]:
+    out: list[tuple[time, time]] = []
+    for row in rows:
+        st = getattr(row, "start_time", None)
+        et = getattr(row, "end_time", None)
+        if st is not None and et is not None:
+            st_n = st.replace(second=0, microsecond=0)
+            et_n = et.replace(second=0, microsecond=0)
+            if st_n >= et_n:
+                continue
+            out.append((st_n, et_n))
+    return out
+
+
+def _merge_sorted_time_ranges(ranges: list[tuple[time, time]]) -> list[tuple[time, time]]:
+    if not ranges:
+        return []
+    ranges = sorted(ranges, key=lambda x: (x[0], x[1]))
+    merged: list[tuple[time, time]] = [ranges[0]]
+    for s, e in ranges[1:]:
+        ps, pe = merged[-1]
+        if s <= pe:
+            merged[-1] = (ps, max(pe, e))
+        else:
+            merged.append((s, e))
+    return merged
+
+
+def _clip_partial_ranges_to_availability(
+    partial_ranges: list[tuple[time, time]],
+    windows: list[DoctorAvailability],
+) -> list[tuple[time, time]]:
+    """Intersect partial time-off with availability windows so odd ranges cannot produce inconsistent blocking."""
+    clipped: list[tuple[time, time]] = []
+    for a, b in partial_ranges:
+        for w in windows:
+            ws = w.start_time.replace(second=0, microsecond=0)
+            we = w.end_time.replace(second=0, microsecond=0)
+            if ws >= we:
+                continue
+            lo = max(a, ws)
+            hi = min(b, we)
+            if lo < hi:
+                clipped.append((lo, hi))
+    return _merge_sorted_time_ranges(clipped)
+
+
+def _slot_overlaps_partial_time_off(
+    slot_start_utc: datetime,
+    slot_minutes: int,
+    target_date: date,
+    doctor_tz: ZoneInfo,
+    partial_ranges: list[tuple[time, time]],
+) -> bool:
+    """True if [slot_start, slot_start+duration) overlaps any partial time-off interval in local time."""
+    if not partial_ranges:
+        return False
+    if slot_start_utc.tzinfo is None:
+        slot_start_utc = slot_start_utc.replace(tzinfo=timezone.utc)
+    slot_start_local = slot_start_utc.astimezone(doctor_tz)
+    if slot_start_local.date() != target_date:
+        return False
+    slot_end_local = slot_start_local + timedelta(minutes=slot_minutes)
+    for a, b in partial_ranges:
+        off_a = _safe_combine_local(doctor_tz, target_date, a)
+        off_b = _safe_combine_local(doctor_tz, target_date, b)
+        if off_a is None or off_b is None or off_a >= off_b:
+            continue
+        if slot_start_local < off_b and off_a < slot_end_local:
+            return True
+    return False
+
+
+def _compute_slots(
+    db: Session,
+    doctor: Doctor,
+    target_date: date,
+) -> list[DoctorSlotRead]:
+    doctor_tz = _doctor_zoneinfo(doctor)
+    time_off_rows = crud_doctor_availability.list_time_off_for_doctor_on_date(db, doctor.id, target_date)
+    if _time_off_blocks_full_day(time_off_rows):
+        return []
+
+    partial_ranges = _partial_time_off_local_ranges(time_off_rows)
+
+    dow = target_date.weekday()
+    windows = crud_doctor_availability.list_availability_for_doctor_day(db, doctor.id, dow)
+    if not windows:
+        return []
+
+    if settings.DOCTOR_SLOT_CLIP_PARTIAL_TIME_OFF_TO_AVAILABILITY and partial_ranges:
+        partial_ranges = _clip_partial_ranges_to_availability(partial_ranges, windows)
+    partial_ranges = _merge_sorted_time_ranges(partial_ranges)
+
+    day_start_utc, day_end_utc = _local_day_bounds_utc(doctor_tz, target_date)
+    busy = crud_appointment.list_doctor_busy_slot_starts_for_day(db, doctor.id, day_start_utc, day_end_utc)
+
+    slots: list[DoctorSlotRead] = []
+    for w in windows:
+        dur = w.slot_duration
+        for start_dt in _iter_slot_starts_utc(target_date, w.start_time, w.end_time, dur, doctor_tz):
+            if _slot_overlaps_partial_time_off(start_dt, dur, target_date, doctor_tz, partial_ranges):
+                continue
+            slots.append(DoctorSlotRead(start=start_dt, available=start_dt not in busy))
+
+    slots.sort(key=lambda s: s.start)
+    return slots
+
+
+def get_doctor_slots_for_date(
+    db: Session,
+    doctor_id: UUID,
+    target_date: date,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> list[DoctorSlotRead]:
+    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+
+    cache = _resolve_slot_cache_backend()
+    cache_key_doc = str(doctor_id)
+    cache_key_date = target_date.isoformat()
+    if cache is not None:
+        cached = cache.get(cache_key_doc, cache_key_date)
+        if cached is not None:
+            return list(cached)
+
+    slots = _compute_slots(db, doctor, target_date)
+
+    if cache is not None:
+        cache.set(cache_key_doc, cache_key_date, list(slots), _SLOTS_CACHE_TTL_SEC)
+
+    return slots
+
+
+def invalidate_slots_cache_for_doctor_date(doctor_id: UUID, target_date: date) -> None:
+    cache = _resolve_slot_cache_backend()
+    if cache is None:
+        return
+    cache.invalidate_date(str(doctor_id), target_date.isoformat())
+
+
+def invalidate_all_slots_cache_for_doctor(doctor_id: UUID) -> None:
+    cache = _resolve_slot_cache_backend()
+    if cache is None:
+        return
+    cache.invalidate_doctor(str(doctor_id))
+
+
+def invalidate_slots_cache_for_appointment(db: Session, doctor: Doctor, appointment_time_utc: datetime) -> None:
+    doctor_tz = _doctor_zoneinfo(doctor)
+    at = _utc_naive(appointment_time_utc)
+    local_d = at.astimezone(doctor_tz).date()
+    invalidate_slots_cache_for_doctor_date(doctor.id, local_d)
+
+
+def collect_allowed_slot_starts_utc_for_booking(
+    db: Session,
+    doctor: Doctor,
+    appointment_time_utc: datetime,
+) -> set[datetime]:
+    """Slot starts (UTC, tz-aware) that match doctor schedule for the local calendar day of the appointment."""
+    doctor_tz = _doctor_zoneinfo(doctor)
+    at = _utc_naive(appointment_time_utc)
+    target_date = at.astimezone(doctor_tz).date()
+    slots = _compute_slots(db, doctor, target_date)
+    return {_slot_compare_key(s.start) for s in slots}
+
+
+def assert_appointment_time_matches_doctor_slots(
+    db: Session,
+    doctor: Doctor,
+    appointment_time_utc: datetime,
+) -> None:
+    allowed = collect_allowed_slot_starts_utc_for_booking(db, doctor, appointment_time_utc)
+    at = _slot_compare_key(appointment_time_utc)
+    if at not in allowed:
+        raise ValidationError("Appointment time is not within an available slot for this doctor")

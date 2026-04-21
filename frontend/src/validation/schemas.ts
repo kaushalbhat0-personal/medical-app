@@ -84,10 +84,46 @@ export const doctorSchema = z.object({
     .min(1, 'Name is required')
     .min(2, 'Name must be at least 2 characters')
     .max(255, 'Name must be less than 255 characters'),
-  specialization: z.string().optional(),
+  specialization: z.string().min(1, 'Specialization is required'),
   license_number: z.string().optional(),
   experience_years: z.coerce.number().min(0, 'Experience must be 0 or greater').max(100, 'Experience must be 100 or less').optional(),
+  account_email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
+  account_password: z
+    .string()
+    .min(1, 'Password is required')
+    .min(8, 'Password must be at least 8 characters'),
 });
+
+const signupLoginSchema = loginSchema.extend({
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+export const patientSignupSchema = signupLoginSchema.merge(patientSchema);
+
+export const doctorSignupSchema = signupLoginSchema.merge(
+  z.object({
+    name: z
+      .string()
+      .min(2, 'Name must be at least 2 characters')
+      .max(255, 'Name must be less than 255 characters'),
+    specialization: z.string().min(1, 'Specialization is required'),
+    experience_years: z.coerce
+      .number({ message: 'Experience must be a valid number' })
+      .min(0, 'Experience must be 0 or greater')
+      .max(100, 'Experience must be 100 or less'),
+  })
+);
+
+export const resetPasswordSchema = z
+  .object({
+    old_password: z.string().min(1, 'Current password is required'),
+    new_password: z.string().min(8, 'New password must be at least 8 characters'),
+    confirm_password: z.string().min(1, 'Please confirm your new password'),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  });
 
 // Type exports
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -99,3 +135,8 @@ export type BillingFormData = z.infer<typeof billingSchema>;
 export type BillingFormInput = z.input<typeof billingSchema>;
 export type DoctorFormData = z.infer<typeof doctorSchema>;
 export type DoctorFormInput = z.input<typeof doctorSchema>;
+export type PatientSignupFormData = z.infer<typeof patientSignupSchema>;
+export type PatientSignupFormInput = z.input<typeof patientSignupSchema>;
+export type DoctorSignupFormData = z.infer<typeof doctorSignupSchema>;
+export type DoctorSignupFormInput = z.input<typeof doctorSignupSchema>;
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;

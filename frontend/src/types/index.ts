@@ -4,10 +4,24 @@ export interface User {
   full_name: string;
   is_active: boolean;
   role: string;
+  /** Primary tenant from login / JWT when applicable */
+  tenant_id?: string | null;
+  /** When true, client must complete password reset before using the app */
+  force_password_reset?: boolean;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  type: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Patient {
   id: number | string;
+  /** When present on GET /patients, matches the authenticated user. */
+  user_id?: string | number;
   // Backend returns 'name', not first_name/last_name
   name?: string;
   first_name?: string;
@@ -35,6 +49,12 @@ export interface Doctor {
   license_number?: string;
   experience_years?: number;
   created_at?: string;
+  /** IANA timezone for the doctor's schedule (e.g. Asia/Kolkata) */
+  timezone?: string;
+  /** True when the doctor has at least one weekly availability window */
+  has_availability_windows?: boolean;
+  /** Login email for the linked user account (admin-created doctors) */
+  linked_user_email?: string | null;
 }
 
 export interface Appointment {
@@ -44,7 +64,8 @@ export interface Appointment {
   // Backend returns 'appointment_time', frontend form uses 'scheduled_at'
   appointment_time?: string;
   scheduled_at?: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  /** `pending` is client-only until refetch replaces with server status. */
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
   notes?: string;
   // Backend returns flat structure, no nested objects
   patient?: Patient;
@@ -78,8 +99,60 @@ export interface LoginCredentials {
 export interface LoginResponse {
   access_token: string;
   token_type: string;
+  /** Present on OAuth login response */
+  role?: string;
+  tenant_id?: string | null;
   user?: User;
+  force_password_reset?: boolean;
 }
+
+export interface LoginResult {
+  success: boolean;
+  error?: string;
+  role?: string;
+  forcePasswordReset?: boolean;
+}
+
+export interface RegisterResponseUser {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  full_name?: string;
+}
+
+export interface RegisterResponse {
+  access_token: string;
+  token_type: string;
+  user: RegisterResponseUser;
+}
+
+export interface PatientProfileSignup {
+  name: string;
+  age: number;
+  gender: string;
+  phone: string;
+}
+
+export interface DoctorProfileSignup {
+  name: string;
+  specialization: string;
+  experience_years: number;
+}
+
+export type RegisterPayload =
+  | {
+      email: string;
+      password: string;
+      role: 'patient';
+      patient_profile: PatientProfileSignup;
+    }
+  | {
+      email: string;
+      password: string;
+      role: 'doctor';
+      doctor_profile: DoctorProfileSignup;
+    };
 
 export interface DashboardStats {
   total_patients: number;

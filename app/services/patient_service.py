@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
+from app.services import doctor_service
 from app.models.patient import Patient
 from app.models.user import User, UserRole
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -114,10 +115,15 @@ def authorize_patient_access(
         return
 
     if current_user.role == UserRole.doctor:
-        if patient.created_by != current_user.id:
-            log_rbac_mutation_violation(current_user, "patient")
-            raise ForbiddenError("Not allowed to modify this patient")
-        return
+        acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        if patient.created_by == current_user.id:
+            return
+        if crud_patient.patient_has_appointment_with_doctor(
+            db, patient.id, acting_doctor.id
+        ):
+            return
+        log_rbac_mutation_violation(current_user, "patient")
+        raise ForbiddenError("Not allowed to modify this patient")
 
     if current_user.role == UserRole.patient:
         if patient.user_id != current_user.id:
@@ -147,8 +153,10 @@ def get_patients(
     user_id: UUID | None = None
     effective_tenant_id = tenant_id
 
+    linked_doctor_id: UUID | None = None
     if current_user.role == UserRole.doctor:
-        created_by = current_user.id
+        acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        linked_doctor_id = acting_doctor.id
     elif current_user.role == UserRole.patient:
         user_id = current_user.id
         # Own profile is keyed by user_id; patient rows may not carry tenant_id
@@ -166,6 +174,8 @@ def get_patients(
         tenant_id=effective_tenant_id,
         created_by=created_by,
         user_id=user_id,
+        linked_doctor_id=linked_doctor_id,
+        doctor_created_by_user_id=current_user.id if linked_doctor_id is not None else None,
     )
 
 

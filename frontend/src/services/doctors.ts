@@ -2,15 +2,38 @@ import { api } from './api';
 import { safeArray } from '../utils';
 import type { Doctor } from '../types';
 
+export interface DoctorSlot {
+  start: string;
+  available: boolean;
+}
+
 export interface CreateDoctorData {
   name: string;
   specialty?: string;
   specialization?: string;
   license_number?: string;
   experience_years?: number;
+  account_email: string;
+  account_password: string;
 }
 
 export const doctorsApi = {
+  getSlots: async (
+    doctorId: string,
+    date: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<DoctorSlot[]> => {
+    try {
+      const response = await api.get(`/doctors/${doctorId}/slots`, {
+        params: { date },
+        signal: options?.signal,
+      });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('[doctorsApi.getSlots] Error:', error);
+      throw error;
+    }
+  },
   getAll: async (params?: { search?: string; skip?: number; limit?: number }): Promise<Doctor[]> => {
     try {
       const response = await api.get('/doctors', { params: { skip: 0, limit: 100, ...params } });

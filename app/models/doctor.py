@@ -38,6 +38,23 @@ class Doctor(Base):
         nullable=False,
         server_default=func.now(),
     )
+    timezone: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="UTC",
+        server_default="UTC",
+    )
 
     appointments = relationship("Appointment", back_populates="doctor")
+    availability_windows = relationship(
+        "DoctorAvailability",
+        back_populates="doctor",
+        cascade="all, delete-orphan",
+    )
+    time_off_days = relationship(
+        "DoctorTimeOff",
+        back_populates="doctor",
+        cascade="all, delete-orphan",
+    )
     tenant = relationship("Tenant")
+    user = relationship("User", foreign_keys=[user_id])

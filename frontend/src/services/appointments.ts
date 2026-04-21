@@ -12,7 +12,7 @@ export interface CreateAppointmentData {
 export interface AppointmentFilters {
   doctor_id?: string;
   patient_id?: string;
-  status?: 'scheduled' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'completed' | 'cancelled' | 'pending';
   skip?: number;
   limit?: number;
 }
@@ -38,9 +38,16 @@ export const appointmentsApi = {
       throw error;
     }
   },
-  create: async (appointment: CreateAppointmentData): Promise<Appointment> => {
+  create: async (
+    appointment: CreateAppointmentData,
+    options?: { idempotencyKey?: string; signal?: AbortSignal }
+  ): Promise<Appointment> => {
     try {
-      const response = await api.post('/appointments', appointment);
+      const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
+      const response = await api.post('/appointments', appointment, {
+        headers: { 'Idempotency-Key': idempotencyKey },
+        signal: options?.signal,
+      });
       return response.data;
     } catch (error) {
       console.error('[appointmentsApi.create] Error:', error);

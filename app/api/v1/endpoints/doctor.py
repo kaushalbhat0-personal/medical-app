@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -11,8 +12,16 @@ from app.api.deps import (
 from app.core.database import get_db
 from app.core.tenant_context import get_current_tenant_id
 from app.models.user import User, UserRole
-from app.schemas.doctor import DoctorCreate, DoctorRead, DoctorUpdate
-from app.services import doctor_service
+from app.schemas.doctor import (
+    DoctorAvailabilityCreate,
+    DoctorAvailabilityRead,
+    DoctorAvailabilityUpdate,
+    DoctorCreate,
+    DoctorRead,
+    DoctorSlotRead,
+    DoctorUpdate,
+)
+from app.services import doctor_availability_service, doctor_service, doctor_slot_service
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -28,20 +37,20 @@ def create_doctor(
         description="Required for super_admin: target tenant for the new doctor profile",
     ),
 ) -> DoctorRead:
-    effective_tenant_id = get_current_tenant_id(current_user, db)
-    if effective_tenant_id is None:
-        if current_user.role != UserRole.super_admin:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Tenant context is required to create a doctor profile",
-            )
-        if target_tenant_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Query parameter tenant_id is required for super administrator doctor creation",
-            )
-        effective_tenant_id = target_tenant_id
-    try:
+    with db.begin():
+        effective_tenant_id = get_current_tenant_id(current_user, db)
+        if effective_tenant_id is None:
+            if current_user.role != UserRole.super_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Tenant context is required to create a doctor profile",
+                )
+            if target_tenant_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Query parameter tenant_id is required for super administrator doctor creation",
+                )
+            effective_tenant_id = target_tenant_id
         doctor = doctor_service.create_doctor(
             db,
             payload,
@@ -49,12 +58,9 @@ def create_doctor(
             user_id=None,
             current_user=current_user,
         )
-        db.commit()
-        db.refresh(doctor)
-        return doctor
-    except Exception:
-        db.rollback()
-        raise
+    db.refresh(doctor)
+    doctor_service.hydrate_doctor_availability_flags(db, [doctor])
+    return doctor
 
 
 @router.get("", response_model=list[DoctorRead])
@@ -78,6 +84,71 @@ def read_doctors(
     )
 
 
+@router.get("/{doctor_id}/slots", response_model=list[DoctorSlotRead])
+def read_doctor_slots(
+    doctor_id: UUID,
+    on_date: date = Query(
+        ...,
+        alias="date",
+        description="Calendar day (YYYY-MM-DD) in the doctor's configured timezone (IANA)",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DoctorSlotRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    return doctor_slot_service.get_doctor_slots_for_date(db, doctor_id, on_date, current_user, tenant_id)
+
+
+@router.post(
+    "/{doctor_id}/availability-windows",
+    response_model=DoctorAvailabilityRead,
+    status_code=201,
+)
+def create_doctor_availability_window(
+    doctor_id: UUID,
+    payload: DoctorAvailabilityCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorAvailabilityRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        row = doctor_availability_service.create_availability_window(
+            db, doctor_id, payload, current_user, tenant_id
+        )
+        db.commit()
+        db.refresh(row)
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return row
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.put(
+    "/{doctor_id}/availability-windows/{window_id}",
+    response_model=DoctorAvailabilityRead,
+)
+def update_doctor_availability_window(
+    doctor_id: UUID,
+    window_id: UUID,
+    payload: DoctorAvailabilityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorAvailabilityRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        row = doctor_availability_service.update_availability_window(
+            db, doctor_id, window_id, payload, current_user, tenant_id
+        )
+        db.commit()
+        db.refresh(row)
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return row
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.get("/{doctor_id}", response_model=DoctorRead)
 def read_doctor(
     doctor_id: UUID,
@@ -87,6 +158,7 @@ def read_doctor(
     tenant_id = get_current_tenant_id(current_user, db)
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
     doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    doctor_service.hydrate_doctor_availability_flags(db, [doctor])
     return doctor
 
 
@@ -98,7 +170,10 @@ def update_doctor(
     current_user: User = Depends(get_current_user),
 ) -> DoctorRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    return doctor_service.update_doctor(db, doctor_id, payload, current_user, tenant_id)
+    updated = doctor_service.update_doctor(db, doctor_id, payload, current_user, tenant_id)
+    if payload.model_dump(exclude_unset=True).get("timezone") is not None:
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+    return updated
 
 
 @router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)

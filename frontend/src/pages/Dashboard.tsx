@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Users, Stethoscope, Calendar, DollarSign } from 'lucide-react';
-import { useDashboard } from '../hooks';
+import { useAuth, useDashboard } from '../hooks';
+import { isPatientRole } from '../utils/roles';
 import { ErrorState, EmptyState, Button } from '../components/common';
 import { SkeletonCard } from '../components/common/skeletons';
 import { FadeContent, staggerContainer, staggerItem } from '../animations';
@@ -9,9 +10,11 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
+  const showStaffQuickActions = !isPatientRole(user?.role);
 
   // Quick action navigation handlers
   const handleAddPatient = () => navigate('/patients', { state: { showForm: true } });
@@ -144,27 +147,29 @@ export function Dashboard() {
             </motion.div>
 
             {/* Quick Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            >
-              <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-              <div className="flex flex-wrap gap-3">
-                <Button variant="secondary" onClick={handleAddPatient}>
-                  Add Patient
-                </Button>
-                <Button variant="secondary" onClick={handleAddDoctor}>
-                  Add Doctor
-                </Button>
-                <Button variant="secondary" onClick={handleNewAppointment}>
-                  New Appointment
-                </Button>
-                <Button variant="secondary" onClick={handleCreateBill}>
-                  Create Bill
-                </Button>
-              </div>
-            </motion.div>
+            {showStaffQuickActions && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="secondary" onClick={handleAddPatient}>
+                    Add Patient
+                  </Button>
+                  <Button variant="secondary" onClick={handleAddDoctor}>
+                    Add Doctor
+                  </Button>
+                  <Button variant="secondary" onClick={handleNewAppointment}>
+                    New Appointment
+                  </Button>
+                  <Button variant="secondary" onClick={handleCreateBill}>
+                    Create Bill
+                  </Button>
+                </div>
+              </motion.div>
+            )}
           </div>
         </FadeContent>
       )}

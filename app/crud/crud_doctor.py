@@ -54,7 +54,7 @@ def get_doctors(
     stmt = (
         select(Doctor)
         .order_by(Doctor.created_at.desc())
-        .options(joinedload(Doctor.tenant))
+        .options(joinedload(Doctor.tenant), joinedload(Doctor.user))
         .where(
             Doctor.is_active == True,
             Doctor.is_deleted == False,

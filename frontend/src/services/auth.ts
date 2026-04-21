@@ -1,6 +1,12 @@
 import { api, retryRequest, isNetworkError, isColdStartError } from './api';
+import type { RegisterPayload, RegisterResponse } from '../types';
 
 export const authApi = {
+  register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
+    const response = await api.post<RegisterResponse>('/register', payload);
+    return response.data;
+  },
+
   login: async (email: string, password: string) => {
     // Debug: Log request payload (only in development)
     if (import.meta.env.DEV) {
@@ -29,6 +35,13 @@ export const authApi = {
       console.log('[authApi.login] Response:', response.data);
     }
     return response.data;
+  },
+
+  resetPassword: async (oldPassword: string, newPassword: string): Promise<void> => {
+    await api.post('/auth/reset-password', {
+      old_password: oldPassword,
+      new_password: newPassword,
+    });
   },
 };
 

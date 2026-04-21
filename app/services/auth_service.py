@@ -5,17 +5,17 @@ from app.crud import crud_patient, crud_user
 from app.models.user import User
 from app.schemas.user import UserCreate
 from app.services import doctor_service
-from app.services.exceptions import AuthenticationError, ConflictError
+from app.services.exceptions import AuthenticationError, ConflictError, ValidationError
 
 logger = logging.getLogger(__name__)
 
 
 def register_user(db: Session, user_in: UserCreate) -> User:
-    if crud_user.get_user_by_email(db, user_in.email):
-        raise ConflictError("Email already registered")
     hashed = hash_password(user_in.password)
 
-    try:
+    with db.begin():
+        if crud_user.get_user_by_email(db, user_in.email):
+            raise ConflictError("Email already registered")
         user = crud_user.create_user_tx(
             db,
             {
@@ -46,12 +46,8 @@ def register_user(db: Session, user_in: UserCreate) -> User:
             patient_data["user_id"] = user.id
             crud_patient.create_patient_tx(db, patient_data)
 
-        db.commit()
-        db.refresh(user)
-        return user
-    except Exception:
-        db.rollback()
-        raise
+    db.refresh(user)
+    return user
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User:
@@ -78,4 +74,17 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
         raise AuthenticationError("Incorrect email or password")
 
     logger.info(f"[AUTH] Login successful: {email_normalized}")
+    return user
+
+
+def reset_password(db: Session, user: User, old_password: str, new_password: str) -> User:
+    if not verify_password(old_password, user.hashed_password):
+        raise ValidationError("Current password is incorrect")
+    if verify_password(new_password, user.hashed_password):
+        raise ValidationError("New password must be different from your current password")
+    user.hashed_password = hash_password(new_password)
+    user.force_password_reset = False
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user

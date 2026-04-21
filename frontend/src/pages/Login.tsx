@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
-import type { LoginCredentials } from '../types';
+import type { LoginCredentials, LoginResult } from '../types';
+import { postLoginHomePath } from '../utils/roles';
 import { loginSchema, type LoginFormData } from '../validation';
 import { Button, Card, Input } from '../components/common';
 
 interface LoginPageProps {
-  onLogin: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
+  onLogin: (credentials: LoginCredentials) => Promise<LoginResult>;
 }
 
 export function Login({ onLogin }: LoginPageProps) {
@@ -35,11 +36,16 @@ export function Login({ onLogin }: LoginPageProps) {
       const result = await onLogin({ email: data.email, password: data.password });
 
       if (result.success) {
-        toast.success('Welcome back!', {
-          duration: 2000,
-          icon: '👋',
-        });
-        navigate('/dashboard');
+        if (result.forcePasswordReset) {
+          toast('You must set a new password to continue.', { icon: '🔐', duration: 4000 });
+          navigate('/reset-password', { replace: true });
+        } else {
+          toast.success('Welcome back!', {
+            duration: 2000,
+            icon: '👋',
+          });
+          navigate(postLoginHomePath(result.role));
+        }
       } else {
         const errorMessage = result.error || 'Login failed. Please check your credentials and try again.';
         setApiError(errorMessage);
@@ -58,7 +64,7 @@ export function Login({ onLogin }: LoginPageProps) {
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🏥</div>
           <h1 className="text-2xl font-bold text-text-primary mb-2">Hospital Management System</h1>
-          <p className="text-text-secondary">Sign in to access your dashboard</p>
+          <p className="text-text-secondary">Sign in to manage care or clinic operations</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -97,7 +103,17 @@ export function Login({ onLogin }: LoginPageProps) {
           </Button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-border text-center">
+        <div className="mt-8 pt-6 border-t border-border text-center space-y-3">
+          <p className="text-sm text-text-muted">
+            New here?{' '}
+            <Link to="/signup/patient" className="text-primary font-medium hover:underline">
+              Patient signup
+            </Link>
+            {' · '}
+            <Link to="/signup/doctor" className="text-primary font-medium hover:underline">
+              Doctor signup
+            </Link>
+          </p>
           <p className="text-sm text-text-muted mb-2">Demo credentials:</p>
           <code className="text-xs bg-surface-hover px-3 py-1.5 rounded-md text-text-secondary">
             admin@hospital.com / admin123

@@ -13,6 +13,30 @@ import { FormWrapper, FormInput } from '../components/common';
 import { doctorSchema, type DoctorFormData, type DoctorFormInput } from '../validation';
 import { EMPTY_DOCTOR } from '../constants';
 
+function formatDoctorCreateError(err: unknown): string {
+  const e = err as { detail?: string | { msg?: string }[]; message?: string };
+  let raw = '';
+  if (typeof e?.detail === 'string') {
+    raw = e.detail;
+  } else if (Array.isArray(e?.detail) && e.detail.length > 0) {
+    const first = e.detail[0];
+    raw = typeof first === 'object' && first && 'msg' in first ? String(first.msg) : JSON.stringify(e.detail);
+  } else if (typeof e?.message === 'string') {
+    raw = e.message;
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes('email already')) {
+    return 'Email already exists';
+  }
+  if (lower.includes('internal error')) {
+    return 'Failed to create doctor account';
+  }
+  if (raw) {
+    return raw;
+  }
+  return 'Failed to create doctor account';
+}
+
 export function Doctors() {
   const location = useLocation();
 
@@ -62,13 +86,17 @@ export function Doctors() {
 
   // Create handler
   const onSubmit = async (data: DoctorFormData) => {
-    console.log('SUBMIT TRIGGERED - Doctors form');
     setApiError('');
 
-    console.log('[Doctors.onSubmit] Submitting:', data);
-
     try {
-      await doctorsApi.create(data);
+      await doctorsApi.create({
+        name: data.name,
+        specialization: data.specialization || 'General',
+        experience_years: data.experience_years ?? 0,
+        account_email: data.account_email,
+        account_password: data.account_password,
+        license_number: data.license_number,
+      });
 
       toast.success('Doctor created successfully', {
         duration: 3000,
@@ -79,25 +107,9 @@ export function Doctors() {
       setShowForm(false);
 
       // Refetch to update UI
-      if (import.meta.env.DEV) {
-        console.log('[Doctors.onSubmit] Refetching data...');
-      }
       await refetch();
-
-      console.log('[Doctors.onSubmit] Success - form reset and data refreshed');
-    } catch (err: any) {
-      console.error('[Doctors.onSubmit] Error:', err);
-
-      let errorMessage = 'Failed to create doctor';
-
-      if (err?.detail) {
-        errorMessage = err.detail;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
-
+    } catch (err: unknown) {
+      const errorMessage = formatDoctorCreateError(err);
       setApiError(errorMessage);
       toast.error(errorMessage, { duration: 5000 });
     }
@@ -160,6 +172,23 @@ export function Doctors() {
                 label="Specialization"
                 disabled={form.formState.isSubmitting}
                 placeholder="e.g., Cardiology, Pediatrics"
+                required
+              />
+              <FormInput<DoctorFormInput>
+                name="account_email"
+                label="Login email"
+                type="email"
+                disabled={form.formState.isSubmitting}
+                placeholder="doctor@clinic.com"
+                required
+              />
+              <FormInput<DoctorFormInput>
+                name="account_password"
+                label="Initial password"
+                type="password"
+                disabled={form.formState.isSubmitting}
+                placeholder="At least 8 characters"
+                required
               />
               <FormInput<DoctorFormInput>
                 name="license_number"
@@ -207,7 +236,9 @@ export function Doctors() {
                   <p className="text-sm text-muted-foreground">
                     {doctor.experience_years ? `${doctor.experience_years} years exp.` : ''}
                   </p>
-                  <p className="text-sm text-muted-foreground truncate">{doctor.user?.email || ''}</p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {doctor.linked_user_email || doctor.user?.email || ''}
+                  </p>
                 </div>
                 <Button
                   variant="danger"
