@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -10,6 +11,8 @@ from app.models.billing import Billing, BillingStatus
 from app.schemas.billing import BillingCreate, BillingEventRead, BillingUpdate
 from app.services import appointment_service, patient_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def _validate_appointment_exists(db: Session, appointment_id: UUID) -> None:
@@ -66,19 +69,16 @@ def create_bill(
     created_by: UUID,
     tenant_id: UUID | None = None,
 ) -> Billing:
-    print("[BILLING SERVICE] Creating bill with data:", billing_in.model_dump())
+    logger.info("[BILLING SERVICE] Creating bill")
 
     # Validate patient exists
     try:
         patient_service.get_patient_or_404(db, billing_in.patient_id)
-        print("[BILLING SERVICE] Patient validated:", billing_in.patient_id)
     except NotFoundError as e:
-        print("[BILLING SERVICE] Patient not found:", billing_in.patient_id)
         raise ValidationError(f"Patient not found: {billing_in.patient_id}")
 
     # Only validate appointment if provided (optional field)
     if billing_in.appointment_id is not None:
-        print("[BILLING SERVICE] Validating appointment:", billing_in.appointment_id)
         _validate_appointment_exists(db, billing_in.appointment_id)
         _validate_appointment_not_cancelled(db, billing_in.appointment_id)
         _validate_no_duplicate_bill(db, billing_in.appointment_id)
@@ -92,13 +92,11 @@ def create_bill(
     billing_data = billing_in.model_dump()
     billing_data["created_by"] = created_by
     billing_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
-    print("[BILLING SERVICE] Creating bill in DB with data:", billing_data)
 
     try:
         bill = crud_billing.create_bill(db, billing_data)
-        print("[BILLING SERVICE] Bill created successfully:", bill.id)
     except Exception as e:
-        print("[BILLING SERVICE] DB ERROR:", str(e))
+        logger.exception("[BILLING SERVICE] DB ERROR")
         raise
 
     # Create initial billing event

@@ -24,6 +24,9 @@ DEFAULT_TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def upgrade() -> None:
+    # Needed for gen_random_uuid()
+    op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+
     # Ensure default tenant exists (idempotent)
     op.execute(
         sa.text(
@@ -47,46 +50,19 @@ def upgrade() -> None:
             ).bindparams(tenant_id=DEFAULT_TENANT_ID)
         )
 
-    # Seed user_tenant for existing users:
-    # - one primary association per user (if user has none yet)
-    # - role mirrors users.role
-    conn = op.get_bind()
-
-    users = list(
-        conn.execute(sa.text("SELECT id, role FROM users")).mappings().all()
+    # Seed user_tenant for existing users (set-based, idempotent)
+    op.execute(
+        sa.text(
+            """
+            INSERT INTO user_tenant (id, user_id, tenant_id, role, is_primary)
+            SELECT gen_random_uuid(), u.id, :tenant_id, COALESCE(u.role, 'admin'), true
+            FROM users u
+            WHERE NOT EXISTS (
+                SELECT 1 FROM user_tenant ut WHERE ut.user_id = u.id
+            )
+            """
+        ).bindparams(tenant_id=DEFAULT_TENANT_ID)
     )
-    for row in users:
-        user_id = row["id"]
-        role = row["role"] or "admin"
-
-        exists = conn.execute(
-            sa.text(
-                """
-                SELECT 1
-                FROM user_tenant
-                WHERE user_id = :user_id
-                LIMIT 1
-                """
-            ),
-            {"user_id": user_id},
-        ).first()
-        if exists:
-            continue
-
-        conn.execute(
-            sa.text(
-                """
-                INSERT INTO user_tenant (id, user_id, tenant_id, role, is_primary)
-                VALUES (:id, :user_id, :tenant_id, :role, true)
-                """
-            ),
-            {
-                "id": uuid.uuid4(),
-                "user_id": user_id,
-                "tenant_id": DEFAULT_TENANT_ID,
-                "role": role,
-            },
-        )
 
 
 def downgrade() -> None:
