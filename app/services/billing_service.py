@@ -127,7 +127,10 @@ def get_bills(
     appointment_id: UUID | None = None,
     status: BillingStatus | None = None,
     created_by: UUID | None = None,
+    doctor_id: UUID | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Billing]:
+    print(f"[TENANT FILTER] tenant_id={tenant_id}")
     return crud_billing.get_bills(
         db,
         skip=skip,
@@ -136,6 +139,8 @@ def get_bills(
         appointment_id=appointment_id,
         status=status,
         created_by=created_by,
+        doctor_id=doctor_id,
+        tenant_id=tenant_id,
     )
 
 

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
+from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.doctor import DoctorCreate, DoctorRead, DoctorUpdate
@@ -18,7 +19,8 @@ def create_doctor(
     db: Session = Depends(get_db),
     auth_ctx: TokenPayload = Depends(get_current_auth_context),
 ) -> DoctorRead:
-    return doctor_service.create_doctor(db, payload, tenant_id=auth_ctx.tenant_id)
+    user_id = auth_ctx.user_id if auth_ctx.role == "doctor" else None
+    return doctor_service.create_doctor(db, payload, tenant_id=auth_ctx.tenant_id, user_id=user_id)
 
 
 @router.get("", response_model=list[DoctorRead])
@@ -27,9 +29,12 @@ def read_doctors(
     limit: int = Query(default=10, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> list[DoctorRead]:
-    return doctor_service.get_doctors(db, skip=skip, limit=limit, search=search)
+    tenant_id = get_current_tenant_id(current_user, db)
+    if current_user.role == "doctor":
+        return [doctor_service.get_doctor_by_user_id(db, current_user.id)]
+    return doctor_service.get_doctors(db, skip=skip, limit=limit, search=search, tenant_id=tenant_id)
 
 
 @router.get("/{doctor_id}", response_model=DoctorRead)

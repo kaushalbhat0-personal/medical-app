@@ -19,15 +19,23 @@ def get_doctor(db: Session, doctor_id: UUID) -> Doctor | None:
     return db.get(Doctor, doctor_id)
 
 
+def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor | None:
+    stmt = select(Doctor).where(Doctor.user_id == user_id)
+    return db.scalars(stmt).first()
+
+
 def get_doctors(
     db: Session,
     skip: int = 0,
     limit: int = 10,
     search: str | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Doctor]:
     stmt = select(Doctor).order_by(Doctor.created_at.desc())
     if search:
         stmt = stmt.where(Doctor.name.ilike(f"%{search}%"))
+    if tenant_id is not None:
+        stmt = stmt.where(Doctor.tenant_id == tenant_id)
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 

@@ -1,14 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
+from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.billing import BillingStatus
 from app.models.user import User
 from app.schemas.billing import BillingCreate, BillingRead, BillingUpdate
-from app.services import billing_service
+from app.services import billing_service, doctor_service, patient_service
 
 router = APIRouter(prefix="/bills", tags=["bills"])
 
@@ -44,6 +45,18 @@ def read_bills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[BillingRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    if current_user.role not in ["admin", "super_admin", "doctor", "patient"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    doctor_id_filter: UUID | None = None
+    if current_user.role == "doctor":
+        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        doctor_id_filter = doctor.id
+        patient_id = None
+    elif current_user.role == "patient":
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        patient_id = patient.id
     return billing_service.get_bills(
         db,
         skip=skip,
@@ -51,7 +64,8 @@ def read_bills(
         patient_id=patient_id,
         appointment_id=appointment_id,
         status=status,
-        created_by=current_user.id,
+        doctor_id=doctor_id_filter,
+        tenant_id=tenant_id,
     )
 
 

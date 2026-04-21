@@ -27,6 +27,7 @@ def get_appointments(
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
     created_by: UUID | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Appointment]:
     stmt = (
         select(Appointment)
@@ -44,6 +45,8 @@ def get_appointments(
         stmt = stmt.where(Appointment.patient_id == patient_id)
     if created_by is not None:
         stmt = stmt.where(Appointment.created_by == created_by)
+    if tenant_id is not None:
+        stmt = stmt.where(Appointment.tenant_id == tenant_id)
 
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())

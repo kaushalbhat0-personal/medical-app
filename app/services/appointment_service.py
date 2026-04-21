@@ -127,12 +127,15 @@ def get_appointments(
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
     created_by: UUID | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Appointment]:
+    print(f"[TENANT FILTER] tenant_id={tenant_id}")
     appointments = crud_appointment.get_appointments(
         db, skip=skip, limit=limit,
         doctor_id=doctor_id,
         patient_id=patient_id,
         created_by=created_by,
+        tenant_id=tenant_id,
     )
     return _update_status_for_past_appointments(db, appointments)
 

@@ -14,10 +14,17 @@ def _validate_experience_years(experience_years: int | None) -> None:
         raise ValidationError("Experience years must be greater than or equal to 0")
 
 
-def create_doctor(db: Session, doctor_in: DoctorCreate, tenant_id: UUID | None = None) -> Doctor:
+def create_doctor(
+    db: Session,
+    doctor_in: DoctorCreate,
+    tenant_id: UUID | None = None,
+    user_id: UUID | None = None,
+) -> Doctor:
     _validate_experience_years(doctor_in.experience_years)
     doctor_data = doctor_in.model_dump()
     doctor_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
+    if user_id is not None:
+        doctor_data["user_id"] = user_id
     return crud_doctor.create_doctor(db, doctor_data)
 
 
@@ -28,13 +35,27 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
     return doctor
 
 
+def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
+    doctor = crud_doctor.get_doctor_by_user_id(db, user_id)
+    if doctor is None:
+        raise NotFoundError("Doctor profile not found for this user")
+    return doctor
+
+
 def get_doctors(
     db: Session,
     skip: int = 0,
     limit: int = 10,
     search: str | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Doctor]:
-    return crud_doctor.get_doctors(db, skip=skip, limit=limit, search=search)
+    return crud_doctor.get_doctors(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        tenant_id=tenant_id,
+    )
 
 
 def update_doctor(

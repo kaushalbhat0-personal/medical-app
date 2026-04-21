@@ -1,13 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
+from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
-from app.services import appointment_service
+from app.services import appointment_service, doctor_service, patient_service
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -35,13 +36,25 @@ def read_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[AppointmentRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    if current_user.role not in ["admin", "super_admin", "doctor", "patient"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if current_user.role == "doctor":
+        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        doctor_id = doctor.id
+        patient_id = None
+    elif current_user.role == "patient":
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        patient_id = patient.id
+        doctor_id = None
     return appointment_service.get_appointments(
         db,
         skip=skip,
         limit=limit,
         doctor_id=doctor_id,
         patient_id=patient_id,
-        created_by=current_user.id,
+        tenant_id=tenant_id,
     )
 
 

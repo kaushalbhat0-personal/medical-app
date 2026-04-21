@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import TokenPayload
 from app.api.deps import get_current_auth_context, get_current_user
+from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
@@ -24,6 +25,7 @@ def create_patient(
         payload,
         created_by=auth_ctx.user_id,
         tenant_id=auth_ctx.tenant_id,
+        user_id=auth_ctx.user_id if auth_ctx.role == "patient" else None,
     )
 
 
@@ -33,9 +35,12 @@ def read_patients(
     limit: int = Query(default=10, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> list[PatientRead]:
-    return patient_service.get_patients(db, skip=skip, limit=limit, search=search)
+    tenant_id = get_current_tenant_id(current_user, db)
+    if current_user.role == "patient":
+        return [patient_service.get_patient_by_user_id(db, current_user.id)]
+    return patient_service.get_patients(db, skip=skip, limit=limit, search=search, tenant_id=tenant_id)
 
 
 @router.get("/{patient_id}", response_model=PatientRead)

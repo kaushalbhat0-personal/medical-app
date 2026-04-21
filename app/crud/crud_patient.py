@@ -19,15 +19,23 @@ def get_patient(db: Session, patient_id: UUID) -> Patient | None:
     return db.get(Patient, patient_id)
 
 
+def get_patient_by_user_id(db: Session, user_id: UUID) -> Patient | None:
+    stmt = select(Patient).where(Patient.user_id == user_id)
+    return db.scalars(stmt).first()
+
+
 def get_patients(
     db: Session,
     skip: int = 0,
     limit: int = 10,
     search: str | None = None,
+    tenant_id: UUID | None = None,
 ) -> list[Patient]:
     stmt = select(Patient).order_by(Patient.created_at.desc())
     if search:
         stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
+    if tenant_id is not None:
+        stmt = stmt.where(Patient.tenant_id == tenant_id)
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 
