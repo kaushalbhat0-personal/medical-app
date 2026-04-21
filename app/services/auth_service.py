@@ -1,9 +1,10 @@
 import logging
 from sqlalchemy.orm import Session
 from app.core.security import hash_password, verify_password
-from app.crud import crud_user
+from app.crud import crud_patient, crud_user
 from app.models.user import User
 from app.schemas.user import UserCreate
+from app.services import doctor_service
 from app.services.exceptions import AuthenticationError, ConflictError
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,44 @@ def register_user(db: Session, user_in: UserCreate) -> User:
     if crud_user.get_user_by_email(db, user_in.email):
         raise ConflictError("Email already registered")
     hashed = hash_password(user_in.password)
-    return crud_user.create_user(db, {"email": user_in.email, "hashed_password": hashed})
+
+    try:
+        user = crud_user.create_user_tx(
+            db,
+            {
+                "email": user_in.email,
+                "hashed_password": hashed,
+                "role": user_in.role,
+            },
+        )
+
+        if user.role.value == "doctor":
+            if user_in.doctor_profile is None:
+                raise ConflictError("Doctor profile data required for doctor role")
+            doctor_service.create_doctor(
+                db,
+                user_in.doctor_profile,
+                tenant_id=None,
+                user_id=user.id,
+                current_user=None,
+            )
+
+        if user.role.value == "patient":
+            if user_in.patient_profile is None:
+                raise ConflictError("Patient profile data required for patient role")
+            patient_data = user_in.patient_profile.model_dump()
+            # Patients are global users; no strict tenant ownership.
+            patient_data["tenant_id"] = None
+            patient_data["created_by"] = user.id
+            patient_data["user_id"] = user.id
+            crud_patient.create_patient_tx(db, patient_data)
+
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        db.rollback()
+        raise
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User:

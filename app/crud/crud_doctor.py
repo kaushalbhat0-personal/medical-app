@@ -2,9 +2,10 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.doctor import Doctor
+from app.models.tenant import Tenant
 
 
 def create_doctor(db: Session, doctor_data: dict[str, Any]) -> Doctor:
@@ -15,12 +16,30 @@ def create_doctor(db: Session, doctor_data: dict[str, Any]) -> Doctor:
     return doctor
 
 
+def create_doctor_tx(db: Session, doctor_data: dict[str, Any]) -> Doctor:
+    """
+    Create a doctor within an existing transaction (no commit).
+    """
+    doctor = Doctor(**doctor_data)
+    db.add(doctor)
+    db.flush()
+    db.refresh(doctor)
+    return doctor
+
+
 def get_doctor(db: Session, doctor_id: UUID) -> Doctor | None:
-    return db.get(Doctor, doctor_id)
+    stmt = select(Doctor).where(
+        Doctor.id == doctor_id,
+        Doctor.is_deleted == False,
+    )
+    return db.scalars(stmt).first()
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor | None:
-    stmt = select(Doctor).where(Doctor.user_id == user_id)
+    stmt = select(Doctor).where(
+        Doctor.user_id == user_id,
+        Doctor.is_deleted == False,
+    )
     return db.scalars(stmt).first()
 
 
@@ -30,12 +49,25 @@ def get_doctors(
     limit: int = 10,
     search: str | None = None,
     tenant_id: UUID | None = None,
+    user_id: UUID | None = None,
 ) -> list[Doctor]:
-    stmt = select(Doctor).order_by(Doctor.created_at.desc())
+    stmt = (
+        select(Doctor)
+        .order_by(Doctor.created_at.desc())
+        .options(joinedload(Doctor.tenant))
+        .where(
+            Doctor.is_active == True,
+            Doctor.is_deleted == False,
+        )
+    )
     if search:
         stmt = stmt.where(Doctor.name.ilike(f"%{search}%"))
+    if user_id is not None:
+        stmt = stmt.where(Doctor.user_id == user_id)
     if tenant_id is not None:
         stmt = stmt.where(Doctor.tenant_id == tenant_id)
+    # Public listing safety: only show doctors attached to active tenants
+    stmt = stmt.join(Doctor.tenant).where(Tenant.is_active == True)
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 

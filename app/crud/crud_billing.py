@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.appointment import Appointment
 from app.models.billing import Billing, BillingEvent, BillingStatus
+from app.models.patient import Patient
 
 
 def create_bill(db: Session, billing_data: dict[str, Any]) -> Billing:
@@ -52,6 +53,7 @@ def get_bills(
     created_by: UUID | None = None,
     doctor_id: UUID | None = None,
     tenant_id: UUID | None = None,
+    user_id: UUID | None = None,
     include_deleted: bool = False,
 ) -> list[Billing]:
     stmt = (
@@ -72,7 +74,12 @@ def get_bills(
         stmt = stmt.where(Billing.created_by == created_by)
     if doctor_id is not None:
         # Restrict bills to those linked to appointments for this doctor
-        stmt = stmt.join(Billing.appointment).where(Appointment.doctor_id == doctor_id)
+        stmt = stmt.join(Billing.appointment).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.is_deleted == False,
+        )
+    if user_id is not None:
+        stmt = stmt.join(Billing.patient).where(Patient.user_id == user_id)
     if tenant_id is not None:
         stmt = stmt.where(Billing.tenant_id == tenant_id)
 

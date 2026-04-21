@@ -20,8 +20,13 @@ class Billing(Base):
     __tablename__ = "billings"
 
     __table_args__ = (
-        # Use unique index with partial condition instead of UniqueConstraint
-        Index("uq_billing_appointment", "appointment_id", unique=True, postgresql_where=text("appointment_id IS NOT NULL")),
+        # One non-deleted bill per appointment (DB-enforced)
+        Index(
+            "uq_billing_active_appointment",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("appointment_id IS NOT NULL AND is_deleted = false"),
+        ),
         UniqueConstraint("idempotency_key", name="uq_billing_idempotency_key"),
         Index("idx_billing_created_by", "created_by"),
         Index("idx_billing_status_paid_at", "status", "paid_at"),

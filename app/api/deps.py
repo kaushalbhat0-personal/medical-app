@@ -15,6 +15,10 @@ from app.crud import crud_user
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/login",
+    auto_error=False,
+)
 
 
 @dataclass
@@ -58,6 +62,19 @@ def _parse_access_token(token: str) -> TokenPayload:
 def _user_id_from_access_token(token: str) -> UUID:
     # Kept for backward compatibility with existing code
     return _parse_access_token(token).user_id
+
+
+def get_current_user_optional(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not token:
+        return None
+    user_id = _user_id_from_access_token(token)
+    user = crud_user.get_user(db, user_id)
+    if user is None or not user.is_active:
+        return None
+    return user
 
 
 def get_current_user(

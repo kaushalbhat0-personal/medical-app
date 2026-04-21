@@ -28,3 +28,19 @@ def create_user(db: Session, user_data: dict[str, Any]) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def create_user_tx(db: Session, user_data: dict[str, Any]) -> User:
+    """
+    Create a user within an existing transaction (no commit).
+    """
+    user = User(
+        email=user_data["email"],
+        hashed_password=user_data["hashed_password"],
+    )
+    if "role" in user_data and user_data["role"] is not None:
+        user.role = user_data["role"]
+    db.add(user)
+    db.flush()
+    db.refresh(user)
+    return user

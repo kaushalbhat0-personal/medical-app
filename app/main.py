@@ -7,6 +7,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.rate_limit import (
+    AuthenticatedWritePostRateLimitMiddleware,
+    PublicEndpointRateLimitMiddleware,
+    RateLimitRule,
+)
 from app.services.exceptions import ServiceError
 
 # Configure logging
@@ -68,11 +73,11 @@ async def log_requests(request: Request, call_next):
 
 
 # Rate limiting middleware placeholder
-@app.middleware("http")
-async def rate_limit_placeholder(request: Request, call_next):
-    # Placeholder for future rate limiting implementation
-    # TODO: Implement Redis-based rate limiting
-    return await call_next(request)
+app.add_middleware(
+    PublicEndpointRateLimitMiddleware,
+    rule=RateLimitRule(window_seconds=60, max_requests=100),
+)
+app.add_middleware(AuthenticatedWritePostRateLimitMiddleware)
 
 
 @app.exception_handler(ServiceError)

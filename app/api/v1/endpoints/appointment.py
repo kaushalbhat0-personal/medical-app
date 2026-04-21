@@ -1,14 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
+from app.api.deps import get_current_active_user, get_current_user
 from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
-from app.services import appointment_service, doctor_service, patient_service
+from app.services import appointment_service
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -17,13 +17,12 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 def create_appointment(
     payload: AppointmentCreate,
     db: Session = Depends(get_db),
-    auth_ctx: TokenPayload = Depends(get_current_auth_context),
+    current_user: User = Depends(get_current_active_user),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> AppointmentRead:
+    tenant_id = get_current_tenant_id(current_user, db)
     return appointment_service.create_appointment(
-        db,
-        payload,
-        created_by=auth_ctx.user_id,
-        tenant_id=auth_ctx.tenant_id,
+        db, payload, current_user, tenant_id, idempotency_key=idempotency_key
     )
 
 
@@ -37,19 +36,9 @@ def read_appointments(
     current_user: User = Depends(get_current_user),
 ) -> list[AppointmentRead]:
     tenant_id = get_current_tenant_id(current_user, db)
-    if current_user.role not in ["admin", "super_admin", "doctor", "patient"]:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    if current_user.role == "doctor":
-        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        doctor_id = doctor.id
-        patient_id = None
-    elif current_user.role == "patient":
-        patient = patient_service.get_patient_by_user_id(db, current_user.id)
-        patient_id = patient.id
-        doctor_id = None
     return appointment_service.get_appointments(
         db,
+        current_user,
         skip=skip,
         limit=limit,
         doctor_id=doctor_id,
@@ -64,8 +53,11 @@ def read_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AppointmentRead:
+    tenant_id = get_current_tenant_id(current_user, db)
     appointment = appointment_service.get_appointment_or_404(db, appointment_id)
-    appointment_service.validate_ownership(appointment, current_user.id)
+    appointment_service.authorize_appointment_read(
+        db, appointment, current_user, tenant_id
+    )
     return appointment
 
 
@@ -76,7 +68,10 @@ def update_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AppointmentRead:
-    return appointment_service.update_appointment(db, appointment_id, payload, current_user.id)
+    tenant_id = get_current_tenant_id(current_user, db)
+    return appointment_service.update_appointment(
+        db, appointment_id, payload, current_user, tenant_id
+    )
 
 
 @router.delete("/{appointment_id}", response_model=AppointmentRead)
@@ -85,4 +80,7 @@ def delete_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AppointmentRead:
-    return appointment_service.delete_appointment(db, appointment_id, current_user.id)
+    tenant_id = get_current_tenant_id(current_user, db)
+    return appointment_service.delete_appointment(
+        db, appointment_id, current_user, tenant_id
+    )

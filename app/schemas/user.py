@@ -4,11 +4,16 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.models.user import UserRole
+from app.schemas.doctor import DoctorCreate
+from app.schemas.patient import PatientCreate
 
 
 class UserCreate(BaseModel):
     email: str
     password: str
+    role: UserRole | None = None
+    doctor_profile: DoctorCreate | None = None
+    patient_profile: PatientCreate | None = None
 
 
 class UserRead(BaseModel):

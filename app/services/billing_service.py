@@ -6,11 +6,17 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_billing
-from app.models.appointment import AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, BillingStatus
+from app.models.user import User, UserRole
 from app.schemas.billing import BillingCreate, BillingEventRead, BillingUpdate
-from app.services import appointment_service, patient_service
+from app.services import appointment_service, doctor_service, patient_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.services.security_audit import (
+    assert_authorized,
+    log_audit_mutation,
+    log_rbac_mutation_violation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +48,10 @@ def _validate_idempotency_key(db: Session, idempotency_key: str | None) -> None:
 def _validate_patient_matches_appointment(
     db: Session,
     patient_id: UUID,
-    appointment_id: UUID,
+    appointment_id: UUID | None,
 ) -> None:
+    if appointment_id is None:
+        return
     appointment = appointment_service.get_appointment_or_404(db, appointment_id)
     if appointment.patient_id != patient_id:
         raise ValidationError("Patient ID does not match appointment's patient")
@@ -63,13 +71,71 @@ def _validate_not_already_paid(existing_status: BillingStatus) -> None:
         raise ValidationError("Bill already paid")
 
 
+def authorize_bill_create(
+    db: Session,
+    billing_in: BillingCreate,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    if current_user.role == UserRole.patient:
+        log_rbac_mutation_violation(current_user, "billing")
+        raise ForbiddenError("Patients cannot create bills")
+
+    if current_user.role == UserRole.doctor and billing_in.appointment_id is None:
+        log_rbac_mutation_violation(current_user, "billing")
+        raise ForbiddenError("Doctors must create bills with an appointment")
+
+    if billing_in.appointment_id is None:
+        if current_user.role not in (UserRole.admin, UserRole.super_admin):
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError(
+                "Bills without an appointment can only be created by administrators"
+            )
+        return
+
+    appointment = appointment_service.get_appointment_or_404(db, billing_in.appointment_id)
+
+    if current_user.role == UserRole.super_admin:
+        return
+
+    if tenant_id is not None:
+        assert_authorized(
+            "create",
+            "billing",
+            current_user,
+            tenant_id,
+            resource_tenant_id=appointment.tenant_id,
+        )
+
+    if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor:
+        try:
+            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Doctor profile not found for this user")
+        if appointment.doctor_id != acting_doctor.id:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError(
+                "Cannot create bill for an appointment you are not assigned to"
+            )
+        return
+
+    log_rbac_mutation_violation(current_user, "billing")
+    raise ForbiddenError("Not allowed to create bills")
+
+
 def create_bill(
     db: Session,
     billing_in: BillingCreate,
-    created_by: UUID,
-    tenant_id: UUID | None = None,
+    current_user: User,
+    tenant_id: UUID | None,
 ) -> Billing:
+    logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
     logger.info("[BILLING SERVICE] Creating bill")
+    authorize_bill_create(db, billing_in, current_user, tenant_id)
 
     # Validate patient exists
     try:
@@ -77,9 +143,11 @@ def create_bill(
     except NotFoundError as e:
         raise ValidationError(f"Patient not found: {billing_in.patient_id}")
 
-    # Only validate appointment if provided (optional field)
+    appointment: Appointment | None = None
     if billing_in.appointment_id is not None:
-        _validate_appointment_exists(db, billing_in.appointment_id)
+        appointment = appointment_service.get_appointment_or_404(
+            db, billing_in.appointment_id
+        )
         _validate_appointment_not_cancelled(db, billing_in.appointment_id)
         _validate_no_duplicate_bill(db, billing_in.appointment_id)
         _validate_patient_matches_appointment(
@@ -90,8 +158,26 @@ def create_bill(
     _validate_idempotency_key(db, billing_in.idempotency_key)
 
     billing_data = billing_in.model_dump()
-    billing_data["created_by"] = created_by
-    billing_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
+    billing_data["created_by"] = current_user.id
+    if appointment is not None:
+        if appointment.tenant_id is None:
+            logger.error(
+                "[TENANT INTEGRITY] appointment.tenant_id is None for appointment_id=%s",
+                appointment.id,
+            )
+            raise ValidationError("Appointment tenant is not set")
+        billing_data["tenant_id"] = appointment.tenant_id
+    else:
+        billing_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
+
+    if tenant_id is not None:
+        assert_authorized(
+            "create",
+            "billing",
+            current_user,
+            tenant_id,
+            resource_tenant_id=billing_data["tenant_id"],
+        )
 
     try:
         bill = crud_billing.create_bill(db, billing_data)
@@ -107,7 +193,14 @@ def create_bill(
         new_status=bill.status.value,
         event_type="created",
         event_metadata=f"Bill created with amount {bill.amount} {bill.currency}",
-        created_by=created_by,
+        created_by=current_user.id,
+    )
+    log_audit_mutation(
+        "create",
+        current_user,
+        "billing",
+        bill.id,
+        bill.tenant_id,
     )
     return bill
 
@@ -121,42 +214,164 @@ def get_bill_or_404(db: Session, bill_id: UUID) -> Billing:
 
 def get_bills(
     db: Session,
+    current_user: User,
     skip: int = 0,
     limit: int = 10,
     patient_id: UUID | None = None,
     appointment_id: UUID | None = None,
     status: BillingStatus | None = None,
-    created_by: UUID | None = None,
-    doctor_id: UUID | None = None,
     tenant_id: UUID | None = None,
 ) -> list[Billing]:
-    print(f"[TENANT FILTER] tenant_id={tenant_id}")
+    if current_user.role not in (
+        UserRole.admin,
+        UserRole.super_admin,
+        UserRole.doctor,
+        UserRole.patient,
+        UserRole.staff,
+    ):
+        log_rbac_mutation_violation(current_user, "billing")
+        raise ForbiddenError("Not authorized")
+    logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
+    eff_patient_id = patient_id
+    eff_doctor_id: UUID | None = None
+    eff_user_id: UUID | None = None
+    eff_tenant_id = tenant_id
+
+    if current_user.role == UserRole.doctor:
+        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        eff_doctor_id = doctor.id
+        eff_patient_id = None
+    elif current_user.role == UserRole.patient:
+        eff_user_id = current_user.id
+        eff_patient_id = None
+    elif current_user.role == UserRole.super_admin:
+        eff_tenant_id = None
+    elif current_user.role in (UserRole.admin, UserRole.staff):
+        pass
+
     return crud_billing.get_bills(
         db,
         skip=skip,
         limit=limit,
-        patient_id=patient_id,
+        patient_id=eff_patient_id,
         appointment_id=appointment_id,
         status=status,
-        created_by=created_by,
-        doctor_id=doctor_id,
-        tenant_id=tenant_id,
+        doctor_id=eff_doctor_id,
+        tenant_id=eff_tenant_id,
+        user_id=eff_user_id,
     )
 
 
-def validate_ownership(bill: Billing, current_user_id: UUID) -> None:
-    if bill.created_by != current_user_id:
-        raise ForbiddenError("Not allowed to access this bill")
+def authorize_bill_read(
+    db: Session,
+    bill: Billing,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    if current_user.role == UserRole.super_admin:
+        return
+
+    assert_authorized(
+        "read",
+        "billing",
+        current_user,
+        tenant_id,
+        resource_tenant_id=bill.tenant_id,
+    )
+
+    if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.patient:
+        try:
+            acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Patient profile not found for this user")
+        if bill.patient_id != acting_patient.id:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Not allowed to access this bill")
+        return
+
+    if current_user.role == UserRole.doctor:
+        if bill.appointment_id is None:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Not allowed to access this bill")
+        appointment = appointment_service.get_appointment_or_404(db, bill.appointment_id)
+        try:
+            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Doctor profile not found for this user")
+        if appointment.doctor_id != acting_doctor.id:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Not allowed to access this bill")
+        return
+
+    log_rbac_mutation_violation(current_user, "billing")
+    raise ForbiddenError("Not allowed to access this bill")
+
+
+def authorize_bill_mutate(
+    db: Session,
+    bill: Billing,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    if current_user.role == UserRole.patient:
+        log_rbac_mutation_violation(current_user, "billing")
+        raise ForbiddenError("Patients cannot modify bills")
+
+    if current_user.role == UserRole.super_admin:
+        return
+
+    assert_authorized(
+        "mutate",
+        "billing",
+        current_user,
+        tenant_id,
+        resource_tenant_id=bill.tenant_id,
+    )
+
+    if bill.appointment_id is None and current_user.role not in (
+        UserRole.admin,
+        UserRole.super_admin,
+    ):
+        log_rbac_mutation_violation(current_user, "billing")
+        raise ForbiddenError("Only administrators may modify bills without an appointment")
+
+    if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor:
+        appointment = appointment_service.get_appointment_or_404(db, bill.appointment_id)
+        try:
+            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Doctor profile not found for this user")
+        if appointment.doctor_id != acting_doctor.id:
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Not allowed to access this bill")
+        return
+
+    log_rbac_mutation_violation(current_user, "billing")
+    raise ForbiddenError("Not allowed to access this bill")
+
+
+authorize_bill_update = authorize_bill_mutate
+authorize_bill_delete = authorize_bill_mutate
 
 
 def update_bill(
     db: Session,
     bill_id: UUID,
     billing_in: BillingUpdate,
-    current_user_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
 ) -> Billing:
     bill = get_bill_or_404(db, bill_id)
-    validate_ownership(bill, current_user_id)
+    authorize_bill_mutate(db, bill, current_user, tenant_id)
 
     update_data = billing_in.model_dump(exclude_unset=True)
     if not update_data:
@@ -176,14 +391,25 @@ def update_bill(
     new_appointment_id = update_data.get("appointment_id", bill.appointment_id)
     new_patient_id = update_data.get("patient_id", bill.patient_id)
 
-    if "appointment_id" in update_data and new_appointment_id != bill.appointment_id:
+    if "appointment_id" in update_data and new_appointment_id is None:
+        if current_user.role not in (UserRole.admin, UserRole.super_admin):
+            log_rbac_mutation_violation(current_user, "billing")
+            raise ForbiddenError("Only administrators may unlink an appointment from a bill")
+
+    if (
+        "appointment_id" in update_data
+        and new_appointment_id is not None
+        and new_appointment_id != bill.appointment_id
+    ):
         _validate_appointment_exists(db, new_appointment_id)
         _validate_appointment_not_cancelled(db, new_appointment_id)
         existing_bill = crud_billing.get_bill_by_appointment(db, new_appointment_id)
         if existing_bill is not None and existing_bill.id != bill_id:
             raise ConflictError("Bill already exists for this appointment")
 
-    if "patient_id" in update_data or "appointment_id" in update_data:
+    if new_appointment_id is not None and (
+        "patient_id" in update_data or "appointment_id" in update_data
+    ):
         _validate_patient_matches_appointment(db, new_patient_id, new_appointment_id)
 
     previous_status = bill.status.value
@@ -198,9 +424,16 @@ def update_bill(
             new_status=new_status.value,
             event_type="status_changed",
             event_metadata=f"Status changed from {previous_status} to {new_status.value}",
-            created_by=current_user_id,
+            created_by=current_user.id,
         )
 
+    log_audit_mutation(
+        "update",
+        current_user,
+        "billing",
+        updated_bill.id,
+        updated_bill.tenant_id,
+    )
     return updated_bill
 
 
@@ -222,10 +455,11 @@ def get_pending_payments(
 def soft_delete_bill(
     db: Session,
     bill_id: UUID,
-    current_user_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
 ) -> Billing:
     bill = get_bill_or_404(db, bill_id)
-    validate_ownership(bill, current_user_id)
+    authorize_bill_mutate(db, bill, current_user, tenant_id)
 
     if bill.is_deleted:
         raise ValidationError("Bill already deleted")
@@ -241,7 +475,14 @@ def soft_delete_bill(
         new_status=updated_bill.status.value,
         event_type="soft_deleted",
         event_metadata="Bill soft deleted",
-        created_by=current_user_id,
+        created_by=current_user.id,
+    )
+    log_audit_mutation(
+        "delete",
+        current_user,
+        "billing",
+        updated_bill.id,
+        updated_bill.tenant_id,
     )
     return updated_bill
 
@@ -249,12 +490,13 @@ def soft_delete_bill(
 def get_billing_history(
     db: Session,
     bill_id: UUID,
-    current_user_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[BillingEventRead]:
     bill = get_bill_or_404(db, bill_id)
-    validate_ownership(bill, current_user_id)
+    authorize_bill_read(db, bill, current_user, tenant_id)
 
     events = crud_billing.get_billing_events(db, bill_id, skip=skip, limit=limit)
     return [BillingEventRead.model_validate(event) for event in events]

@@ -1,4 +1,4 @@
-from app.models.appointment import Appointment
+from app.models.appointment import Appointment, AppointmentCreationIdempotency
 from app.models.billing import Billing, BillingEvent
 from app.models.doctor import Doctor
 from app.models.patient import Patient
@@ -11,6 +11,7 @@ __all__ = [
     "Patient",
     "Doctor",
     "Appointment",
+    "AppointmentCreationIdempotency",
     "Billing",
     "BillingEvent",
     "Tenant",

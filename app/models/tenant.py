@@ -11,6 +11,7 @@ from app.core.database import Base
 
 class TenantType(str, enum.Enum):
     hospital = "hospital"
+    independent_doctor = "independent_doctor"
     clinic = "clinic"
 
 

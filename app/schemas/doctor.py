@@ -17,6 +17,9 @@ class DoctorRead(BaseModel):
     name: str
     specialization: str
     experience_years: int
+    tenant_id: UUID | None = None
+    tenant_type: str | None = None
+    tenant_name: str | None = None
     created_at: datetime
 
 

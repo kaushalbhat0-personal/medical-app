@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, desc, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,6 +21,13 @@ class Appointment(Base):
     __table_args__ = (
         UniqueConstraint("doctor_id", "appointment_time", name="uq_doctor_time"),
         Index("idx_user_doctor_time", "created_by", "doctor_id", "appointment_time"),
+        Index(
+            "ix_appointments_tenant_patient_created",
+            "tenant_id",
+            "patient_id",
+            desc("created_at"),
+            postgresql_where=text("is_deleted = false"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -71,3 +78,37 @@ class Appointment(Base):
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
     billing = relationship("Billing", back_populates="appointment", uselist=False)
+
+
+class AppointmentCreationIdempotency(Base):
+    """Stores Idempotency-Key + body hash for POST /appointments deduplication."""
+
+    __tablename__ = "appointment_creation_idempotency"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_appointment_idempotency_user_key"),
+        Index("ix_appointment_idempotency_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )

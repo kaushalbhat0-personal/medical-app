@@ -1,15 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import TokenPayload, get_current_auth_context, get_current_user
+from app.api.deps import get_current_active_user, get_current_user
 from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.billing import BillingStatus
 from app.models.user import User
 from app.schemas.billing import BillingCreate, BillingRead, BillingUpdate
-from app.services import billing_service, doctor_service, patient_service
+from app.services import billing_service
 
 router = APIRouter(prefix="/bills", tags=["bills"])
 
@@ -18,21 +18,10 @@ router = APIRouter(prefix="/bills", tags=["bills"])
 def create_bill(
     payload: BillingCreate,
     db: Session = Depends(get_db),
-    auth_ctx: TokenPayload = Depends(get_current_auth_context),
+    current_user: User = Depends(get_current_active_user),
 ) -> BillingRead:
-    print("[BILLING API] Incoming payload:", payload.model_dump())
-    try:
-        result = billing_service.create_bill(
-            db,
-            payload,
-            created_by=auth_ctx.user_id,
-            tenant_id=auth_ctx.tenant_id,
-        )
-        print("[BILLING API] Bill created successfully:", result.id)
-        return result
-    except Exception as e:
-        print("[BILLING API] ERROR:", str(e))
-        raise
+    tenant_id = get_current_tenant_id(current_user, db)
+    return billing_service.create_bill(db, payload, current_user, tenant_id)
 
 
 @router.get("", response_model=list[BillingRead])
@@ -46,25 +35,14 @@ def read_bills(
     current_user: User = Depends(get_current_user),
 ) -> list[BillingRead]:
     tenant_id = get_current_tenant_id(current_user, db)
-    if current_user.role not in ["admin", "super_admin", "doctor", "patient"]:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    doctor_id_filter: UUID | None = None
-    if current_user.role == "doctor":
-        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        doctor_id_filter = doctor.id
-        patient_id = None
-    elif current_user.role == "patient":
-        patient = patient_service.get_patient_by_user_id(db, current_user.id)
-        patient_id = patient.id
     return billing_service.get_bills(
         db,
+        current_user,
         skip=skip,
         limit=limit,
         patient_id=patient_id,
         appointment_id=appointment_id,
         status=status,
-        doctor_id=doctor_id_filter,
         tenant_id=tenant_id,
     )
 
@@ -75,8 +53,9 @@ def read_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BillingRead:
+    tenant_id = get_current_tenant_id(current_user, db)
     bill = billing_service.get_bill_or_404(db, bill_id)
-    billing_service.validate_ownership(bill, current_user.id)
+    billing_service.authorize_bill_read(db, bill, current_user, tenant_id)
     return bill
 
 
@@ -87,7 +66,8 @@ def update_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BillingRead:
-    return billing_service.update_bill(db, bill_id, payload, current_user.id)
+    tenant_id = get_current_tenant_id(current_user, db)
+    return billing_service.update_bill(db, bill_id, payload, current_user, tenant_id)
 
 
 @router.get("/revenue/total", response_model=dict[str, float])
@@ -126,11 +106,9 @@ def pay_bill(
     from app.schemas.billing import BillingUpdate
     from app.models.billing import BillingStatus
 
-    bill = billing_service.get_bill_or_404(db, bill_id)
-    billing_service.validate_ownership(bill, current_user.id)
-
+    tenant_id = get_current_tenant_id(current_user, db)
     update_data = BillingUpdate(status=BillingStatus.paid)
-    return billing_service.update_bill(db, bill_id, update_data, current_user.id)
+    return billing_service.update_bill(db, bill_id, update_data, current_user, tenant_id)
 
 
 @router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,5 +118,6 @@ def delete_bill(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     """Soft delete a bill."""
-    billing_service.soft_delete_bill(db, bill_id, current_user.id)
+    tenant_id = get_current_tenant_id(current_user, db)
+    billing_service.soft_delete_bill(db, bill_id, current_user, tenant_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

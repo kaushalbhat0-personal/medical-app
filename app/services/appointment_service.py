@@ -1,15 +1,44 @@
 from datetime import datetime, timezone
+import hashlib
+import json
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.user import User, UserRole
 from app.services import doctor_service, patient_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.services.security_audit import (
+    assert_authorized,
+    log_audit_mutation,
+    log_rbac_mutation_violation,
+)
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
+
+logger = logging.getLogger(__name__)
+
+
+def _appointment_payload_hash(appointment_in: AppointmentCreate) -> str:
+    body = appointment_in.model_dump(mode="json")
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _ensure_can_list_appointments(current_user: User) -> None:
+    if current_user.role not in (
+        UserRole.admin,
+        UserRole.super_admin,
+        UserRole.doctor,
+        UserRole.patient,
+        UserRole.staff,
+    ):
+        log_rbac_mutation_violation(current_user, "appointment")
+        raise ForbiddenError("Not authorized")
 
 
 def _validate_patient_and_doctor_exist(
@@ -53,12 +82,76 @@ def _validate_appointment_time_in_future(appointment_time: datetime) -> None:
         raise ValidationError("Cannot book appointment in the past")
 
 
+def authorize_appointment_create(
+    db: Session,
+    appointment_in: AppointmentCreate,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    if current_user.role == UserRole.super_admin:
+        return
+
+    if current_user.role in (UserRole.admin, UserRole.staff):
+        if tenant_id is not None:
+            doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
+            assert_authorized(
+                "create",
+                "appointment",
+                current_user,
+                tenant_id,
+                resource_tenant_id=doctor.tenant_id,
+            )
+        return
+
+    if current_user.role == UserRole.doctor:
+        try:
+            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Doctor profile not found for this user")
+        if acting_doctor.id != appointment_in.doctor_id:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Cannot create appointment for another doctor")
+        return
+
+    if current_user.role == UserRole.patient:
+        try:
+            acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Patient profile not found for this user")
+        if acting_patient.id != appointment_in.patient_id:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Cannot create appointment for another patient")
+        return
+
+    log_rbac_mutation_violation(current_user, "appointment")
+    raise ForbiddenError("Not allowed to create appointments")
+
+
 def create_appointment(
     db: Session,
     appointment_in: AppointmentCreate,
-    created_by: UUID,
-    tenant_id: UUID | None = None,
+    current_user: User,
+    tenant_id: UUID | None,
+    idempotency_key: str | None = None,
 ) -> Appointment:
+    logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
+    authorize_appointment_create(db, appointment_in, current_user, tenant_id)
+
+    if idempotency_key is not None:
+        idempotency_key = idempotency_key.strip() or None
+
+    body_hash = _appointment_payload_hash(appointment_in)
+    if idempotency_key:
+        existing = crud_appointment.get_appointment_idempotency_record(
+            db, current_user.id, idempotency_key
+        )
+        if existing is not None:
+            if existing.request_hash != body_hash:
+                raise ConflictError("Idempotency-Key reused with a different request body")
+            return get_appointment_or_404(db, existing.appointment_id)
+
     _validate_patient_and_doctor_exist(
         db,
         patient_id=appointment_in.patient_id,
@@ -71,9 +164,43 @@ def create_appointment(
     )
     _validate_appointment_time_in_future(appointment_in.appointment_time)
     appointment_data = appointment_in.model_dump()
-    appointment_data["created_by"] = created_by
-    appointment_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
-    return crud_appointment.create_appointment(db, appointment_data)
+    appointment_data["created_by"] = current_user.id
+    doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
+    if doctor.tenant_id is None:
+        logger.error("[TENANT INTEGRITY] doctor.tenant_id is None for doctor_id=%s", doctor.id)
+        raise ValidationError("Doctor tenant is not set")
+    appointment_data["tenant_id"] = doctor.tenant_id
+
+    try:
+        appointment = crud_appointment.add_appointment(db, appointment_data)
+        if idempotency_key:
+            crud_appointment.record_appointment_idempotency(
+                db,
+                user_id=current_user.id,
+                idempotency_key=idempotency_key,
+                request_hash=body_hash,
+                appointment_id=appointment.id,
+            )
+        db.commit()
+        db.refresh(appointment)
+    except IntegrityError:
+        db.rollback()
+        if idempotency_key:
+            existing = crud_appointment.get_appointment_idempotency_record(
+                db, current_user.id, idempotency_key
+            )
+            if existing is not None and existing.request_hash == body_hash:
+                return get_appointment_or_404(db, existing.appointment_id)
+        raise
+
+    log_audit_mutation(
+        "create",
+        current_user,
+        "appointment",
+        appointment.id,
+        appointment.tenant_id,
+    )
+    return appointment
 
 
 def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
@@ -122,27 +249,92 @@ def _update_status_for_past_appointments(
 
 def get_appointments(
     db: Session,
+    current_user: User,
     skip: int = 0,
     limit: int = 10,
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
-    created_by: UUID | None = None,
     tenant_id: UUID | None = None,
 ) -> list[Appointment]:
-    print(f"[TENANT FILTER] tenant_id={tenant_id}")
+    _ensure_can_list_appointments(current_user)
+    logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
+    eff_doctor_id = doctor_id
+    eff_patient_id = patient_id
+    eff_tenant_id = tenant_id
+
+    if current_user.role == UserRole.doctor:
+        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        eff_doctor_id = doctor.id
+        eff_patient_id = None
+    elif current_user.role == UserRole.patient:
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        eff_patient_id = patient.id
+        eff_doctor_id = None
+    elif current_user.role == UserRole.super_admin:
+        eff_tenant_id = None
+    elif current_user.role in (UserRole.admin, UserRole.staff):
+        pass
+
     appointments = crud_appointment.get_appointments(
-        db, skip=skip, limit=limit,
-        doctor_id=doctor_id,
-        patient_id=patient_id,
-        created_by=created_by,
-        tenant_id=tenant_id,
+        db,
+        skip=skip,
+        limit=limit,
+        doctor_id=eff_doctor_id,
+        patient_id=eff_patient_id,
+        tenant_id=eff_tenant_id,
     )
     return _update_status_for_past_appointments(db, appointments)
 
 
-def validate_ownership(appointment: Appointment, current_user_id: UUID) -> None:
-    if appointment.created_by != current_user_id:
-        raise ForbiddenError("Not allowed to access this appointment")
+def authorize_appointment_access(
+    db: Session,
+    appointment: Appointment,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    if current_user.role == UserRole.super_admin:
+        return
+
+    assert_authorized(
+        "access",
+        "appointment",
+        current_user,
+        tenant_id,
+        resource_tenant_id=appointment.tenant_id,
+    )
+
+    if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor:
+        try:
+            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Doctor profile not found for this user")
+        if appointment.doctor_id != acting_doctor.id:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Not allowed to access this appointment")
+        return
+
+    if current_user.role == UserRole.patient:
+        try:
+            acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Patient profile not found for this user")
+        if appointment.patient_id != acting_patient.id:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Not allowed to access this appointment")
+        return
+
+    log_rbac_mutation_violation(current_user, "appointment")
+    raise ForbiddenError("Not allowed to access this appointment")
+
+
+authorize_appointment_read = authorize_appointment_access
+authorize_appointment_update = authorize_appointment_access
+authorize_appointment_delete = authorize_appointment_access
 
 
 def _validate_status_regression(
@@ -157,10 +349,11 @@ def update_appointment(
     db: Session,
     appointment_id: UUID,
     appointment_in: AppointmentUpdate,
-    current_user_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
-    validate_ownership(appointment, current_user_id)
+    authorize_appointment_access(db, appointment, current_user, tenant_id)
 
     update_data = appointment_in.model_dump(exclude_unset=True)
     if not update_data:
@@ -182,18 +375,35 @@ def update_appointment(
     )
     if "appointment_time" in update_data:
         _validate_appointment_time_in_future(appointment_time)
-    return crud_appointment.update_appointment(db, appointment, update_data)
+    updated = crud_appointment.update_appointment(db, appointment, update_data)
+    log_audit_mutation(
+        "update",
+        current_user,
+        "appointment",
+        updated.id,
+        updated.tenant_id,
+    )
+    return updated
 
 
 def delete_appointment(
     db: Session,
     appointment_id: UUID,
-    current_user_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
-    validate_ownership(appointment, current_user_id)
+    authorize_appointment_access(db, appointment, current_user, tenant_id)
 
     if appointment.status == AppointmentStatus.completed:
         raise ValidationError("Completed appointment cannot be deleted")
 
-    return crud_appointment.soft_delete_appointment(db, appointment)
+    deleted = crud_appointment.soft_delete_appointment(db, appointment)
+    log_audit_mutation(
+        "delete",
+        current_user,
+        "appointment",
+        deleted.id,
+        deleted.tenant_id,
+    )
+    return deleted
