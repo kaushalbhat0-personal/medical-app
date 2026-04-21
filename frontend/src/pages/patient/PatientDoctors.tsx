@@ -483,6 +483,7 @@ export function PatientDoctors() {
                         <Button
                           key={slot.start}
                           type="button"
+                          data-testid="slot-button"
                           size="sm"
                           variant={selectedSlotStart === slot.start ? 'default' : 'outline'}
                           disabled={!slot.available || submitting || pastOnToday}
