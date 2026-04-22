@@ -15,7 +15,6 @@ import {
   countBookableSlotsInWindow,
   formatTimeShort,
   sortAvailabilityWindows,
-  windowOverlapsExisting,
 } from '../../utils/availabilityWindows';
 import { cn } from '@/lib/utils';
 
@@ -211,23 +210,18 @@ export function DoctorAvailabilityPage() {
         toast.error('No windows to copy for this day');
         return;
       }
+      const uniqueTargets = [...new Set(targetDows)].filter((d) => d !== selectedDow);
+      if (uniqueTargets.length === 0) {
+        toast.error('Pick at least one other day to copy to');
+        return;
+      }
       setCopyBusy(true);
       try {
-        const merged: DoctorAvailabilityWindow[] = [...nonTemp(windows)];
-        for (const t of targetDows) {
-          if (t === selectedDow) continue;
-          for (const w of source) {
-            if (windowOverlapsExisting(t, w.start_time, w.end_time, merged)) continue;
-            const created = await doctorsApi.createAvailabilityWindow(doctorId, {
-              day_of_week: t,
-              start_time: w.start_time,
-              end_time: w.end_time,
-              slot_duration: w.slot_duration,
-            });
-            merged.push(created);
-          }
-        }
-        setWindows(sortAvailabilityWindows(merged));
+        const list = await doctorsApi.copyAvailabilityWindows(doctorId, {
+          source_day: selectedDow,
+          target_days: uniqueTargets,
+        });
+        setWindows(sortAvailabilityWindows(list));
         afterMutation(doctorId);
         toast.success('Copy finished');
       } catch (e) {

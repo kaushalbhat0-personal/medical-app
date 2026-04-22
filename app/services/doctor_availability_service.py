@@ -10,6 +10,7 @@ from app.crud import crud_doctor_availability
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 from app.models.user import User
 from app.schemas.doctor import (
+    DoctorAvailabilityCopyRequest,
     DoctorAvailabilityCreate,
     DoctorAvailabilityUpdate,
     DoctorTimeOffCreate,
@@ -114,6 +115,42 @@ def delete_availability_window(
     if window is None or window.doctor_id != doctor_id:
         raise NotFoundError("Availability window not found")
     crud_doctor_availability.delete_availability_window(db, window)
+
+
+def copy_availability_to_days(
+    db: Session,
+    doctor_id: UUID,
+    payload: DoctorAvailabilityCopyRequest,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> None:
+    doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
+    doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
+    doctor_service.ensure_self_managed_doctor(doctor)
+    if doctor.tenant_id is None:
+        raise ValidationError("Doctor tenant is not set")
+
+    source_rows = crud_doctor_availability.list_availability_for_doctor_day(db, doctor_id, payload.source_day)
+    if not source_rows:
+        raise ValidationError("No availability windows to copy for the source day")
+
+    for w in source_rows:
+        if w.start_time >= w.end_time:
+            raise ValidationError("Availability end time must be after start time")
+        if _span_minutes(w.start_time, w.end_time) < float(w.slot_duration):
+            raise ValidationError("Window is too short to fit a slot of this duration")
+
+    target_days = sorted({d for d in payload.target_days if d != payload.source_day and 0 <= d <= 6})
+    print("COPY FROM:", payload.source_day, "TO:", target_days)
+
+    for dow in target_days:
+        crud_doctor_availability.replace_availability_day_from_templates(
+            db,
+            doctor_id=doctor_id,
+            day_of_week=dow,
+            tenant_id=doctor.tenant_id,
+            template_windows=source_rows,
+        )
 
 
 def _assert_time_off_shape(start_t: time | None, end_t: time | None) -> None:

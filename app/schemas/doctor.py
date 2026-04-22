@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime, time
 from uuid import UUID
 
@@ -111,6 +113,23 @@ class DoctorAvailabilityRead(BaseModel):
     slot_duration: int
     tenant_id: UUID
     created_at: datetime
+
+
+class DoctorAvailabilityCopyRequest(BaseModel):
+    """Copy all availability windows from ``source_day`` onto each listed ``target_days`` (source day is ignored)."""
+
+    source_day: int = Field(ge=0, le=6, description="Monday=0 .. Sunday=6")
+    target_days: list[int] = Field(
+        min_length=1,
+        description="Weekdays to overwrite; values 0..6; same as source_day are skipped",
+    )
+
+    @model_validator(mode="after")
+    def _validate_target_days(self) -> DoctorAvailabilityCopyRequest:
+        for d in self.target_days:
+            if not 0 <= d <= 6:
+                raise ValueError("Each target day must be between 0 and 6")
+        return self
 
 
 class DoctorTimeOffRead(BaseModel):

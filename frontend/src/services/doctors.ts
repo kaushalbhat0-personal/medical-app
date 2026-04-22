@@ -257,6 +257,17 @@ export const doctorsApi = {
     return response.data;
   },
 
+  copyAvailabilityWindows: async (
+    doctorId: string,
+    body: { source_day: number; target_days: number[] }
+  ): Promise<DoctorAvailabilityWindow[]> => {
+    const response = await api.post<DoctorAvailabilityWindow[]>(
+      `/doctors/${doctorId}/availability-windows/copy`,
+      body
+    );
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
   updateAvailabilityWindow: async (
     doctorId: string,
     windowId: string,

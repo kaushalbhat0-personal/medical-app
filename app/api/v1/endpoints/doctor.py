@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.core.tenant_context import get_current_tenant_id
 from app.models.user import User, UserRole
 from app.schemas.doctor import (
+    DoctorAvailabilityCopyRequest,
     DoctorAvailabilityCreate,
     DoctorAvailabilityRead,
     DoctorAvailabilityUpdate,
@@ -210,6 +211,31 @@ def create_doctor_availability_window(
         db.commit()
         db.refresh(row)
         return row
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post(
+    "/{doctor_id}/availability-windows/copy",
+    response_model=list[DoctorAvailabilityRead],
+    status_code=200,
+)
+def copy_doctor_availability_windows(
+    doctor_id: UUID,
+    payload: DoctorAvailabilityCopyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DoctorAvailabilityRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        doctor_availability_service.copy_availability_to_days(
+            db, doctor_id, payload, current_user, tenant_id
+        )
+        db.commit()
+        return doctor_availability_service.list_availability_windows(
+            db, doctor_id, current_user, tenant_id
+        )
     except Exception:
         db.rollback()
         raise

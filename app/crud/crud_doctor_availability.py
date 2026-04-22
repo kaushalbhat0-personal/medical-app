@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.slot_cache_invalidation import schedule_invalidate_doctor_slot_cache_on_commit
@@ -53,6 +53,34 @@ def get_availability_window(db: Session, window_id: UUID) -> DoctorAvailability 
 def delete_availability_window(db: Session, window: DoctorAvailability) -> None:
     doctor_id = window.doctor_id
     db.delete(window)
+    db.flush()
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
+
+
+def replace_availability_day_from_templates(
+    db: Session,
+    *,
+    doctor_id: UUID,
+    day_of_week: int,
+    tenant_id: UUID,
+    template_windows: list[DoctorAvailability],
+) -> None:
+    """Remove all availability rows for the doctor on ``day_of_week``, then insert copies of ``template_windows``."""
+    stmt = delete(DoctorAvailability).where(
+        DoctorAvailability.doctor_id == doctor_id,
+        DoctorAvailability.day_of_week == day_of_week,
+    )
+    db.execute(stmt)
+    for tw in template_windows:
+        row = DoctorAvailability(
+            doctor_id=doctor_id,
+            day_of_week=day_of_week,
+            start_time=tw.start_time,
+            end_time=tw.end_time,
+            slot_duration=tw.slot_duration,
+            tenant_id=tenant_id,
+        )
+        db.add(row)
     db.flush()
     schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
 
