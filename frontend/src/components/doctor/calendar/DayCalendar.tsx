@@ -560,13 +560,13 @@ export function DayCalendar({
           width: `calc(${colPct}% - ${gutter * 2}%)`,
         }}
         className={cn(
-          'absolute z-10 box-border flex min-h-[1.5rem] flex-col items-stretch justify-center overflow-hidden rounded-md border px-2 py-0.5 text-left text-xs transition-colors sm:text-sm',
-          past && 'cursor-not-allowed border-border bg-muted/30 text-muted-foreground opacity-45',
-          !past && !p.slot.available &&
-            'cursor-not-allowed border-rose-500/35 bg-rose-950/20 text-rose-950/90 dark:text-rose-100/90',
+          'absolute z-10 box-border flex min-h-[1.5rem] flex-col items-stretch justify-center overflow-hidden rounded-md border px-2 py-0.5 text-left text-sm font-semibold tabular-nums transition-colors',
+          past &&
+            'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400',
+          !past && !p.slot.available && 'border border-red-200 bg-red-50 text-red-900',
           !past && p.slot.available && !selected &&
-            'cursor-pointer border-emerald-600/50 bg-emerald-500/15 text-emerald-950 hover:bg-emerald-500/25 dark:text-emerald-50',
-          !past && p.slot.available && selected && 'z-[15] ring-2 ring-primary border-primary bg-primary/20 text-foreground shadow-sm',
+            'cursor-pointer border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+          !past && p.slot.available && selected && 'z-[15] border border-primary bg-primary text-white shadow-sm hover:bg-primary/90',
           isInteractive && p.slot.available && !past && !bookingBusy && 'active:scale-[0.99]'
         )}
         disabled={disabled}
@@ -601,8 +601,16 @@ export function DayCalendar({
         }}
         aria-disabled={disabled}
       >
-        <span className="font-medium tabular-nums">{formatSlotTime(p.slot.start, tz)}</span>
-        <span className="truncate text-[10px] leading-tight sm:text-xs">
+        <span className="font-semibold tabular-nums">{formatSlotTime(p.slot.start, tz)}</span>
+        <span
+          className={cn(
+            'truncate text-[10px] leading-tight sm:text-xs',
+            !past && p.slot.available && selected && 'text-white/80',
+            !past && p.slot.available && !selected && 'text-emerald-800/90',
+            !past && !p.slot.available && 'text-red-800/90',
+            past && 'text-gray-500'
+          )}
+        >
           {past ? 'Past' : p.slot.available ? 'Available' : 'Booked'}
         </span>
       </button>
@@ -653,14 +661,14 @@ export function DayCalendar({
       isInteractive && !past && appt && (appt.status === 'scheduled' || appt.status === 'pending');
 
     const listCardBaseClass = cn(
-      'w-full rounded-xl border p-4 text-left transition-colors min-h-[64px] flex flex-col gap-3',
-      past && 'border-border bg-muted/30 text-muted-foreground',
-      !past && s.available && 'border-emerald-600/40 bg-green-50 dark:bg-emerald-950/25',
-      !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border-border bg-gray-50 dark:bg-muted/40',
-      !past && !s.available && appt?.status === 'completed' && 'border-border bg-gray-50 opacity-60 dark:bg-muted/40',
-      !past && !s.available && appt?.status === 'cancelled' && 'border-red-200 bg-red-50 dark:bg-red-950/20',
-      !past && !s.available && !appt && 'border-border bg-gray-50 dark:bg-muted/40',
-      selected && 'ring-2 ring-primary border-primary shadow-sm'
+      'w-full rounded-xl border p-4 text-left transition-colors min-h-[44px] flex flex-col gap-3 sm:min-h-[64px]',
+      past && 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400',
+      !past && s.available && !selected && 'border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+      !past && s.available && selected && 'z-[1] border border-primary bg-primary text-white shadow-sm hover:bg-primary/90',
+      !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border border-red-200 bg-red-50 text-red-900',
+      !past && !s.available && appt?.status === 'completed' && 'border border-gray-200 bg-gray-100 text-gray-500',
+      !past && !s.available && appt?.status === 'cancelled' && 'border border-red-200 bg-red-50 text-red-800',
+      !past && !s.available && !appt && 'border border-red-200 bg-red-50 text-red-900'
     );
 
     const cardShell = (opts: {
@@ -716,21 +724,33 @@ export function DayCalendar({
     const body = (
       <>
         <div className="min-w-0 space-y-1">
-          <p className="text-xl font-bold tabular-nums leading-tight">{formatSlotTime(s.start, tz)}</p>
+          <p
+            className={cn(
+              'text-sm font-semibold tabular-nums leading-tight sm:text-xl sm:font-bold',
+              selected && 'text-white'
+            )}
+          >
+            {formatSlotTime(s.start, tz)}
+          </p>
           {pName ? (
             pid ? (
               <Link
                 to={`/doctor/patients/${pid}`}
-                className="text-base font-medium text-primary hover:underline truncate block"
+                className={cn(
+                  'text-base font-medium hover:underline truncate block',
+                  selected ? 'text-white' : 'text-primary'
+                )}
                 onClick={(e) => e.stopPropagation()}
               >
                 {pName}
               </Link>
             ) : (
-              <p className="text-base font-medium truncate">{pName}</p>
+              <p className={cn('text-base font-medium truncate', selected && 'text-white')}>{pName}</p>
             )
           ) : null}
-          <p className="text-sm text-muted-foreground capitalize">{statusLabel}</p>
+          <p className={cn('text-sm capitalize', selected ? 'text-white/80' : 'text-muted-foreground')}>
+            {statusLabel}
+          </p>
         </div>
         {showCompleteCancel && appt && (
           <div className="flex w-full gap-2">

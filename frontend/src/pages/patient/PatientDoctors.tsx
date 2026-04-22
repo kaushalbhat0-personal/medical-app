@@ -448,6 +448,7 @@ export function PatientDoctors() {
                 const sk = slotKey(slot.start);
                 const selected = selectedSlotStart != null && slotKey(selectedSlotStart) === sk;
                 const disabled = !slot.available || submitting || pastOnToday;
+                const booked = !slot.available;
                 return (
                   <button
                     key={sk}
@@ -458,12 +459,17 @@ export function PatientDoctors() {
                     aria-disabled={disabled}
                     onClick={() => setSelectedSlotStart(sk)}
                     className={cn(
-                      'min-h-[44px] rounded-lg border px-2 text-sm font-medium tabular-nums transition-colors',
+                      'flex min-h-[44px] w-full items-center justify-center rounded-lg border px-2 text-center text-sm font-semibold tabular-nums transition-colors',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      'disabled:cursor-not-allowed disabled:opacity-45',
-                      selected
-                        ? 'border-primary bg-primary text-white hover:bg-primary/90'
-                        : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                      pastOnToday &&
+                        'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed',
+                      !pastOnToday && booked &&
+                        'border border-red-200 bg-red-50 text-red-900 cursor-not-allowed',
+                      !pastOnToday && !booked && selected &&
+                        'border border-primary bg-primary text-white hover:bg-primary/90',
+                      !pastOnToday && !booked && !selected &&
+                        'border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+                      submitting && 'pointer-events-none'
                     )}
                   >
                     {formatSlotTimeWithZoneLabel(slot.start, DISPLAY_TIMEZONE)}
