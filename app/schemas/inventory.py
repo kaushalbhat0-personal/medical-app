@@ -70,3 +70,14 @@ class StockOperationResult(BaseModel):
     doctor_id: UUID | None
     quantity: int
     movement_id: UUID
+
+
+class StockRead(BaseModel):
+    item_id: UUID
+    doctor_id: UUID | None
+    quantity: int
+
+
+class BulkStockRow(BaseModel):
+    item_id: UUID
+    quantity: int

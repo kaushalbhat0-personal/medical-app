@@ -233,5 +233,90 @@ async def test_inventory_patient_forbidden(
     assert login.status_code == 200
     auth = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-    resp = await client.get("/api/v1/inventory/items", headers=auth)
-    assert resp.status_code == 403
+    for path in ("/api/v1/inventory/items", "/api/v1/inventory/stock?item_id=00000000-0000-0000-0000-000000000000"):
+        resp = await client.get(path, headers=auth)
+        assert resp.status_code == 403
+
+    r_bulk = await client.get("/api/v1/inventory/stock/bulk", headers=auth)
+    assert r_bulk.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_inventory_bulk_stock_merges_with_items_list(
+    client: AsyncClient, db_session: Session
+) -> None:
+    """Three items, stock on two only — bulk returns all with missing stock as 0."""
+    db = db_session
+    tenant = create_tenant(db, name="inv-tenant-bulk")
+    email = f"inv_bulk_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=email,
+        password="InvPass9!",
+        role=UserRole.admin,
+        tenant_id=tenant.id,
+    )
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": email, "password": "InvPass9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    created_ids: list[str] = []
+    for i, name in enumerate(["Paracetamol", "Gloves", "Syringe"]):
+        r = await client.post(
+            "/api/v1/inventory/items",
+            json={
+                "name": name,
+                "type": "medicine" if i == 0 else "consumable",
+                "unit": "unit",
+                "cost_price": 1.0,
+                "selling_price": 2.0,
+            },
+            headers=auth,
+        )
+        assert r.status_code == 201
+        created_ids.append(r.json()["id"])
+
+    add1 = await client.post(
+        "/api/v1/inventory/stock/add",
+        json={"item_id": created_ids[0], "quantity": 120, "doctor_id": None},
+        headers=auth,
+    )
+    assert add1.status_code == 200
+    add2 = await client.post(
+        "/api/v1/inventory/stock/add",
+        json={"item_id": created_ids[1], "quantity": 45, "doctor_id": None},
+        headers=auth,
+    )
+    assert add2.status_code == 200
+
+    bulk = await client.get("/api/v1/inventory/stock/bulk", headers=auth)
+    assert bulk.status_code == 200
+    by_id = {row["item_id"]: row["quantity"] for row in bulk.json()}
+    assert len(by_id) == 3
+    assert by_id[created_ids[0]] == 120
+    assert by_id[created_ids[1]] == 45
+    assert by_id[created_ids[2]] == 0
+
+    as_map = await client.get("/api/v1/inventory/stock/bulk?as_map=true", headers=auth)
+    assert as_map.status_code == 200
+    m = as_map.json()
+    assert m[created_ids[0]] == 120
+    assert m[created_ids[2]] == 0
+
+    one = await client.get(
+        f"/api/v1/inventory/stock?item_id={created_ids[0]}",
+        headers=auth,
+    )
+    assert one.status_code == 200
+    assert one.json() == {
+        "item_id": created_ids[0],
+        "doctor_id": None,
+        "quantity": 120,
+    }

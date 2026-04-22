@@ -9,6 +9,7 @@ import {
   CreditCard,
   Home,
   Receipt,
+  Package,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -42,7 +43,8 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
   const staffNavItems = useMemo(() => {
     if (!isAdminRole(user?.role)) return staffNavBase;
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
-    return [staffNavBase[0], adminItem, ...staffNavBase.slice(1)];
+    const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
+    return [staffNavBase[0], adminItem, inventoryItem, ...staffNavBase.slice(1)];
   }, [user?.role]);
 
   const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;

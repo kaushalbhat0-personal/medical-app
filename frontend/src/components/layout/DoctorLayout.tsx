@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import {
   Calendar,
   Home,
+  Package,
   Receipt,
   Stethoscope,
   UserRound,
@@ -26,6 +27,7 @@ function DoctorLayoutInner() {
     { to: '/doctor/patients', label: 'Patients', icon: Users },
     { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
     { to: '/doctor/bills', label: 'Bills', icon: Receipt },
+    { to: '/doctor/inventory', label: 'Inventory', icon: Package },
     { to: '/doctor/availability', label: 'Availability', icon: Clock },
   ];
 

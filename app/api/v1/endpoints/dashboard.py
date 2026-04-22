@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -51,16 +51,24 @@ def get_dashboard(
 def get_admin_dashboard_metrics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    target_tenant_id: UUID | None = Query(
+    x_tenant_id: UUID | None = Header(
+        default=None,
+        alias="X-Tenant-ID",
+        description="Tenant to scope admin dashboard metrics (required)",
+    ),
+    _legacy_tenant_id: UUID | None = Query(
         default=None,
         alias="tenant_id",
-        description="For super_admin without primary tenant: target tenant for metrics",
+        description="Deprecated; use X-Tenant-ID. Ignored.",
     ),
 ) -> AdminDashboardMetricsResponse:
     dashboard_service.authorize_admin_dashboard_access(current_user)
-    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(
-        db, current_user, target_tenant_id=target_tenant_id
-    )
+    if x_tenant_id is None:
+        raise HTTPException(
+            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
+        )
+    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
+    logger.info("TENANT ID: %s", tenant_id)
     metrics = dashboard_service.get_admin_dashboard_metrics(db, tenant_id)
     return AdminDashboardMetricsResponse.model_validate(metrics)
 
@@ -69,16 +77,23 @@ def get_admin_dashboard_metrics(
 def get_admin_revenue_trend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    target_tenant_id: UUID | None = Query(
+    x_tenant_id: UUID | None = Header(
+        default=None,
+        alias="X-Tenant-ID",
+    ),
+    _legacy_tenant_id: UUID | None = Query(
         default=None,
         alias="tenant_id",
-        description="For super_admin without primary tenant: target tenant for revenue trend",
+        description="Deprecated; use X-Tenant-ID. Ignored.",
     ),
 ) -> list[RevenueTrendItem]:
     dashboard_service.authorize_admin_dashboard_access(current_user)
-    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(
-        db, current_user, target_tenant_id=target_tenant_id
-    )
+    if x_tenant_id is None:
+        raise HTTPException(
+            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
+        )
+    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
+    logger.info("TENANT ID: %s", tenant_id)
     rows = dashboard_service.get_revenue_trend(db, tenant_id)
     return [RevenueTrendItem.model_validate(x) for x in rows]
 
@@ -90,15 +105,22 @@ def get_admin_revenue_trend(
 def get_admin_doctor_performance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    target_tenant_id: UUID | None = Query(
+    x_tenant_id: UUID | None = Header(
+        default=None,
+        alias="X-Tenant-ID",
+    ),
+    _legacy_tenant_id: UUID | None = Query(
         default=None,
         alias="tenant_id",
-        description="For super_admin without primary tenant: target tenant for doctor performance",
+        description="Deprecated; use X-Tenant-ID. Ignored.",
     ),
 ) -> list[DoctorPerformanceItem]:
     dashboard_service.authorize_admin_dashboard_access(current_user)
-    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(
-        db, current_user, target_tenant_id=target_tenant_id
-    )
+    if x_tenant_id is None:
+        raise HTTPException(
+            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
+        )
+    tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
+    logger.info("TENANT ID: %s", tenant_id)
     rows = dashboard_service.get_doctor_performance(db, tenant_id)
     return [DoctorPerformanceItem.model_validate(x) for x in rows]

@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
 import { navigateTo } from '../utils/navigation';
+import { getTenantIdForRequest } from '../utils/tenantIdForRequest';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -53,6 +54,11 @@ api.interceptors.request.use(
     }
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    const tenantId = getTenantIdForRequest();
+    if (tenantId && config.headers) {
+      config.headers['X-Tenant-ID'] = tenantId;
     }
 
     // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).

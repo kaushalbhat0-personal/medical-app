@@ -26,6 +26,10 @@ REVENUE_TREND_PATH = "/api/v1/admin/dashboard/revenue-trend"
 DOCTOR_PERFORMANCE_PATH = "/api/v1/admin/dashboard/doctor-performance"
 
 
+def _bearer_tenant(token: str, tenant_id) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}", "X-Tenant-ID": str(tenant_id)}
+
+
 def _seed_tenant_a_metrics(
     db: Session,
 ) -> tuple[object, float, float, int, int, float, object, str, str]:
@@ -338,7 +342,7 @@ async def test_admin_can_read_dashboard_metrics(
     )
     assert login.status_code == 200
     token = login.json()["access_token"]
-    r = await client.get(METRICS_PATH, headers={"Authorization": f"Bearer {token}"})
+    r = await client.get(METRICS_PATH, headers=_bearer_tenant(token, _t.id))
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["total_revenue"] == exp_total
@@ -355,6 +359,23 @@ async def test_admin_can_read_dashboard_metrics(
         "pending_bills",
     ):
         assert k in body
+
+
+@pytest.mark.asyncio
+async def test_admin_dashboard_metrics_400_without_tenant_header(
+    client: AsyncClient, db_session: Session
+) -> None:
+    t, _a, _b, _c, _d, _e, _f, ad_email, ad_pw = _seed_tenant_a_metrics(db_session)
+    _ = t
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": ad_email, "password": ad_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+    r = await client.get(METRICS_PATH, headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 400, r.text
 
 
 @pytest.mark.asyncio
@@ -399,7 +420,7 @@ async def test_metrics_respect_tenant_isolation(
     ).json()["access_token"]
     r = await client.get(
         f"{METRICS_PATH}?tenant_id={t_b.id}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=_bearer_tenant(token, t_a.id),
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -490,7 +511,7 @@ async def test_admin_revenue_trend_seven_days_includes_zero_revenue_days(
     )
     assert login.status_code == 200, login.text
     token = login.json()["access_token"]
-    r = await client.get(REVENUE_TREND_PATH, headers={"Authorization": f"Bearer {token}"})
+    r = await client.get(REVENUE_TREND_PATH, headers=_bearer_tenant(token, t_a.id))
     assert r.status_code == 200, r.text
     body = r.json()
     assert len(body) == 7
@@ -544,7 +565,7 @@ async def test_revenue_trend_respects_tenant_isolation(
     ).json()["access_token"]
     r = await client.get(
         f"{REVENUE_TREND_PATH}?tenant_id={t_b.id}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=_bearer_tenant(token, t_a.id),
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -727,7 +748,6 @@ async def test_admin_gets_doctor_performance_including_empty_doctor(
     _t, d_data, d_empty, ad_email, ad_pw, exp_n, exp_c, exp_rev = _seed_doctor_performance_tenant(
         db_session
     )
-    _ = _t
     login = await client.post(
         "/api/v1/login",
         data={"username": ad_email, "password": ad_pw},
@@ -736,7 +756,7 @@ async def test_admin_gets_doctor_performance_including_empty_doctor(
     assert login.status_code == 200, login.text
     token = login.json()["access_token"]
     r = await client.get(
-        DOCTOR_PERFORMANCE_PATH, headers={"Authorization": f"Bearer {token}"}
+        DOCTOR_PERFORMANCE_PATH, headers=_bearer_tenant(token, _t.id)
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -806,7 +826,7 @@ async def test_doctor_performance_respects_tenant_isolation(
     ).json()["access_token"]
     r = await client.get(
         f"{DOCTOR_PERFORMANCE_PATH}?tenant_id={t_b.id}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=_bearer_tenant(token, t_a.id),
     )
     assert r.status_code == 200, r.text
     body = r.json()

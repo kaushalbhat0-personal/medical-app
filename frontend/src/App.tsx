@@ -34,6 +34,7 @@ import { DoctorPatientDetailPage } from './pages/doctor/DoctorPatientDetailPage'
 import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
+import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
 import { ResetPassword } from './pages/ResetPassword';
@@ -176,6 +177,23 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/admin/inventory"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <AdminRoute user={user}>
+                  <AppLayout user={user} onLogout={logout}>
+                    <AnimatedPage>
+                      <AdminInventoryPage />
+                    </AnimatedPage>
+                  </AppLayout>
+                </AdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
@@ -299,6 +317,14 @@ function AnimatedRoutes() {
             element={
               <AnimatedPage>
                 <DoctorAvailabilityPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="inventory"
+            element={
+              <AnimatedPage>
+                <DoctorInventoryPage />
               </AnimatedPage>
             }
           />

@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import DEFAULT_TENANT_ID
@@ -60,6 +60,73 @@ def get_item_or_404(db: Session, item_id: UUID) -> InventoryItem:
     if item is None:
         raise NotFoundError("Inventory item not found")
     return item
+
+
+def get_stock(
+    db: Session,
+    item_id: UUID,
+    doctor_id: UUID | None = None,
+    *,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> int:
+    """
+    Read current quantity for one item and doctor scope (tenant level if doctor_id is None).
+    If no row exists in inventory_stock, returns 0.
+    """
+    _forbid_patients(current_user)
+    item = get_item_or_404(db, item_id)
+    _authorize_item_tenant(item, current_user, tenant_id)
+    _validate_doctor_for_item_tenant(db, doctor_id, item.tenant_id)
+    row = db.scalars(_stock_query(item_id, doctor_id)).first()
+    return int(row.quantity) if row is not None else 0
+
+
+def get_bulk_stock(
+    tenant_id: UUID | None,
+    doctor_id: UUID | None = None,
+    item_ids: list[UUID] | None = None,
+    *,
+    db: Session,
+    current_user: User,
+) -> list[tuple[UUID, int]]:
+    """
+    One-query stock for all items in the tenant (optionally doctor-scoped).
+    Items without a stock row get quantity 0. Super admin with tenant_id None and
+    no doctor_id lists all items across all tenants; otherwise tenant is enforced.
+    """
+    _forbid_patients(current_user)
+    filter_tenant: UUID | None = tenant_id
+    if doctor_id is not None:
+        doctor = db.get(Doctor, doctor_id)
+        if doctor is None:
+            raise NotFoundError("Doctor not found")
+        if tenant_id is not None and doctor.tenant_id != tenant_id:
+            raise ValidationError("Doctor does not belong to the current tenant")
+        filter_tenant = doctor.tenant_id
+    else:
+        if current_user.role != UserRole.super_admin and tenant_id is None:
+            log_rbac_mutation_violation(current_user, "inventory", action="get_bulk_stock")
+            raise ForbiddenError("Tenant scope required")
+
+    join_cond = and_(
+        InventoryStock.item_id == InventoryItem.id,
+        (
+            InventoryStock.doctor_id.is_(None)
+            if doctor_id is None
+            else InventoryStock.doctor_id == doctor_id
+        ),
+    )
+    q = select(InventoryItem.id, func.coalesce(InventoryStock.quantity, 0)).outerjoin(
+        InventoryStock,
+        join_cond,
+    )
+    if filter_tenant is not None:
+        q = q.where(InventoryItem.tenant_id == filter_tenant)
+    if item_ids is not None and len(item_ids) > 0:
+        q = q.where(InventoryItem.id.in_(item_ids))
+    q = q.order_by(InventoryItem.name.asc())
+    return [(r[0], int(r[1])) for r in db.execute(q).all()]
 
 
 def _validate_doctor_for_item_tenant(

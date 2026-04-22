@@ -9,17 +9,64 @@ from app.core.tenant_context import get_current_tenant_id
 from app.models.inventory import InventoryItemType
 from app.models.user import User
 from app.schemas.inventory import (
+    BulkStockRow,
     InventoryItemCreate,
     InventoryItemRead,
     InventoryItemUpdate,
     StockAddRequest,
     StockAdjustRequest,
     StockOperationResult,
+    StockRead,
     StockReduceRequest,
 )
 from app.services import inventory_service
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+@router.get("/stock/bulk", response_model=None)
+def get_bulk_stock(
+    doctor_id: UUID | None = Query(default=None, description="Doctor-scoped stock; omit for tenant level"),
+    item_ids: list[UUID] | None = Query(
+        default=None,
+        description="If set, only these item IDs (must belong to the tenant scope)",
+    ),
+    as_map: bool = Query(
+        default=False,
+        description="If true, return a JSON object mapping item_id (string) to quantity",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[BulkStockRow] | dict[str, int]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    rows = inventory_service.get_bulk_stock(
+        tenant_id,
+        doctor_id=doctor_id,
+        item_ids=item_ids,
+        db=db,
+        current_user=current_user,
+    )
+    if as_map:
+        return {str(iid): qty for iid, qty in rows}
+    return [BulkStockRow(item_id=iid, quantity=qty) for iid, qty in rows]
+
+
+@router.get("/stock", response_model=StockRead)
+def get_one_stock(
+    item_id: UUID = Query(..., description="Inventory item id"),
+    doctor_id: UUID | None = Query(default=None, description="Doctor id for doctor-level stock; omit for tenant level"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StockRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    quantity = inventory_service.get_stock(
+        db,
+        item_id,
+        doctor_id=doctor_id,
+        current_user=current_user,
+        tenant_id=tenant_id,
+    )
+    return StockRead(item_id=item_id, doctor_id=doctor_id, quantity=quantity)
 
 
 @router.post("/items", response_model=InventoryItemRead, status_code=201)

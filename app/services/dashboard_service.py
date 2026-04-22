@@ -62,18 +62,22 @@ def authorize_admin_dashboard_access(current_user: User) -> None:
 def resolve_admin_metrics_tenant_id(
     db: Session,
     current_user: User,
-    target_tenant_id: UUID | None = None,
+    x_tenant_id: UUID,
 ) -> UUID:
     """
-    Resolve tenant for admin metrics. Hospital admins have an implicit tenant;
-    super_admin may need ``target_tenant_id`` when they have no primary tenant row.
+    Resolve tenant for admin metrics using the ``X-Tenant-ID`` header (required for these routes).
+
+    - admin: header must match the user's primary tenant.
+    - super_admin: uses the header as the selected tenant (no UserTenant row).
     """
     eff = get_current_tenant_id(current_user, db)
-    if eff is not None:
-        return eff
-    if current_user.role == UserRole.super_admin and target_tenant_id is not None:
-        return target_tenant_id
-    raise ValidationError("Tenant context is required for dashboard metrics")
+    if current_user.role == UserRole.super_admin:
+        return x_tenant_id
+    if eff is None:
+        raise ValidationError("Tenant context is not configured for this user")
+    if x_tenant_id != eff:
+        raise ForbiddenError("X-Tenant-ID does not match your organization")
+    return eff
 
 
 def get_admin_dashboard_metrics(db: Session, tenant_id: UUID) -> dict:
