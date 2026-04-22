@@ -1,18 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { ChevronLeft, ChevronRight, LayoutGrid, List, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { LayoutGrid, List, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
+  appointmentsApi,
   doctorsApi,
   invalidateDoctorSlotsClientCache,
   shouldSyncSlotsCrossTab,
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
 } from '../../../services';
-import type { Patient } from '../../../types';
+import type { Appointment, Patient } from '../../../types';
 import {
   dedupeDoctorSlots,
   formatNextAvailablePhrase,
@@ -154,9 +164,9 @@ function CalendarGridSkeleton() {
 
 function ListSkeleton() {
   return (
-    <div className="space-y-2" aria-hidden>
+    <div className="flex flex-col gap-3" aria-hidden>
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-14 w-full rounded-md border border-border bg-muted/40 animate-pulse" />
+        <div key={i} className="min-h-[64px] w-full rounded-xl border border-border bg-muted/40 animate-pulse p-4" />
       ))}
     </div>
   );
@@ -166,6 +176,8 @@ export interface DayCalendarProps {
   doctorId: string | null;
   isInteractive: boolean;
   patients: Patient[];
+  /** Matched to slot starts for patient name and Complete/Cancel on the day list. */
+  appointments?: Appointment[];
   /** When set, booking flow pre-selects this patient in the modal. */
   bookPatientId?: string | null;
   hasAvailabilityWindows?: boolean;
@@ -178,6 +190,7 @@ export function DayCalendar({
   doctorId,
   isInteractive,
   patients,
+  appointments = [],
   bookPatientId = null,
   hasAvailabilityWindows,
   doctorTimeZone = 'UTC',
@@ -393,6 +406,68 @@ export function DayCalendar({
     [slots]
   );
 
+  const apptBySlotKey = useMemo(() => {
+    const m = new Map<string, Appointment>();
+    if (!doctorId) return m;
+    for (const a of appointments) {
+      if (String(a.doctor_id) !== String(doctorId)) continue;
+      const raw = a.appointment_time || a.scheduled_at;
+      if (!raw) continue;
+      if (ymdInTimeZone(tz, new Date(raw)) !== date) continue;
+      m.set(slotKey(raw), a);
+    }
+    return m;
+  }, [appointments, doctorId, date, tz]);
+
+  const [apptActionBusy, setApptActionBusy] = useState<string | null>(null);
+
+  const onCompleteAppt = useCallback(
+    async (apptId: string) => {
+      setApptActionBusy(apptId);
+      try {
+        await appointmentsApi.update(apptId, { status: 'completed' });
+        toast.success('Visit marked complete');
+        onBooked?.();
+        void loadDaySchedule({ skipSlotsCache: true });
+      } catch {
+        toast.error('Could not mark complete');
+      } finally {
+        setApptActionBusy(null);
+      }
+    },
+    [onBooked, loadDaySchedule]
+  );
+
+  const onCancelAppt = useCallback(
+    async (apptId: string) => {
+      setApptActionBusy(apptId);
+      try {
+        await appointmentsApi.update(apptId, { status: 'cancelled' });
+        toast.success('Appointment cancelled');
+        onBooked?.();
+        void loadDaySchedule({ skipSlotsCache: true });
+      } catch {
+        toast.error('Could not cancel');
+      } finally {
+        setApptActionBusy(null);
+      }
+    },
+    [onBooked, loadDaySchedule]
+  );
+
+  const openNewAppointment = useCallback(() => {
+    if (bookingBusy) return;
+    const first = sortedSlots.find(
+      (s) => s.available && !isSlotInPast(s.start, date, doctorTodayYmd)
+    );
+    if (first) {
+      setSelectedStart(slotKey(first.start));
+      setModalOpen(true);
+    } else {
+      toast.error('No open slots on this day. Try another date.');
+    }
+  }, [sortedSlots, date, doctorTodayYmd, bookingBusy]);
+
   const navSlotKeys = useMemo(() => sortedSlots.map((s) => slotKey(s.start)), [sortedSlots]);
 
   const focusNeighborSlot = useCallback(
@@ -536,69 +611,166 @@ export function DayCalendar({
     );
   };
 
-  const listSlotItem = (s: DoctorSlot) => {
+  const slotNavKeyHandler = (k: string) => (e: KeyboardEvent) => {
+    if (e.key === 'Home') {
+      e.preventDefault();
+      focusFirstSlot();
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      focusLastSlot();
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusNeighborSlot(k, e.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      focusNeighborLane(k, e.key === 'ArrowRight' ? 1 : -1);
+    }
+  };
+
+  const listSlotCard = (s: DoctorSlot) => {
     const k = slotKey(s.start);
     const past = isSlotInPast(s.start, date, doctorTodayYmd);
     const selected = Boolean(modalOpen && selectedStart != null && slotKey(selectedStart) === k);
-    const disabled = !s.available || !isInteractive || past || bookingBusy;
-    return (
-      <button
-        key={k}
-        type="button"
-        data-testid="doctor-schedule-slot"
-        ref={(el) => {
-          if (el) slotBtnRefs.current.set(k, el);
-          else slotBtnRefs.current.delete(k);
-        }}
-        className={cn(
-          'w-full flex flex-col items-stretch justify-center rounded-md border px-3 py-2 text-left text-sm transition-colors',
-          past && 'border-border bg-muted/30 text-muted-foreground opacity-50',
-          !past && !s.available && 'border-rose-500/35 bg-rose-950/15 text-rose-950/90 dark:text-rose-100/90',
-          !past && s.available && !selected && 'border-emerald-600/50 bg-emerald-500/10 hover:bg-emerald-500/20',
-          !past && s.available && selected && 'ring-2 ring-primary border-primary bg-primary/15',
-          isInteractive && s.available && !past && !bookingBusy && 'active:scale-[0.99]'
+    const appt = apptBySlotKey.get(k);
+    const pid = appt?.patient_id != null ? String(appt.patient_id) : '';
+    const pName =
+      (pid && patients.find((p) => String(p.id) === pid)?.name) ||
+      appt?.patient?.name ||
+      (appt && !s.available ? 'Patient' : '');
+
+    let statusLabel: string;
+    if (past) statusLabel = 'Past';
+    else if (s.available) statusLabel = 'Available';
+    else if (appt?.status === 'completed') statusLabel = 'Completed';
+    else if (appt?.status === 'cancelled') statusLabel = 'Cancelled';
+    else statusLabel = 'Booked';
+
+    const showCompleteCancel =
+      isInteractive && !past && appt && (appt.status === 'scheduled' || appt.status === 'pending');
+
+    const cardShell = (opts: {
+      interactive: boolean;
+      children: ReactNode;
+      className?: string;
+    }) => {
+      const base = cn(
+        'w-full rounded-xl border p-4 text-left transition-colors min-h-[64px] flex flex-col gap-3',
+        past && 'border-border bg-muted/30 text-muted-foreground',
+        !past && s.available && 'border-emerald-600/40 bg-green-50 dark:bg-emerald-950/25',
+        !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border-border bg-gray-50 dark:bg-muted/40',
+        !past && !s.available && appt?.status === 'completed' && 'border-border bg-gray-50 opacity-60 dark:bg-muted/40',
+        !past && !s.available && appt?.status === 'cancelled' && 'border-red-200 bg-red-50 dark:bg-red-950/20',
+        !past && !s.available && !appt && 'border-border bg-gray-50 dark:bg-muted/40',
+        selected && 'ring-2 ring-primary border-primary shadow-sm'
+      );
+
+      if (opts.interactive) {
+        return (
+          <button
+            key={k}
+            type="button"
+            data-testid="doctor-schedule-slot"
+            ref={(el) => {
+              if (el) slotBtnRefs.current.set(k, el);
+              else slotBtnRefs.current.delete(k);
+            }}
+            className={cn(base, opts.className, isInteractive && !bookingBusy && 'active:scale-[0.99]')}
+            disabled={!isInteractive || past || bookingBusy}
+            onClick={() => {
+              if (modalOpen || bookingBusy || !isInteractive || past) return;
+              setSelectedStart(k);
+              setModalOpen(true);
+            }}
+            onKeyDown={slotNavKeyHandler(k)}
+            aria-disabled={!isInteractive || past || bookingBusy}
+          >
+            {opts.children}
+          </button>
+        );
+      }
+
+      return (
+        <div
+          key={k}
+          data-testid="doctor-schedule-slot"
+          ref={(el) => {
+            if (el) slotBtnRefs.current.set(k, el);
+            else slotBtnRefs.current.delete(k);
+          }}
+          role="listitem"
+          tabIndex={showCompleteCancel ? 0 : -1}
+          className={cn(base, opts.className)}
+          onKeyDown={showCompleteCancel ? slotNavKeyHandler(k) : undefined}
+        >
+          {opts.children}
+        </div>
+      );
+    };
+
+    const body = (
+      <>
+        <div className="min-w-0 space-y-1">
+          <p className="text-xl font-bold tabular-nums leading-tight">{formatSlotTime(s.start, tz)}</p>
+          {pName ? (
+            pid ? (
+              <Link
+                to={`/doctor/patients/${pid}`}
+                className="text-base font-medium text-primary hover:underline truncate block"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {pName}
+              </Link>
+            ) : (
+              <p className="text-base font-medium truncate">{pName}</p>
+            )
+          ) : null}
+          <p className="text-sm text-muted-foreground capitalize">{statusLabel}</p>
+        </div>
+        {showCompleteCancel && appt && (
+          <div className="flex w-full gap-2">
+            <Button
+              type="button"
+              className="min-h-[44px] flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={apptActionBusy != null}
+              onClick={() => void onCompleteAppt(String(appt.id))}
+            >
+              {apptActionBusy === String(appt.id) ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                'Complete'
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px] flex-1 border-red-500/60 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+              disabled={apptActionBusy != null}
+              onClick={() => void onCancelAppt(String(appt.id))}
+            >
+              Cancel
+            </Button>
+          </div>
         )}
-        disabled={disabled}
-        onClick={() => {
-          if (modalOpen) return;
-          if (bookingBusy) return;
-          if (!isInteractive || !s.available || past) return;
-          setSelectedStart(k);
-          setModalOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Home') {
-            e.preventDefault();
-            focusFirstSlot();
-            return;
-          }
-          if (e.key === 'End') {
-            e.preventDefault();
-            focusLastSlot();
-            return;
-          }
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            focusNeighborSlot(k, e.key === 'ArrowDown' ? 1 : -1);
-            return;
-          }
-          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            focusNeighborLane(k, e.key === 'ArrowRight' ? 1 : -1);
-          }
-        }}
-        aria-disabled={disabled}
-      >
-        <span className="font-medium tabular-nums">{formatSlotTime(s.start, tz)}</span>
-        <span className="text-xs text-muted-foreground">
-          {s.duration_minutes != null ? `${s.duration_minutes} min` : ''} · {past ? 'Past' : s.available ? 'Available' : 'Booked'}
-        </span>
-      </button>
+      </>
     );
+
+    if (!past && s.available && isInteractive) {
+      return cardShell({ interactive: true, children: body });
+    }
+
+    return cardShell({ interactive: false, children: body });
   };
 
+  const canGoYesterday = date > minYmd;
+
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-3', isInteractive && 'pb-24 md:pb-3', className)}>
       {doctorId && hasAvailabilityWindows && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
           {nextAvailLoading && (
@@ -619,34 +791,37 @@ export function DayCalendar({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:max-w-md">
           <Button
             type="button"
             variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
+            className="min-h-[44px] sm:min-h-9"
             onClick={() => shiftDate(-1)}
-            disabled={date <= minYmd}
-            aria-label="Previous day"
+            disabled={!canGoYesterday}
           >
-            <ChevronLeft className="h-4 w-4" />
+            Yesterday
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => shiftDate(1)} aria-label="Next day">
-            <ChevronRight className="h-4 w-4" />
+          <Button
+            type="button"
+            variant={isToday ? 'default' : 'outline'}
+            className="min-h-[44px] sm:min-h-9"
+            onClick={() => setDateParam(minYmd)}
+          >
+            Today
+          </Button>
+          <Button type="button" variant="outline" className="min-h-[44px] sm:min-h-9" onClick={() => shiftDate(1)}>
+            Tomorrow
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
-            className="h-8 w-auto min-w-[10rem] text-sm"
+            className="h-10 sm:h-8 w-full sm:w-auto min-w-0 sm:min-w-[10rem] text-sm"
             value={date}
             min={minYmd}
             onChange={(e) => setDateParam(e.target.value)}
           />
-          <Button type="button" variant="secondary" size="sm" className="h-8" onClick={() => setDateParam(minYmd)}>
-            Today
-          </Button>
           {isDesktop && (
             <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5" role="group" aria-label="Calendar view">
               <Button
@@ -705,8 +880,8 @@ export function DayCalendar({
       )}
 
       {!loading && !error && slots.length > 0 && !showGrid && (
-        <div className="space-y-2" role="list" aria-label="Appointment slots">
-          {sortedSlots.map((s) => listSlotItem(s))}
+        <div className="flex flex-col gap-3" role="list" aria-label="Appointment slots">
+          {sortedSlots.map((s) => listSlotCard(s))}
         </div>
       )}
 
@@ -770,6 +945,17 @@ export function DayCalendar({
           timeZone={tz}
           onSubmittingChange={setBookingBusy}
         />
+      )}
+
+      {isInteractive && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-sm md:hidden"
+          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        >
+          <Button type="button" className="h-11 w-full min-h-[44px] text-base font-semibold" onClick={openNewAppointment}>
+            + New Appointment
+          </Button>
+        </div>
       )}
     </div>
   );

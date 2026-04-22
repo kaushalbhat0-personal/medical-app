@@ -157,6 +157,7 @@ export function DoctorAppointmentsPage() {
                 doctorId={String(selfDoctor.id)}
                 isInteractive={isIndependent}
                 patients={patients}
+                appointments={appointments}
                 bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
                 doctorTimeZone={selfDoctor.timezone || 'UTC'}

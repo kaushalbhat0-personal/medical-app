@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   appointmentsApi,
   doctorsApi,
@@ -49,9 +48,9 @@ function isSlotInThePast(isoStart: string): boolean {
 
 function SlotsSkeleton() {
   return (
-    <div className="flex flex-wrap gap-2" aria-hidden>
-      {Array.from({ length: 10 }).map((_, i) => (
-        <div key={i} className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+    <div className="grid grid-cols-3 gap-2" aria-hidden>
+      {Array.from({ length: 9 }).map((_, i) => (
+        <div key={i} className="min-h-[44px] rounded-lg bg-muted animate-pulse" />
       ))}
     </div>
   );
@@ -59,21 +58,9 @@ function SlotsSkeleton() {
 
 function DoctorsGridSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i} className="overflow-hidden">
-          <CardHeader className="space-y-2">
-            <div className="h-5 w-48 max-w-[70%] rounded-md bg-muted animate-pulse" />
-            <div className="h-4 w-28 rounded-md bg-muted animate-pulse" />
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
-            <div className="h-3 w-full rounded-md bg-muted animate-pulse" />
-          </CardContent>
-          <CardFooter>
-            <div className="h-9 w-full rounded-md bg-muted animate-pulse" />
-          </CardFooter>
-        </Card>
+    <div className="grid gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="min-h-[44px] w-full rounded-lg bg-muted animate-pulse" />
       ))}
     </div>
   );
@@ -86,7 +73,7 @@ export function PatientDoctors() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [bookingDoctor, setBookingDoctor] = useState<Doctor | null>(null);
   const [bookDate, setBookDate] = useState('');
   const [slots, setSlots] = useState<DoctorSlot[]>([]);
@@ -103,18 +90,18 @@ export function PatientDoctors() {
   const minBookDate = useMemo(() => localDateInputValue(new Date()), []);
   const todayCalendarStr = localDateInputValue(new Date());
 
-  useModalFocusTrap(dialogRef, modalOpen && Boolean(bookingDoctor));
+  useModalFocusTrap(dialogRef, confirmOpen && Boolean(bookingDoctor));
 
   const slotOk = selectedSlotStart != null && selectedSlotIsFuture(selectedSlotStart);
   const bookingReady =
     Boolean(patientId) && Boolean(bookDate) && Boolean(bookingIdempotencyKey) && slotOk;
 
-  const closeModal = useCallback(() => {
+  const exitBookingFlow = useCallback(() => {
     abortCreateRef.current?.abort();
     abortCreateRef.current = null;
     slotsFetchAbortRef.current?.abort();
     slotsFetchAbortRef.current = null;
-    setModalOpen(false);
+    setConfirmOpen(false);
     setBookingDoctor(null);
     setBookDate('');
     setSlots([]);
@@ -125,6 +112,11 @@ export function PatientDoctors() {
     setBookingIdempotencyKey('');
   }, []);
 
+  const closeConfirmOnly = useCallback(() => {
+    if (submitting) return;
+    setConfirmOpen(false);
+  }, [submitting]);
+
   useEffect(() => {
     return () => {
       abortCreateRef.current?.abort();
@@ -133,24 +125,24 @@ export function PatientDoctors() {
   }, []);
 
   useEffect(() => {
-    if (!modalOpen || !bookingDoctor) return;
+    if (!bookingDoctor || confirmOpen) return;
     const id = requestAnimationFrame(() => {
       document.getElementById('book-date')?.focus();
     });
     return () => cancelAnimationFrame(id);
-  }, [modalOpen, bookingDoctor?.id]);
+  }, [bookingDoctor?.id, confirmOpen]);
 
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!confirmOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !submitting) {
         e.preventDefault();
-        closeModal();
+        closeConfirmOnly();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modalOpen, submitting, closeModal]);
+  }, [confirmOpen, submitting, closeConfirmOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +203,7 @@ export function PatientDoctors() {
   );
 
   useEffect(() => {
-    if (!modalOpen || !bookingDoctor || !bookDate || !patientId) {
+    if (!bookingDoctor || !bookDate || !patientId) {
       setSlots([]);
       setSlotsLoading(false);
       setSlotsError(null);
@@ -220,10 +212,10 @@ export function PatientDoctors() {
     }
     void fetchSlots('initial');
     return () => slotsFetchAbortRef.current?.abort();
-  }, [modalOpen, bookingDoctor?.id, bookDate, patientId, fetchSlots]);
+  }, [bookingDoctor?.id, bookDate, patientId, fetchSlots]);
 
   useEffect(() => {
-    if (!modalOpen || !bookingDoctor || !bookDate || !patientId) return;
+    if (!bookingDoctor || !bookDate || !patientId) return;
 
     let intervalId: ReturnType<typeof window.setInterval> | undefined;
 
@@ -261,27 +253,26 @@ export function PatientDoctors() {
       document.removeEventListener('visibilitychange', onVisibility);
       clearPoll();
     };
-  }, [modalOpen, bookingDoctor?.id, bookDate, patientId, fetchSlots]);
+  }, [bookingDoctor?.id, bookDate, patientId, fetchSlots]);
 
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!bookingDoctor) return;
     const onOtherTab = () => {
       if (!shouldSyncSlotsCrossTab()) return;
       void fetchSlots('poll');
     };
     window.addEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
     return () => window.removeEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
-  }, [modalOpen, fetchSlots]);
+  }, [bookingDoctor, fetchSlots]);
 
-  const openBookModal = (d: Doctor) => {
-    if (modalOpen) return;
+  const selectDoctor = (d: Doctor) => {
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookingDoctor(d);
-    setBookDate('');
+    setBookDate(minBookDate);
     setSlots([]);
     setSlotsError(null);
     setSelectedSlotStart(null);
-    setModalOpen(true);
+    setConfirmOpen(false);
   };
 
   const confirmBooking = async () => {
@@ -322,7 +313,7 @@ export function PatientDoctors() {
       } catch {
         /* storage full / disabled */
       }
-      closeModal();
+      exitBookingFlow();
       toast.success(
         idempotentReplay ? 'Appointment already booked successfully.' : 'Appointment booked.'
       );
@@ -363,12 +354,36 @@ export function PatientDoctors() {
     return <ErrorState title="Could not load doctors" description={error} />;
   }
 
+  const inTimeStep = Boolean(bookingDoctor) && !confirmOpen;
+  const stickyBookEnabled =
+    Boolean(patientId) && slotOk && !slotsLoading && !submitting && !slotsError && slots.length > 0;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Doctors</h1>
-        <p className="text-muted-foreground text-sm mt-1">Browse providers and book an appointment.</p>
-      </div>
+    <div className={cn('space-y-4', inTimeStep && 'pb-24')}>
+      {!bookingDoctor ? (
+        <>
+          <h1 className="text-xl font-semibold tracking-tight">Book a visit</h1>
+          <p className="text-xs text-muted-foreground">Step 1 — Doctor</p>
+        </>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 -ml-2 h-11 w-11"
+            aria-label="Back to doctors"
+            onClick={() => exitBookingFlow()}
+            disabled={submitting}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight truncate">{formatDoctorName(bookingDoctor)}</h1>
+            <p className="text-xs text-muted-foreground">Step 2 — Time</p>
+          </div>
+        </div>
+      )}
 
       {patientError && (
         <p className="text-sm text-destructive" role="alert">
@@ -379,62 +394,126 @@ export function PatientDoctors() {
         </p>
       )}
 
-      {loading || patientLoading ? (
-        <DoctorsGridSkeleton />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+      {!bookingDoctor && (loading || patientLoading) && <DoctorsGridSkeleton />}
+
+      {!bookingDoctor && !loading && !patientLoading && (
+        <div className="grid gap-2">
           {doctors.map((d) => {
             const spec = d.specialization || d.specialty;
             const noAvailability = d.has_availability_windows === false;
             return (
-              <Card key={String(d.id)} className="flex flex-col">
-                <CardHeader>
-                  <CardTitle className="text-lg">{formatDoctorName(d)}</CardTitle>
-                  <CardDescription>
-                    {d.experience_years != null ? `${d.experience_years}+ yrs experience` : 'Provider'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 space-y-2">
-                  {spec && (
-                    <Badge variant="secondary" className="text-xs">
-                      {spec}
-                    </Badge>
-                  )}
-                  {d.license_number && (
-                    <p className="text-xs text-muted-foreground">License: {d.license_number}</p>
-                  )}
-                  {noAvailability && (
-                    <p className="text-sm text-muted-foreground" role="status">
-                      Doctor has not set availability
-                    </p>
-                  )}
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    onClick={() => openBookModal(d)}
-                    disabled={!patientId || noAvailability}
-                  >
-                    Book appointment
-                  </Button>
-                </CardFooter>
-              </Card>
+              <button
+                key={String(d.id)}
+                type="button"
+                disabled={!patientId || noAvailability}
+                onClick={() => selectDoctor(d)}
+                className={cn(
+                  'min-h-[44px] w-full rounded-lg border border-input bg-background px-4 py-3 text-left text-sm font-medium transition-colors',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  'disabled:pointer-events-none disabled:opacity-50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                )}
+              >
+                <span className="block truncate">{formatDoctorName(d)}</span>
+                {spec ? <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">{spec}</span> : null}
+              </button>
             );
           })}
         </div>
       )}
 
-      {!loading && !patientLoading && doctors.length === 0 && (
-        <p className="text-sm text-muted-foreground">No doctors are available right now.</p>
+      {!loading && !patientLoading && !bookingDoctor && doctors.length === 0 && (
+        <p className="text-sm text-muted-foreground">No doctors available.</p>
       )}
 
-      {modalOpen && bookingDoctor && (
+      {inTimeStep && bookingDoctor && (
+        <>
+          {!patientId && (
+            <p className="text-sm text-destructive" role="alert">
+              Profile required to book. Retry above.
+            </p>
+          )}
+
+          <Input
+            id="book-date"
+            type="date"
+            min={minBookDate}
+            className="h-11"
+            value={bookDate}
+            onChange={(e) => {
+              setBookDate(e.target.value);
+              setSelectedSlotStart(null);
+            }}
+            disabled={!patientId || submitting}
+          />
+
+          {slotsError && (
+            <p className="text-sm text-destructive" role="alert">
+              {slotsError}
+            </p>
+          )}
+
+          {bookDate && patientId && slotsLoading && <SlotsSkeleton />}
+
+          {bookDate && patientId && !slotsLoading && !slotsError && slots.length === 0 && (
+            <p className="text-sm text-muted-foreground">No slots this day.</p>
+          )}
+
+          {bookDate && patientId && !slotsLoading && slots.length > 0 && (
+            <div role="listbox" aria-label="Times" className="grid grid-cols-3 gap-2">
+              {slots.map((slot) => {
+                const pastOnToday = bookDate === todayCalendarStr && isSlotInThePast(slot.start);
+                const sk = slotKey(slot.start);
+                const selected = selectedSlotStart != null && slotKey(selectedSlotStart) === sk;
+                const disabled = !slot.available || submitting || pastOnToday;
+                return (
+                  <button
+                    key={sk}
+                    type="button"
+                    data-testid="slot-button"
+                    disabled={disabled}
+                    aria-pressed={selected}
+                    aria-disabled={disabled}
+                    onClick={() => setSelectedSlotStart(sk)}
+                    className={cn(
+                      'min-h-[44px] rounded-lg border px-2 text-sm font-medium tabular-nums transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'disabled:cursor-not-allowed disabled:opacity-45',
+                      selected
+                        ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                        : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    {formatSlotLabel(slot.start)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-sm"
+            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+          >
+            <Button
+              type="button"
+              className="h-12 w-full min-h-[44px] text-base font-semibold"
+              disabled={!stickyBookEnabled}
+              onClick={() => setConfirmOpen(true)}
+            >
+              Book Appointment
+            </Button>
+          </div>
+        </>
+      )}
+
+      {confirmOpen && bookingDoctor && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
           role="presentation"
           aria-busy={submitting}
           onClick={() => {
-            if (!submitting) closeModal();
+            if (!submitting) closeConfirmOnly();
           }}
         >
           <div
@@ -442,111 +521,29 @@ export function PatientDoctors() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="book-appt-title"
-            aria-describedby="book-appt-desc"
-            aria-busy={submitting}
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg outline-none"
+            className="w-full max-w-md rounded-t-xl border border-border bg-card shadow-lg outline-none sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-border px-4 py-3">
               <h2 id="book-appt-title" className="text-lg font-semibold">
-                Book appointment
+                Step 3 — Confirm
               </h2>
-              <p id="book-appt-desc" className="text-sm text-muted-foreground mt-0.5">
-                {formatDoctorName(bookingDoctor)}. Select a date and time, then confirm.
-              </p>
             </div>
             <div className="space-y-4 px-4 py-4">
-              {!patientId && (
-                <p className="text-sm text-destructive" role="alert">
-                  Unable to resolve patient profile. Use Retry on this page or contact the clinic.
-                </p>
-              )}
-              <div>
-                <label htmlFor="book-date" className="text-xs font-medium text-muted-foreground">
-                  Date
-                </label>
-                <Input
-                  id="book-date"
-                  type="date"
-                  min={minBookDate}
-                  className="mt-1"
-                  value={bookDate}
-                  onChange={(e) => {
-                    setBookDate(e.target.value);
-                    setSelectedSlotStart(null);
-                  }}
-                  disabled={!patientId || submitting}
-                />
-              </div>
-
-              {slotsError && (
-                <p className="text-sm text-destructive" role="alert">
-                  {slotsError}
-                </p>
-              )}
-
-              {bookDate && patientId && slotsLoading && <SlotsSkeleton />}
-
-              {bookDate &&
-                patientId &&
-                !slotsLoading &&
-                !slotsError &&
-                slots.length === 0 && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      {bookingDoctor?.has_availability_windows === false
-                        ? 'Doctor has not set availability'
-                        : 'No slots available for this date.'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full"
-                      disabled={submitting}
-                      onClick={() => {
-                        closeModal();
-                      }}
-                    >
-                      Try another doctor
-                    </Button>
-                  </div>
-                )}
-
-              {bookDate && patientId && !slotsLoading && slots.length > 0 && (
-                <div role="listbox" aria-label="Available appointment times">
-                  <p className="text-xs font-medium text-muted-foreground">Time</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {slots.map((slot) => {
-                      const pastOnToday =
-                        bookDate === todayCalendarStr && isSlotInThePast(slot.start);
-                      const sk = slotKey(slot.start);
-                      return (
-                        <Button
-                          key={sk}
-                          type="button"
-                          data-testid="slot-button"
-                          size="sm"
-                          variant={selectedSlotStart != null && slotKey(selectedSlotStart) === sk ? 'default' : 'outline'}
-                          disabled={!slot.available || submitting || pastOnToday}
-                          aria-pressed={selectedSlotStart != null && slotKey(selectedSlotStart) === sk}
-                          aria-disabled={!slot.available || pastOnToday}
-                          className="min-w-[4.5rem]"
-                          onClick={() => setSelectedSlotStart(sk)}
-                        >
-                          {formatSlotLabel(slot.start)}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap justify-end gap-2 pt-1">
-                <Button type="button" variant="outline" onClick={closeModal} disabled={submitting}>
-                  Cancel
+              <p className="text-sm">
+                <span className="font-medium">{formatDoctorName(bookingDoctor)}</span>
+                <br />
+                <span className="text-muted-foreground">
+                  {bookDate} · {selectedSlotStart ? formatSlotLabel(selectedSlotStart) : '—'}
+                </span>
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={closeConfirmOnly} disabled={submitting}>
+                  Back
                 </Button>
                 <Button
                   type="button"
+                  className="min-h-[44px] w-full sm:w-auto"
                   onClick={() => void confirmBooking()}
                   disabled={submitting || !bookingReady}
                 >
