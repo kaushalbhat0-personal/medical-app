@@ -1,6 +1,17 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import appointment, auth, billing, dashboard, doctor, health, patient, tenant, users
+from app.api.v1.endpoints import (
+    appointment,
+    auth,
+    billing,
+    dashboard,
+    doctor,
+    health,
+    inventory,
+    patient,
+    tenant,
+    users,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
@@ -11,5 +22,6 @@ api_router.include_router(tenant.router)
 api_router.include_router(doctor.router)
 api_router.include_router(appointment.router)
 api_router.include_router(billing.router)
+api_router.include_router(inventory.router)
 api_router.include_router(dashboard.router, prefix="/dashboard")
 api_router.include_router(dashboard.admin_router, prefix="/admin")

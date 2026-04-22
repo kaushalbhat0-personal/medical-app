@@ -1,6 +1,13 @@
 from app.models.appointment import Appointment, AppointmentCreationIdempotency
 from app.models.billing import Billing, BillingEvent
 from app.models.doctor import Doctor, DoctorCreationIdempotency
+from app.models.inventory import (
+    InventoryItem,
+    InventoryItemType,
+    InventoryMovement,
+    InventoryMovementType,
+    InventoryStock,
+)
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 from app.models.patient import Patient
 from app.models.tenant import (
@@ -23,6 +30,11 @@ __all__ = [
     "AppointmentCreationIdempotency",
     "Billing",
     "BillingEvent",
+    "InventoryItem",
+    "InventoryItemType",
+    "InventoryStock",
+    "InventoryMovement",
+    "InventoryMovementType",
     "Tenant",
     "TenantCreationIdempotency",
     "TenantType",
