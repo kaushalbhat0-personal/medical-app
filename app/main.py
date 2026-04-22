@@ -1,9 +1,11 @@
 import logging
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -21,13 +23,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Fail fast on startup if the database is unreachable (after migrations in the process supervisor)."""
+    logger.info("Application startup: validating database connectivity")
+    try:
+        from app.core.database import engine
+
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Application startup: database connectivity OK")
+    except Exception:
+        logger.exception("Application startup failed — full traceback above")
+        raise
+    yield
+    logger.info("Application shutdown")
+
+
 app = FastAPI(
     title="Hospital Management API",
     version="1.0.0",
     debug=settings.DEBUG,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
+
+
+@app.get("/health")
+def root_health() -> dict[str, str]:
+    """Minimal health check for load balancers (e.g. Render) without API prefix."""
+    return {"status": "ok"}
+
 
 # CORS: MUST be first middleware, before any routes or custom middleware
 app.add_middleware(
@@ -57,18 +85,18 @@ async def debug_cors_origin(request: Request, call_next):
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    
+
     # Log request
     logger.info(f"{request.method} {request.url.path} - Started")
-    
+
     response = await call_next(request)
-    
+
     # Log response
     duration = time.time() - start_time
     logger.info(
         f"{request.method} {request.url.path} - {response.status_code} - {duration:.3f}s"
     )
-    
+
     return response
 
 

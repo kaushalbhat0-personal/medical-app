@@ -3,8 +3,10 @@ services:
     name: hospital-management-api
     runtime: python
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    # Install all deps from requirements.txt, then verify email-validator (needed for pydantic EmailStr).
+    buildCommand: "pip install -r requirements.txt && python -c \"import email_validator\""
+    # Migrations before web server; PORT is set by Render in production.
+    startCommand: bash -c "set -euo pipefail; alembic upgrade head; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

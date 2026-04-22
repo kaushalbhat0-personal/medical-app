@@ -40,8 +40,9 @@ def _normalize_timezone_string(tz: str) -> str:
         raise ValidationError("timezone must be a non-empty IANA name")
     try:
         ZoneInfo(stripped)
-    except ZoneInfoNotFoundError as e:
-        raise ValidationError(f"Unknown IANA timezone: {stripped!r}") from e
+    except (ZoneInfoNotFoundError, OSError):
+        logger.warning("Unknown or unavailable IANA timezone %r; using UTC", stripped)
+        return "UTC"
     return stripped
 
 

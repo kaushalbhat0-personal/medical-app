@@ -21,6 +21,7 @@ class PatientRead(BaseModel):
     phone: str
     created_by: UUID
     created_at: datetime
+    user_id: UUID | None = None
 
 
 class PatientUpdate(BaseModel):

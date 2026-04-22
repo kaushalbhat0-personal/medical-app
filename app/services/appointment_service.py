@@ -234,9 +234,14 @@ def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
 
     # Auto-update status if appointment time has passed
     now = datetime.now(timezone.utc)
+    apt_time = appointment.appointment_time
+    if apt_time.tzinfo is None:
+        apt_time = apt_time.replace(tzinfo=timezone.utc)
+    else:
+        apt_time = apt_time.astimezone(timezone.utc)
     if (
         appointment.status == AppointmentStatus.scheduled
-        and appointment.appointment_time < now
+        and apt_time < now
     ):
         appointment.status = AppointmentStatus.completed
         db.add(appointment)
@@ -255,9 +260,14 @@ def _update_status_for_past_appointments(
     updated = []
 
     for apt in appointments:
+        apt_time = apt.appointment_time
+        if apt_time.tzinfo is None:
+            apt_time = apt_time.replace(tzinfo=timezone.utc)
+        else:
+            apt_time = apt_time.astimezone(timezone.utc)
         if (
             apt.status == AppointmentStatus.scheduled
-            and apt.appointment_time < now
+            and apt_time < now
         ):
             apt.status = AppointmentStatus.completed
             db.add(apt)

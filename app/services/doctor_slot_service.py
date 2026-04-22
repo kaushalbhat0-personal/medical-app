@@ -48,13 +48,24 @@ def set_slot_read_cache_backend(backend: SlotReadCacheBackend | None) -> None:
     _slot_cache_backend = backend
 
 
+def _zoneinfo_or_utc(name: str, *, context: str) -> ZoneInfo:
+    """Resolve IANA zone; fall back to UTC if missing or invalid (e.g. minimal images without tzdata)."""
+    label = (name or "UTC").strip() or "UTC"
+    try:
+        return ZoneInfo(label)
+    except (ZoneInfoNotFoundError, OSError) as e:
+        logger.warning("ZoneInfo failed for %r (%s); using UTC: %s", label, context, e)
+        try:
+            return ZoneInfo("UTC")
+        except (ZoneInfoNotFoundError, OSError) as e2:
+            raise RuntimeError(
+                "IANA time zone data unavailable; install the tzdata package."
+            ) from e2
+
+
 def _doctor_zoneinfo(doctor: Doctor) -> ZoneInfo:
     tz_name = (doctor.timezone or "UTC").strip() or "UTC"
-    try:
-        return ZoneInfo(tz_name)
-    except ZoneInfoNotFoundError:
-        logger.warning("Unknown doctor timezone %r for doctor_id=%s; using UTC", tz_name, doctor.id)
-        return ZoneInfo("UTC")
+    return _zoneinfo_or_utc(tz_name, context=f"doctor_id={doctor.id}")
 
 
 def _utc_naive(dt: datetime) -> datetime:
