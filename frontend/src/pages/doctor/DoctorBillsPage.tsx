@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { Receipt, Plus } from 'lucide-react';
@@ -58,6 +58,7 @@ export function DoctorBillsPage() {
   }, [appointments, selfDoctor, bills]);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [prefillBillPatientId, setPrefillBillPatientId] = useState<string | null>(null);
   const [appointmentId, setAppointmentId] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -69,10 +70,15 @@ export function DoctorBillsPage() {
 
   const closeCreate = useCallback(() => {
     setCreateOpen(false);
+    setPrefillBillPatientId(null);
     setAppointmentId('');
     setAmount('');
     setDescription('');
-    if (location.state && typeof location.state === 'object' && 'openCreateBill' in location.state) {
+    if (
+      location.state &&
+      typeof location.state === 'object' &&
+      ('openCreateBill' in location.state || 'billPatientId' in location.state)
+    ) {
       navigate(
         { pathname: location.pathname, search: location.search, hash: location.hash },
         { replace: true, state: {} }
@@ -81,16 +87,33 @@ export function DoctorBillsPage() {
   }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
-    const st = location.state as { openCreateBill?: boolean } | null;
+    const st = location.state as { openCreateBill?: boolean; billPatientId?: string } | null;
+    if (st?.billPatientId) {
+      setPrefillBillPatientId(String(st.billPatientId));
+    }
     if (st?.openCreateBill && isIndependent && !createOpenedRef.current) {
       createOpenedRef.current = true;
       setCreateOpen(true);
     }
   }, [location.state, isIndependent]);
 
+  const bookableForModal = useMemo(() => {
+    if (!prefillBillPatientId) return bookableAppointments;
+    return bookableAppointments.filter((a) => String(a.patient_id) === prefillBillPatientId);
+  }, [bookableAppointments, prefillBillPatientId]);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    if (!prefillBillPatientId) return;
+    const forPatient = bookableForModal;
+    if (forPatient.length === 0) return;
+    if (forPatient.some((a) => String(a.id) === appointmentId)) return;
+    setAppointmentId(String(forPatient[0].id));
+  }, [createOpen, prefillBillPatientId, bookableForModal, appointmentId]);
+
   const selectedAppt: Appointment | undefined = useMemo(
-    () => bookableAppointments.find((a) => String(a.id) === appointmentId),
-    [bookableAppointments, appointmentId]
+    () => bookableForModal.find((a) => String(a.id) === appointmentId),
+    [bookableForModal, appointmentId]
   );
 
   const createBill = async () => {
@@ -150,7 +173,10 @@ export function DoctorBillsPage() {
             type="button"
             size="sm"
             className="gap-2"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              setPrefillBillPatientId(null);
+              setCreateOpen(true);
+            }}
           >
             <Plus className="h-4 w-4" aria-hidden />
             Create bill
@@ -181,7 +207,12 @@ export function DoctorBillsPage() {
             <Card key={b.id}>
               <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div>
-                  <p className="font-medium">{patientName(patientNameById, String(b.patient_id))}</p>
+                  <Link
+                    to={`/doctor/patients/${b.patient_id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {patientName(patientNameById, String(b.patient_id))}
+                  </Link>
                   {b.description && <p className="text-xs text-muted-foreground truncate max-w-md">{b.description}</p>}
                 </div>
                 <div className="text-right">
@@ -229,7 +260,7 @@ export function DoctorBillsPage() {
                   disabled={submitting}
                 >
                   <option value="">Select appointment</option>
-                  {bookableAppointments.map((a) => (
+                  {bookableForModal.map((a) => (
                     <option key={String(a.id)} value={String(a.id)}>
                       {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)} —{' '}
                       {patientName(patientNameById, String(a.patient_id))}

@@ -1,6 +1,11 @@
 import { api } from './api';
-import { safeObject } from '../utils';
-import type { DashboardStats } from '../types';
+import { safeArray, safeObject } from '../utils';
+import type {
+  AdminDashboardMetrics,
+  AdminDoctorPerformanceRow,
+  AdminRevenueTrendItem,
+  DashboardStats,
+} from '../types';
 
 /**
  * Dashboard API service
@@ -41,5 +46,34 @@ export const dashboardApi = {
     }
 
     return stats;
+  },
+
+  /**
+   * Admin KPIs — GET /api/v1/admin/dashboard/metrics
+   * Requires role admin or super_admin.
+   */
+  getAdminMetrics: async (): Promise<AdminDashboardMetrics> => {
+    const response = await api.get('/admin/dashboard/metrics');
+    const data = safeObject<AdminDashboardMetrics>(response.data);
+    if (!data) {
+      throw new Error('Invalid admin dashboard metrics');
+    }
+    return data;
+  },
+
+  /**
+   * Last 7 days paid revenue by UTC date — GET /api/v1/admin/dashboard/revenue-trend
+   */
+  getAdminRevenueTrend: async (): Promise<AdminRevenueTrendItem[]> => {
+    const response = await api.get('/admin/dashboard/revenue-trend');
+    return safeArray<AdminRevenueTrendItem>(response.data);
+  },
+
+  /**
+   * Doctor stats in 7-day window — GET /api/v1/admin/dashboard/doctor-performance
+   */
+  getAdminDoctorPerformance: async (): Promise<AdminDoctorPerformanceRow[]> => {
+    const response = await api.get('/admin/dashboard/doctor-performance');
+    return safeArray<AdminDoctorPerformanceRow>(response.data);
   },
 };

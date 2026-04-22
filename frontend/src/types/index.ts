@@ -40,6 +40,8 @@ export interface Patient {
   age?: number;
   gender?: string;
   medical_history?: string;
+  /** Doctor-facing notes (from API); persisted per patient. */
+  clinical_notes?: string | null;
   created_by?: number | string;
   created_at?: string;
   updated_at?: string;
@@ -195,6 +197,30 @@ export interface DashboardStats {
   total_patients: number;
   total_doctors: number;
   today_appointments: number;
+  total_revenue: number;
+}
+
+/** GET /api/v1/admin/dashboard/metrics */
+export interface AdminDashboardMetrics {
+  total_revenue: number;
+  revenue_today: number;
+  appointments_today: number;
+  completed_appointments: number;
+  pending_bills: number;
+}
+
+/** GET /api/v1/admin/dashboard/revenue-trend — one point per day (7 days) */
+export interface AdminRevenueTrendItem {
+  date: string;
+  revenue: number;
+}
+
+/** GET /api/v1/admin/dashboard/doctor-performance */
+export interface AdminDoctorPerformanceRow {
+  doctor_id: string;
+  doctor_name: string;
+  appointments_count: number;
+  completed_appointments: number;
   total_revenue: number;
 }
 

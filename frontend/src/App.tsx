@@ -9,6 +9,7 @@ import { postLoginHomePath } from './utils/roles';
 import { roleFromToken } from './utils/jwtPayload';
 import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { AdminRoute } from './components/layout/AdminRoute';
 import { StaffRoute } from './components/layout/StaffRoute';
 import { PatientRoute } from './components/layout/PatientRoute';
 import { PatientLayout } from './components/layout/PatientLayout';
@@ -17,6 +18,7 @@ import { DoctorRoute } from './components/layout/DoctorRoute';
 import { AnimatedPage } from './animations';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { Patients } from './pages/Patients';
 import { Doctors } from './pages/Doctors';
 import { Appointments } from './pages/Appointments';
@@ -28,6 +30,7 @@ import { PatientBills } from './pages/patient/PatientBills';
 import { DoctorHome } from './pages/doctor/DoctorHome';
 import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
+import { DoctorPatientDetailPage } from './pages/doctor/DoctorPatientDetailPage';
 import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
@@ -156,6 +159,23 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <AdminRoute user={user}>
+                  <AppLayout user={user} onLogout={logout}>
+                    <AnimatedPage>
+                      <AdminDashboard />
+                    </AnimatedPage>
+                  </AppLayout>
+                </AdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
@@ -247,6 +267,14 @@ function AnimatedRoutes() {
             element={
               <AnimatedPage>
                 <DoctorPatientsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="patients/:id"
+            element={
+              <AnimatedPage>
+                <DoctorPatientDetailPage />
               </AnimatedPage>
             }
           />

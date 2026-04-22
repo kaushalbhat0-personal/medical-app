@@ -80,6 +80,8 @@ def main() -> None:
             "doctorBPassword": "TempPass9!",
             "doctorBDisplayName": extras["doctor_b_display_name"],
             "patientOnlyDoctorBName": extras["patient_only_doctor_b_name"],
+            "doctorLinkedPatientId": extras["doctor_a_patient_id"],
+            "doctorLinkedAppointmentId": extras["doctor_a_appointment_id"],
             "doctorOtherTenantEmail": other_tenant["doctor_other_tenant_email"],
             "doctorOtherTenantPassword": other_tenant["doctor_other_tenant_password"],
             "doctorOtherTenantDisplayName": other_tenant["doctor_other_tenant_display_name"],

@@ -1,6 +1,19 @@
-import { X, PanelLeft, LayoutDashboard, Users, Stethoscope, Calendar, CreditCard, Home, Receipt } from 'lucide-react';
+import {
+  X,
+  PanelLeft,
+  LayoutDashboard,
+  BarChart3,
+  Users,
+  Stethoscope,
+  Calendar,
+  CreditCard,
+  Home,
+  Receipt,
+} from 'lucide-react';
+import { useMemo } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { isPatientRole } from '../../utils/roles';
+import { isAdminRole, isPatientRole } from '../../utils/roles';
 import { NavItem } from './NavItem';
 
 interface SidebarProps {
@@ -10,7 +23,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-const staffNavItems = [
+const staffNavBase: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/patients', label: 'Patients', icon: Users },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope },
@@ -26,6 +39,12 @@ const patientFallbackNavItems = [
 ];
 
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
+  const staffNavItems = useMemo(() => {
+    if (!isAdminRole(user?.role)) return staffNavBase;
+    const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
+    return [staffNavBase[0], adminItem, ...staffNavBase.slice(1)];
+  }, [user?.role]);
+
   const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;
   return (
     <div className="h-screen overflow-hidden bg-surface border-r border-border flex flex-col w-full">

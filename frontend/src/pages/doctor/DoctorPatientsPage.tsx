@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { Card, CardContent } from '@/components/ui/card';
@@ -120,16 +120,18 @@ export function DoctorPatientsPage() {
       {!loading && patients.length > 0 && (
         <div className="grid gap-3">
           {patients.map((p) => (
-            <Card key={String(p.id)}>
-              <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium">{p.name || 'Patient'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {[p.age != null ? `${p.age} yrs` : null, p.gender, p.phone].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link key={String(p.id)} to={`/doctor/patients/${p.id}`} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Card className="transition-colors hover:bg-muted/40">
+                <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-foreground">{p.name || 'Patient'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {[p.age != null ? `${p.age} yrs` : null, p.gender, p.phone].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

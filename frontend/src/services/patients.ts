@@ -9,6 +9,14 @@ export interface CreatePatientData {
   phone: string;
 }
 
+export type PatientUpdatePayload = {
+  name?: string;
+  age?: number;
+  gender?: string;
+  phone?: string;
+  clinical_notes?: string | null;
+};
+
 export const patientsApi = {
   getAll: async (params?: { search?: string; skip?: number; limit?: number }): Promise<Patient[]> => {
     try {
@@ -24,6 +32,15 @@ export const patientsApi = {
       throw error;
     }
   },
+  getById: async (id: string): Promise<Patient> => {
+    try {
+      const response = await api.get(`/patients/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('[patientsApi.getById] Error:', error);
+      throw error;
+    }
+  },
   create: async (patient: CreatePatientData): Promise<Patient> => {
     try {
       const response = await api.post('/patients', patient);
@@ -32,6 +49,10 @@ export const patientsApi = {
       console.error('[patientsApi.create] Error:', error);
       throw error;
     }
+  },
+  update: async (id: string, payload: PatientUpdatePayload): Promise<Patient> => {
+    const response = await api.put(`/patients/${id}`, payload);
+    return response.data;
   },
   delete: async (id: string): Promise<void> => {
     try {

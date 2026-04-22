@@ -57,6 +57,18 @@ export const appointmentsApi = {
       throw error;
     }
   },
+  update: async (
+    id: string,
+    payload: Partial<{
+      status: 'scheduled' | 'completed' | 'cancelled';
+      patient_id: string;
+      doctor_id: string;
+      appointment_time: string;
+    }>
+  ): Promise<Appointment> => {
+    const response = await api.put(`/appointments/${id}`, payload);
+    return response.data;
+  },
   delete: async (id: string): Promise<void> => {
     try {
       await api.delete(`/appointments/${id}`);

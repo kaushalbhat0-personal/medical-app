@@ -177,17 +177,34 @@ export function DoctorHome() {
             <p className="text-sm text-muted-foreground">No appointments scheduled for today.</p>
           )}
           {!loading &&
-            todaysAppointments.map((a) => (
-              <div
-                key={String(a.id)}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                <span className="font-medium">
-                  {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
-                </span>
-                <span className="text-muted-foreground capitalize">{a.status}</span>
-              </div>
-            ))}
+            todaysAppointments.map((a) => {
+              const pid = a.patient_id != null ? String(a.patient_id) : '';
+              const pName =
+                patients.find((p) => String(p.id) === pid)?.name || a.patient?.name || 'Patient';
+              return (
+                <div
+                  key={String(a.id)}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    {pid ? (
+                      <Link
+                        to={`/doctor/patients/${pid}`}
+                        className="font-medium text-primary hover:underline truncate block"
+                      >
+                        {pName}
+                      </Link>
+                    ) : (
+                      <span className="font-medium truncate block">{pName}</span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
+                    </span>
+                  </div>
+                  <span className="text-muted-foreground capitalize shrink-0">{a.status}</span>
+                </div>
+              );
+            })}
         </CardContent>
       </Card>
     </div>

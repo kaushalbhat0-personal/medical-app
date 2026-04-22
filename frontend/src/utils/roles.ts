@@ -7,6 +7,12 @@ export function isDoctorRole(role: string | null | undefined): boolean {
   return role?.toLowerCase() === 'doctor';
 }
 
+/** Admin dashboard and admin-only APIs (admin or super_admin). */
+export function isAdminRole(role: string | null | undefined): boolean {
+  const r = role?.toLowerCase();
+  return r === 'admin' || r === 'super_admin';
+}
+
 export function staffHomePath(): string {
   return '/dashboard';
 }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAppointments } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
@@ -16,6 +17,15 @@ function appointmentTime(a: Appointment): number {
   return t ? new Date(t).getTime() : 0;
 }
 
+function apptStatusBadgeVariant(
+  s: Appointment['status']
+): 'default' | 'secondary' | 'outline' | 'destructive' {
+  if (s === 'completed') return 'secondary';
+  if (s === 'cancelled') return 'destructive';
+  if (s === 'scheduled' || s === 'pending') return 'default';
+  return 'outline';
+}
+
 export function DoctorAppointmentsPage() {
   const [tab, setTab] = useState<Tab>('upcoming');
   const { appointments, patients, loading, error, refetch } = useAppointments();
@@ -25,6 +35,8 @@ export function DoctorAppointmentsPage() {
   const [now] = useState(() => Date.now());
   const calendarRef = useRef<HTMLDivElement>(null);
   const scheduleFocusRef = useRef(false);
+  const apptHashHandledRef = useRef<string>('');
+  const [bookPatientId, setBookPatientId] = useState<string | null>(null);
 
   const { upcoming, past } = useMemo(() => {
     const u: Appointment[] = [];
@@ -44,8 +56,12 @@ export function DoctorAppointmentsPage() {
 
   const list = tab === 'upcoming' ? upcoming : past;
 
-  const clearScheduleState = useCallback(() => {
-    if (location.state && typeof location.state === 'object' && 'openSchedule' in location.state) {
+  const clearApptPageNavState = useCallback(() => {
+    if (
+      location.state &&
+      typeof location.state === 'object' &&
+      ('openSchedule' in location.state || 'bookPatientId' in location.state)
+    ) {
       navigate(
         { pathname: location.pathname, search: location.search, hash: location.hash },
         { replace: true, state: {} }
@@ -54,16 +70,44 @@ export function DoctorAppointmentsPage() {
   }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
-    const st = location.state as { openSchedule?: boolean } | null;
-    if (st?.openSchedule && isIndependent && !scheduleFocusRef.current) {
+    const st = location.state as { openSchedule?: boolean; bookPatientId?: string } | null;
+    if (st?.bookPatientId) {
+      setBookPatientId(String(st.bookPatientId));
+    }
+    const shouldScroll = Boolean(st?.openSchedule || st?.bookPatientId);
+    if (shouldScroll && isIndependent && !scheduleFocusRef.current) {
       scheduleFocusRef.current = true;
       const id = window.setTimeout(() => {
         calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
-      clearScheduleState();
+      clearApptPageNavState();
       return () => clearTimeout(id);
     }
-  }, [location.state, isIndependent, clearScheduleState]);
+    if (st && typeof st === 'object' && ('openSchedule' in st || 'bookPatientId' in st)) {
+      clearApptPageNavState();
+    }
+  }, [location.state, isIndependent, clearApptPageNavState]);
+
+  useLayoutEffect(() => {
+    if (loading) return;
+    const h = location.hash || '';
+    if (!h.startsWith('#appt-')) {
+      apptHashHandledRef.current = '';
+      return;
+    }
+    if (apptHashHandledRef.current === h) return;
+    const raw = h.replace(/^#/, '');
+    const appt = appointments.find((x) => `appt-${x.id}` === raw);
+    if (!appt) return;
+    const t = appointmentTime(appt);
+    const inUp = t >= now && (appt.status === 'scheduled' || appt.status === 'pending');
+    setTab(inUp ? 'upcoming' : 'past');
+    apptHashHandledRef.current = h;
+    const raf = requestAnimationFrame(() => {
+      document.getElementById(raw)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [location.hash, loading, appointments, now]);
 
   const scrollToCalendar = () => {
     calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -113,6 +157,7 @@ export function DoctorAppointmentsPage() {
                 doctorId={String(selfDoctor.id)}
                 isInteractive={isIndependent}
                 patients={patients}
+                bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
                 doctorTimeZone={selfDoctor.timezone || 'UTC'}
                 onBooked={() => void refetch()}
@@ -147,16 +192,43 @@ export function DoctorAppointmentsPage() {
       )}
 
       {!loading &&
-        list.map((a) => (
-          <Card key={String(a.id)}>
-            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="font-medium">
-                {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
-              </span>
-              <span className="text-muted-foreground capitalize">{a.status}</span>
-            </CardContent>
-          </Card>
-        ))}
+        list.map((a) => {
+          const hashTarget = (location.hash || '').replace(/^#/, '') === `appt-${a.id}`;
+          const pid = a.patient_id != null ? String(a.patient_id) : '';
+          const pName =
+            patients.find((p) => String(p.id) === pid)?.name || a.patient?.name || 'Patient';
+          return (
+            <Card
+              key={String(a.id)}
+              id={`appt-${a.id}`}
+              className={cn(
+                'scroll-mt-4 transition-colors',
+                hashTarget && 'bg-primary/10 ring-2 ring-primary/30 shadow-sm'
+              )}
+            >
+              <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="min-w-0 space-y-1">
+                  {pid ? (
+                    <Link
+                      to={`/doctor/patients/${pid}`}
+                      className="font-medium text-primary hover:underline truncate block"
+                    >
+                      {pName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium truncate block">{pName}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
+                  </span>
+                </div>
+                <Badge variant={apptStatusBadgeVariant(a.status)} className="capitalize shrink-0">
+                  {a.status}
+                </Badge>
+              </CardContent>
+            </Card>
+          );
+        })}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,7 @@ class Patient(Base):
         nullable=False,
         server_default=func.now(),
     )
+    clinical_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     appointments = relationship("Appointment", back_populates="patient")
     billings = relationship("Billing", back_populates="patient")

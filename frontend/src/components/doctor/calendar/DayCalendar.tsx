@@ -166,6 +166,8 @@ export interface DayCalendarProps {
   doctorId: string | null;
   isInteractive: boolean;
   patients: Patient[];
+  /** When set, booking flow pre-selects this patient in the modal. */
+  bookPatientId?: string | null;
   hasAvailabilityWindows?: boolean;
   doctorTimeZone?: string;
   onBooked?: () => void;
@@ -176,6 +178,7 @@ export function DayCalendar({
   doctorId,
   isInteractive,
   patients,
+  bookPatientId = null,
   hasAvailabilityWindows,
   doctorTimeZone = 'UTC',
   onBooked,
@@ -762,6 +765,7 @@ export function DayCalendar({
           slotStart={selectedStart}
           doctorId={doctorId}
           patients={patients}
+          defaultPatientId={bookPatientId}
           onSuccess={onBookingSuccess}
           timeZone={tz}
           onSubmittingChange={setBookingBusy}

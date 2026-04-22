@@ -22,6 +22,7 @@ class PatientRead(BaseModel):
     created_by: UUID
     created_at: datetime
     user_id: UUID | None = None
+    clinical_notes: str | None = None
 
 
 class PatientUpdate(BaseModel):
@@ -29,3 +30,4 @@ class PatientUpdate(BaseModel):
     age: int | None = None
     gender: str | None = None
     phone: str | None = None
+    clinical_notes: str | None = None

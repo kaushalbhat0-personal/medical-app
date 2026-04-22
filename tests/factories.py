@@ -17,6 +17,7 @@ from app.crud.crud_appointment import add_appointment
 from app.models.doctor import Doctor
 from app.models.doctor_availability import DoctorAvailability
 from app.models.appointment import AppointmentStatus
+from app.models.billing import Billing, BillingStatus
 from app.models.patient import Patient
 from app.models.tenant import Tenant, TenantType, UserTenant
 from app.models.user import User, UserRole
@@ -278,7 +279,7 @@ def extend_playwright_e2e_seed(
     appt_a_time = normalize_appointment_time_utc(
         datetime.combine(_BOOKING_ANCHOR_DATE, time(11, 30), tzinfo=timezone.utc)
     )
-    add_appointment(
+    appt_a = add_appointment(
         db,
         {
             "patient_id": patient_a.id,
@@ -289,6 +290,18 @@ def extend_playwright_e2e_seed(
             "tenant_id": tenant_id,
         },
     )
+    e2e_bill = Billing(
+        patient_id=patient_a.id,
+        appointment_id=appt_a.id,
+        tenant_id=tenant_id,
+        amount=500,
+        currency="INR",
+        status=BillingStatus.paid,
+        description="E2E seed bill",
+        idempotency_key="e2e-seed-bill-001",
+        created_by=doctor_a.user_id,
+    )
+    db.add(e2e_bill)
 
     appt_b_time = normalize_appointment_time_utc(
         datetime.combine(_BOOKING_ANCHOR_DATE, time(11, 0), tzinfo=timezone.utc)
@@ -309,6 +322,8 @@ def extend_playwright_e2e_seed(
     return {
         "doctor_b_display_name": doctor_b.name,
         "patient_only_doctor_b_name": patient_only_b.name,
+        "doctor_a_patient_id": str(patient_a.id),
+        "doctor_a_appointment_id": str(appt_a.id),
     }
 
 

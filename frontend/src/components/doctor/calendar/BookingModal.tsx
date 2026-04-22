@@ -17,6 +17,8 @@ export interface BookingModalProps {
   slotStart: string | null;
   doctorId: string;
   patients: Patient[];
+  /** When set, the patient field defaults to this id if present in the list. */
+  defaultPatientId?: string | null;
   onSuccess: (bookedSlotStart?: string) => void;
   /** Doctor IANA zone for the slot subtitle */
   timeZone: string;
@@ -29,6 +31,7 @@ export function BookingModal({
   slotStart,
   doctorId,
   patients,
+  defaultPatientId = null,
   onSuccess,
   timeZone,
   onSubmittingChange,
@@ -49,9 +52,11 @@ export function BookingModal({
   useEffect(() => {
     if (open) {
       setIdempotencyKey(crypto.randomUUID());
-      setPatientId('');
+      const def = defaultPatientId?.trim() ?? '';
+      const match = def && patients.some((p) => String(p.id) === def);
+      setPatientId(match ? def : '');
     }
-  }, [open, slotStart]);
+  }, [open, slotStart, defaultPatientId, patients]);
 
   const close = useCallback(() => {
     if (submitting) return;
