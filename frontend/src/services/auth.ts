@@ -13,12 +13,13 @@ export const authApi = {
       console.log('[authApi.login] Request payload:', { username: email, password: '***' });
     }
 
-    // Send as form-data for OAuth2PasswordRequestForm compatibility
+    // Send as x-www-form-urlencoded for OAuth2PasswordRequestForm compatibility.
+    // The backend uses FastAPI's OAuth2PasswordRequestForm which expects `username` + `password`.
     const formData = new URLSearchParams();
     formData.append('username', email);  // OAuth2 uses 'username' field
     formData.append('password', password);
 
-    // Use retry logic to handle Render cold start
+    // Use retry logic to handle PaaS cold starts (no response / timeout).
     const response = await retryRequest(
       () =>
         api.post('/login', formData, {

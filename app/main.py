@@ -27,7 +27,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Fail fast on startup if the database is unreachable (after migrations in the process supervisor)."""
+    """
+    Startup/shutdown lifecycle hook.
+
+    We intentionally "fail fast" if the database is unreachable so process supervisors (Render,
+    Railway, systemd, etc.) can restart the service rather than serving partial functionality.
+
+    This hook assumes migrations are applied before the app starts accepting traffic.
+    """
     logger.info("Application startup: validating database connectivity")
     try:
         from app.core.database import engine
@@ -119,7 +126,9 @@ def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
 @app.exception_handler(Exception)
 def handle_generic_exception(_: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception occurred")
-    # TEMP DEBUG: Return actual error details for troubleshooting
+    # TEMP DEBUG:
+    # Returning raw exception messages can leak internal details. Keep this disabled in production
+    # once debugging is complete (return a generic message instead).
     error_msg = str(exc)
     return JSONResponse(
         status_code=500,

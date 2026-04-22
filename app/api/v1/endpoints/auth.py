@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 
 
 def _build_token_payload(user) -> dict:
+    """
+    Build the JWT payload used by the frontend to determine:
+    - **who** the user is (`sub`)
+    - **what** the user can see (`role`)
+    - **which tenant** to scope requests to (`tenant_id`, when applicable)
+
+    We include `tenant_id` to support multi-tenant routing on the client and server.
+    If a user has multiple tenant associations, we pick the primary association if present,
+    otherwise we fall back to the first association for a deterministic token.
+    """
     payload = {
         "sub": str(user.id),
         "type": "access",
@@ -34,6 +44,7 @@ def _build_token_payload(user) -> dict:
 
 @router.post("/register", response_model=Token)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
+    """Create a new user and return an access token for immediate sign-in."""
     user = auth_service.register_user(db, payload)
     access_token = create_access_token(_build_token_payload(user))
     return Token(
@@ -45,7 +56,12 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # OAuth2PasswordRequestForm uses 'username' field - treat as email
+    """
+    OAuth2 login endpoint.
+
+    FastAPI's OAuth2PasswordRequestForm uses a `username` field even when the application
+    authenticates by email. We treat `username` as the user's email address.
+    """
     user = auth_service.authenticate_user(db, form_data.username, form_data.password)
     if user.force_password_reset:
         logger.warning("[PASSWORD RESET REQUIRED] user_id=%s", user.id)
@@ -66,5 +82,6 @@ def reset_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> dict[str, str]:
+    """Authenticated password change (requires current password)."""
     auth_service.reset_password(db, current_user, body.old_password, body.new_password)
     return {"detail": "Password updated"}

@@ -10,7 +10,17 @@ DEFAULT_TENANT_NAME = "Default"
 
 
 def ensure_default_tenant_exists() -> None:
-    """Idempotent: guarantees the well-known default tenant row for FKs (e.g. user_tenant)."""
+    """
+    Idempotent: guarantees the well-known default tenant row exists.
+
+    We keep a fixed UUID as a "sentinel" tenant so foreign keys (e.g. user↔tenant association)
+    always have at least one valid tenant to reference in fresh databases.
+
+    Implementation notes:
+    - Uses a direct INSERT ... ON CONFLICT for startup safety and to avoid importing ORM models
+      (which can trigger extra side effects during application boot).
+    - Runs inside a transaction so it can be safely called at startup in a process supervisor.
+    """
     with engine.begin() as conn:
         conn.execute(
             text(

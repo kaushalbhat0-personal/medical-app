@@ -24,6 +24,13 @@ class PublicEndpointRateLimitMiddleware(BaseHTTPMiddleware):
 
     - Scope: only GET /api/v1/doctors and GET /api/v1/tenants
     - Key: client IP (X-Forwarded-For first hop if present, else request.client.host)
+
+    Notes / trade-offs:
+    - This is intentionally simple and **process-local**. In multi-worker deployments (e.g. gunicorn
+      with multiple workers, or multiple instances behind a load balancer), limits are enforced per
+      worker/instance and will not be globally consistent.
+    - We read `X-Forwarded-For` because most PaaS providers/proxies sit in front of the app. Only
+      trust it if your deployment ensures it is set/overwritten by the proxy (not client-controlled).
     """
 
     def __init__(self, app, *, rule: RateLimitRule) -> None:
@@ -34,7 +41,7 @@ class PublicEndpointRateLimitMiddleware(BaseHTTPMiddleware):
     def _client_ip(self, request: Request) -> str:
         xff = request.headers.get("x-forwarded-for")
         if xff:
-            # first hop is the original client
+            # First hop is the original client IP (when set by a trusted proxy).
             return xff.split(",")[0].strip()
         if request.client and request.client.host:
             return request.client.host
@@ -59,7 +66,7 @@ class PublicEndpointRateLimitMiddleware(BaseHTTPMiddleware):
             q = deque()
             self._hits[ip] = q
 
-        # purge old timestamps
+        # Sliding-window enforcement: we keep timestamps within the active window only.
         while q and q[0] < window_start:
             q.popleft()
 
@@ -79,6 +86,7 @@ class PublicEndpointRateLimitMiddleware(BaseHTTPMiddleware):
         q.append(now)
         remaining = max(0, limit - len(q))
         response = await call_next(request)
+        # These headers are useful for debugging and for clients that want to back off gracefully.
         response.headers["X-RateLimit-Limit"] = str(limit)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response
@@ -94,6 +102,10 @@ class AuthenticatedWritePostRateLimitMiddleware(BaseHTTPMiddleware):
     """
     Rate limit mutating /appointments and /bills routes per authenticated user (JWT sub).
     Unauthenticated requests fall back to client IP for the same limits.
+
+    Why per-user:
+    - For authenticated endpoints, IP-based limits can punish NATed users (hospitals, offices).
+      Using the JWT subject makes limits fairer per user, while still providing an IP fallback.
     """
 
     def __init__(self, app) -> None:
@@ -115,6 +127,8 @@ class AuthenticatedWritePostRateLimitMiddleware(BaseHTTPMiddleware):
         parts = auth.split(None, 1)
         if len(parts) < 2:
             return None
+        # We only use the token to extract a stable bucket key. Authorization decisions still happen
+        # in the actual route dependencies (e.g. get_current_active_user).
         payload = decode_access_token(parts[1])
         if not payload or payload.get("type") != "access":
             return None

@@ -57,7 +57,10 @@ class Settings(BaseSettings):
             return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
         origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
-        # Filter out wildcards - FastAPI CORSMiddleware requires explicit origins
+        # Filter out wildcard entries.
+        #
+        # FastAPI/Starlette CORSMiddleware expects explicit origins for credentialed requests.
+        # We keep the filtering conservative: any entry containing '*' is ignored.
         explicit_origins = [o for o in origins if "*" not in o]
 
         # Ensure production frontend is always included in production
@@ -66,7 +69,9 @@ class Settings(BaseSettings):
             if prod_origin not in explicit_origins:
                 explicit_origins.append(prod_origin)
 
-        return explicit_origins if explicit_origins else ["*"]  # Fallback to allow all if no valid origins
+        # If nothing valid remains, fall back to permissive behavior to avoid bricking local dev.
+        # Prefer setting explicit `ALLOWED_ORIGINS` instead of relying on this.
+        return explicit_origins if explicit_origins else ["*"]
 
     @model_validator(mode="after")
     def production_must_not_use_dev_defaults(self) -> Self:

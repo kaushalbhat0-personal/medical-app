@@ -51,6 +51,8 @@ const safeParseUser = (): User | null => {
 
 function buildUserFromLogin(credentials: LoginCredentials, response: LoginResponse): User {
   const base = response.user;
+  // Role/tenant can come from either the API response (preferred) or the token payload.
+  // We keep the fallback so the UI stays usable even if the backend returns a minimal login response.
   const role = response.role ?? base?.role ?? roleFromToken(response.access_token) ?? 'admin';
   const tenantRaw = response.tenant_id ?? base?.tenant_id ?? tenantIdFromToken(response.access_token);
 
@@ -112,10 +114,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       setIsAuthenticated(true);
       if (storedUser) {
+        // Keep local user info in sync with the current token (role/tenant may change across sessions).
         storedUser = mergeUserWithToken(storedUser, token);
         localStorage.setItem('user', JSON.stringify(storedUser));
         setUser(storedUser);
       } else {
+        // Token exists but user blob is missing/corrupted; synthesize a minimal user so routes can render.
+        // We intentionally keep this minimal to avoid "inventing" profile fields.
         const role = roleFromToken(token);
         if (role) {
           const minimal: User = {
@@ -147,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPatientProfileLoading(true);
     setPatientProfileError(null);
     try {
+      // The backend links Patient → User via `patient.user_id`. We resolve the current patient's row
+      // by matching that field against either the app user id or the JWT `sub`.
       const list = await patientsApi.getAll();
       const tokenUserId = userIdFromAccessToken(token);
       const linked = resolveLinkedPatient(list, effectiveUser?.id, tokenUserId);
@@ -174,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (skipPatientProfileEffectRef.current) {
+      // login()/signUp() already fetched patient profile; avoid duplicate network call right after auth.
       skipPatientProfileEffectRef.current = false;
       return;
     }
@@ -282,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPatientProfileError(null);
     setPatientProfileLoading(false);
     skipPatientProfileEffectRef.current = false;
+    // Hard navigation guarantees all state is reset (including any in-memory caches).
     window.location.href = '/login';
   }, []);
 

@@ -1,9 +1,13 @@
 /**
- * Core API Configuration
+ * Core API configuration + request/response policy.
  *
- * SECURITY NOTE: Currently using localStorage for token storage.
- * For production, migrate to httpOnly cookies to prevent XSS attacks.
- * See SECURITY.md for implementation details.
+ * Key goals:
+ * - Centralize auth header attachment and common error handling.
+ * - Be resilient to PaaS "cold starts" (e.g. Render) without incorrectly logging users out.
+ *
+ * SECURITY NOTE:
+ * We currently store tokens in localStorage for simplicity. For production hardening,
+ * prefer httpOnly cookies (mitigates XSS token theft). See `SECURITY.md`.
  */
 
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
@@ -27,7 +31,10 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor - attach auth token + clean params + dev logging
+// Request interceptor:
+// - attach auth token (if present)
+// - normalize query params so FastAPI doesn't receive empty strings (422s)
+// - add extra logs in dev for debugging
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Log request details in dev mode
@@ -48,7 +55,8 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // GLOBAL FIX: Clean params to prevent FastAPI 422 errors from empty strings
+    // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).
+    // FastAPI may treat that as invalid input, so we strip empty values consistently here.
     if (config.params) {
       config.params = cleanParams(config.params);
     }
@@ -58,21 +66,25 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle auth errors and common error cases
+// Response interceptor:
+// - special-case network errors (cold start / offline) so we *don't* treat them as auth failures
+// - redirect to login only on real 401s
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     // Debug: Log error details
     console.error('API ERROR:', error.response?.data || error.message);
 
-    // Handle network errors (no response) - CRITICAL: Do NOT logout on network errors
+    // Network error (no response):
+    // Treat as "server unavailable" (cold start, offline, DNS, etc.). Do NOT clear session here,
+    // because a cold start should not force a re-login.
     if (error.request && !error.response) {
       // This is likely a Render cold start or network issue, NOT an auth failure
       const isColdStart = error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !navigator.onLine;
       if (isColdStart) {
         console.log('[API] Cold start or network issue detected, not logging out');
       }
-      // Return special error object that components can detect
+      // Return a structured object so UI can show a friendly "waking up" state and optionally retry.
       return Promise.reject({
         __networkError: true,
         __coldStart: isColdStart,
@@ -89,7 +101,8 @@ api.interceptors.response.use(
       data?.errors?.[0] ||
       handleApiError(error as AxiosError<ApiErrorResponse>);
 
-    // Handle 401 Unauthorized - redirect to login
+    // 401 means "your token is not valid for this request" (expired, revoked, missing, etc.).
+    // This is the one case where we clear local state and force the login flow.
     if (error.response?.status === 401) {
       // Prevent redirect loops if already on login page
       if (window.location.pathname !== '/login') {
@@ -131,7 +144,8 @@ api.interceptors.response.use(
   }
 );
 
-// Retry utility for handling Render cold starts
+// Retry helper for transient network errors (typically cold starts).
+// Keep retry rules conservative: we should not retry validation/auth errors.
 export const retryRequest = async <T>(
   fn: () => Promise<T>,
   retries = 3,

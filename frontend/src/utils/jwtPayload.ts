@@ -1,4 +1,9 @@
-/** Decode JWT payload (middle segment) without verifying signature — for UI role hints only. */
+/**
+ * Decode the JWT payload (middle segment) without verifying signature.
+ *
+ * This is intentionally "best effort" for UI convenience only (role/tenant hints, debug).
+ * Do NOT use this for security decisions — the server remains the source of truth.
+ */
 export function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split('.');
