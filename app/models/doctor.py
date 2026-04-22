@@ -41,8 +41,8 @@ class Doctor(Base):
     timezone: Mapped[str] = mapped_column(
         String(64),
         nullable=False,
-        default="UTC",
-        server_default="UTC",
+        default="Asia/Kolkata",
+        server_default="Asia/Kolkata",
     )
 
     appointments = relationship("Appointment", back_populates="doctor")

@@ -273,7 +273,7 @@ export function formatHourLabelForDate(hour: number, dateYmd: string, _iana: str
   try {
     return dayjs.tz(s, tz).format('h:mm A');
   } catch {
-    return dayjs.utc(`${dateYmd}T${pad(hour)}:00:00`).tz(DISPLAY_TIMEZONE).format('h:mm A');
+    return dayjs.tz(`${dateYmd} ${pad(hour)}:00:00`, DISPLAY_TIMEZONE).format('h:mm A');
   }
 }
 

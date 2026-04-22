@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,13 @@ from app.models.patient import Patient
 from app.models.tenant import Tenant, TenantType, UserTenant
 from app.models.user import User, UserRole
 from app.utils.appointment_datetime import normalize_appointment_time_utc
+
+# Product default; availability `time` fields are wall clock in the doctor's IANA zone.
+_IST = ZoneInfo("Asia/Kolkata")
+
+
+def _wall_clock_to_utc_appointment(d: date, t: time, zone: ZoneInfo) -> datetime:
+    return normalize_appointment_time_utc(datetime.combine(d, t, tzinfo=zone).astimezone(timezone.utc))
 
 
 def create_tenant(db: Session, *, name: str | None = None, tenant_type: TenantType = TenantType.clinic) -> Tenant:
@@ -72,7 +80,7 @@ def create_doctor_profile(
     *,
     tenant_id: UUID,
     user_id: UUID | None = None,
-    timezone_name: str = "UTC",
+    timezone_name: str = "Asia/Kolkata",
 ) -> Doctor:
     d = Doctor(
         name=f"Dr Test {uuid.uuid4().hex[:6]}",
@@ -138,11 +146,8 @@ BOOKING_ANCHOR_DATE_ISO: str = _BOOKING_ANCHOR_DATE.isoformat()
 
 
 def booking_slot_datetime_utc() -> datetime:
-    """UTC instant matching first 30m slot of seeded availability on BOOKING_ANCHOR_DATE."""
-    # Friday = 4; window 10:00–12:00 UTC → 10:00 is first slot
-    return normalize_appointment_time_utc(
-        datetime.combine(_BOOKING_ANCHOR_DATE, time(10, 0), tzinfo=timezone.utc)
-    )
+    """UTC instant for first 30m slot of seeded availability on BOOKING_ANCHOR_DATE (wall times in IST)."""
+    return _wall_clock_to_utc_appointment(_BOOKING_ANCHOR_DATE, time(10, 0), _IST)
 
 
 def seed_bookable_doctor_and_patient(
@@ -163,8 +168,8 @@ def seed_bookable_doctor_and_patient(
         tenant_id=tenant.id,
         force_password_reset=doctor_force_password_reset,
     )
-    doc = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="UTC")
-    assert doc.timezone == "UTC"
+    doc = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="Asia/Kolkata")
+    assert doc.timezone == "Asia/Kolkata"
     add_weekly_availability(
         db,
         doctor_id=doc.id,
@@ -275,10 +280,8 @@ def extend_playwright_e2e_seed(
         name="E2E Only Doctor B Patient",
     )
 
-    # After 10:00 so first bookable slot (10:00) stays valid for double-book e2e (30-minute buffer).
-    appt_a_time = normalize_appointment_time_utc(
-        datetime.combine(_BOOKING_ANCHOR_DATE, time(11, 30), tzinfo=timezone.utc)
-    )
+    # After 10:00 IST so first bookable slot (10:00) stays valid for double-book e2e (30-minute buffer).
+    appt_a_time = _wall_clock_to_utc_appointment(_BOOKING_ANCHOR_DATE, time(11, 30), _IST)
     appt_a = add_appointment(
         db,
         {
@@ -338,7 +341,7 @@ def seed_e2e_hospital_doctor(db: Session) -> dict[str, str]:
         tenant_id=tenant.id,
         force_password_reset=False,
     )
-    doctor = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="UTC")
+    doctor = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="Asia/Kolkata")
     add_weekly_availability(
         db,
         doctor_id=doctor.id,

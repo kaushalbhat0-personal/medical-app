@@ -10,7 +10,7 @@ class DoctorCreate(BaseModel):
     experience_years: int
     timezone: str | None = Field(
         default=None,
-        description="IANA timezone for availability and slots (e.g. Asia/Kolkata); defaults to UTC",
+        description="IANA timezone for availability and slots; defaults to Asia/Kolkata (IST)",
     )
     account_email: EmailStr | None = Field(
         default=None,
@@ -33,7 +33,10 @@ class DoctorRead(BaseModel):
     tenant_type: str | None = None
     tenant_name: str | None = None
     created_at: datetime
-    timezone: str = Field(default="UTC", description="IANA timezone for availability windows and slot dates")
+    timezone: str = Field(
+        default="Asia/Kolkata",
+        description="IANA timezone for availability windows and slot dates (wall-clock times are in this zone)",
+    )
     has_availability_windows: bool = Field(
         default=False,
         description="True if this doctor has at least one recurring availability window configured",
