@@ -8,6 +8,7 @@ import { useAppointments } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState, EmptyState } from '../../components/common';
 import { DayCalendar } from '../../components/doctor/calendar/DayCalendar';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import type { Appointment } from '../../types';
 
@@ -57,7 +58,6 @@ export function DoctorAppointmentsPage() {
 
   const list = tab === 'upcoming' ? upcoming : past;
 
-  const displayTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
 
   const clearApptPageNavState = useCallback(() => {
     if (
@@ -128,7 +128,7 @@ export function DoctorAppointmentsPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {isReadOnly
               ? 'Upcoming and past visits assigned to you (read only).'
-              : 'Your calendar and visit list. Times follow your profile timezone.'}
+              : 'Your calendar and visit list. All times in IST.'}
           </p>
         </div>
         {isIndependent && selfDoctor && selfDoctor.has_availability_windows !== false && (
@@ -163,7 +163,7 @@ export function DoctorAppointmentsPage() {
                 appointments={appointments}
                 bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
-                doctorTimeZone={(selfDoctor.timezone || 'UTC').trim() || 'UTC'}
+                doctorTimeZone={DISPLAY_TIMEZONE}
                 onBooked={() => void refetch()}
               />
             </CardContent>
@@ -225,7 +225,7 @@ export function DoctorAppointmentsPage() {
                   <span className="text-xs text-muted-foreground tabular-nums">
                     {formatAppointmentDateTimeWithZoneLabel(
                       a.appointment_time || a.scheduled_at || '',
-                      displayTz
+                      DISPLAY_TIMEZONE
                     )}
                   </span>
                 </div>

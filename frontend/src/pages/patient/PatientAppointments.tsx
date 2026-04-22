@@ -12,6 +12,7 @@ import { formatAppointmentDoctorName } from '../../utils';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import { ErrorState } from '../../components/common';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY } from '../../constants/patient';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 
 dayjs.extend(utc);
 
@@ -19,10 +20,6 @@ type TabKey = 'upcoming' | 'past';
 
 function appointmentTime(a: Appointment): string | undefined {
   return a.appointment_time || a.scheduled_at;
-}
-
-function doctorTimeZone(a: Appointment): string {
-  return a.doctor?.timezone?.trim() || 'UTC';
 }
 
 function doctorLabel(a: Appointment): string {
@@ -232,7 +229,7 @@ export function PatientAppointments() {
                   <div>
                     <p className="font-medium">{doctorLabel(a)}</p>
                     <p className="text-sm text-muted-foreground">
-                      {t ? formatAppointmentDateTimeWithZoneLabel(t, doctorTimeZone(a)) : 'Time TBD'}
+                      {t ? formatAppointmentDateTimeWithZoneLabel(t, DISPLAY_TIMEZONE) : 'Time TBD'}
                     </p>
                     {a.notes && <p className="text-xs text-muted-foreground mt-1 max-w-md">{a.notes}</p>}
                   </div>

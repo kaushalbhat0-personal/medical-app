@@ -23,6 +23,7 @@ import {
   type DoctorSlot,
 } from '../../../services';
 import type { Appointment, Patient } from '../../../types';
+import { DISPLAY_TIMEZONE } from '../../../constants/time';
 import {
   addDaysYmd,
   appointmentCalendarDayYmd,
@@ -177,6 +178,7 @@ export interface DayCalendarProps {
   /** When set, booking flow pre-selects this patient in the modal. */
   bookPatientId?: string | null;
   hasAvailabilityWindows?: boolean;
+  /** @deprecated Ignored; UI always displays Asia/Kolkata (IST). */
   doctorTimeZone?: string;
   onBooked?: () => void;
   className?: string;
@@ -189,11 +191,11 @@ export function DayCalendar({
   appointments = [],
   bookPatientId = null,
   hasAvailabilityWindows,
-  doctorTimeZone = 'UTC',
+  doctorTimeZone: _doctorTimeZone,
   onBooked,
   className,
 }: DayCalendarProps) {
-  const tz = doctorTimeZone || 'UTC';
+  const tz = DISPLAY_TIMEZONE;
   const isDesktop = useIsDesktop();
   const [searchParams, setSearchParams] = useSearchParams();
   const [slots, setSlots] = useState<DoctorSlot[]>([]);

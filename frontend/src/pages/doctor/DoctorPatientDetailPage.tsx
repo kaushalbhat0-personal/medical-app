@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '../../components/common';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 import {
   appointmentCalendarDayYmd,
   formatSlotTimeWithZoneLabel,
@@ -104,7 +105,6 @@ export function DoctorPatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isIndependent, isReadOnly, selfDoctor } = useDoctorWorkspace();
-  const scheduleTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -180,7 +180,7 @@ export function DoctorPatientDetailPage() {
       const raw = a.appointment_time || a.scheduled_at;
       const t = appointmentTime(a);
       if (!raw || !t) continue;
-      const dayKey = appointmentCalendarDayYmd(raw, scheduleTz);
+      const dayKey = appointmentCalendarDayYmd(raw, DISPLAY_TIMEZONE);
       if (!dayKey) continue;
       items.push({
         id: `a-${a.id}`,
@@ -198,7 +198,7 @@ export function DoctorPatientDetailPage() {
         : b.created_at || b.updated_at;
       const t = raw ? new Date(raw).getTime() : 0;
       if (!raw || !t) continue;
-      const dayKey = appointmentCalendarDayYmd(raw, scheduleTz);
+      const dayKey = appointmentCalendarDayYmd(raw, DISPLAY_TIMEZONE);
       if (!dayKey) continue;
       items.push({
         id: `b-${b.id}`,
@@ -222,7 +222,7 @@ export function DoctorPatientDetailPage() {
     }
     const order = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a));
     return { timelineByDay: byDay, dayOrder: order };
-  }, [appointments, bills, scheduleTz]);
+  }, [appointments, bills]);
 
   if (!id) {
     return <ErrorState title="Invalid link" description="This patient page address is not valid." />;
@@ -497,7 +497,7 @@ export function DoctorPatientDetailPage() {
                     )}
                   >
                     <h2 className="text-lg font-semibold tracking-tight text-foreground border-b border-border/60 pb-2 mb-4">
-                      {sampleIso ? relativeCalendarDayTitleInZone(sampleIso, scheduleTz) : ''}
+                      {sampleIso ? relativeCalendarDayTitleInZone(sampleIso, DISPLAY_TIMEZONE) : ''}
                     </h2>
                     <ul className="space-y-3">
                       {list.map((it) => {
@@ -521,7 +521,7 @@ export function DoctorPatientDetailPage() {
                                     <span className="font-medium text-foreground">
                                       {formatSlotTimeWithZoneLabel(
                                         a.appointment_time || a.scheduled_at || '',
-                                        scheduleTz
+                                        DISPLAY_TIMEZONE
                                       )}
                                     </span>
                                     <span className="mx-1.5 text-border">·</span>
@@ -586,7 +586,7 @@ export function DoctorPatientDetailPage() {
                               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                                 <p className="text-muted-foreground tabular-nums">
                                   <span className="font-medium text-foreground">
-                                    {formatSlotTimeWithZoneLabel(it.iso, scheduleTz)}
+                                    {formatSlotTimeWithZoneLabel(it.iso, DISPLAY_TIMEZONE)}
                                   </span>
                                   <span className="mx-1.5 text-border">·</span>
                                   <span className="text-foreground font-medium">
@@ -658,7 +658,7 @@ export function DoctorPatientDetailPage() {
               const apptTime = appt
                 ? formatSlotTimeWithZoneLabel(
                     appt.appointment_time || appt.scheduled_at || '',
-                    scheduleTz
+                    DISPLAY_TIMEZONE
                   )
                 : null;
               return (

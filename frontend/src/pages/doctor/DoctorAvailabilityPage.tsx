@@ -45,7 +45,6 @@ export function DoctorAvailabilityPage() {
   const [presetBusy, setPresetBusy] = useState(false);
 
   const doctorId = selfDoctor ? String(selfDoctor.id) : null;
-  const tz = selfDoctor?.timezone?.trim() || 'UTC';
 
   const loadWindows = useCallback(async () => {
     if (!doctorId) return;
@@ -308,15 +307,15 @@ export function DoctorAvailabilityPage() {
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
           {isReadOnly
             ? 'Your organization manages your schedule in the staff application. The windows below are read only.'
-            : 'Set weekly hours for patient booking. Times use your profile timezone for scheduling.'}
+            : 'Set weekly hours for patient booking. Calendar and slots are shown in IST.'}
         </p>
-        <p className="text-xs text-muted-foreground mt-2">Timezone: {tz}</p>
+        <p className="text-xs text-muted-foreground mt-2">All times in IST</p>
         {!loadError && (
           <p className="text-sm text-muted-foreground mt-3" data-testid="availability-slot-preview">
             <span className="text-foreground font-medium">Preview:</span> on this weekday, about {selectedDaySlotCount} bookable
             slot {selectedDaySlotCount === 1 ? 'start' : 'starts'}; across the whole week, about {weekSlotCount} slot{' '}
             {weekSlotCount === 1 ? 'start' : 'starts'}
-            (approximate; use your calendar to confirm in your timezone).
+            (approximate; confirm on your calendar).
           </p>
         )}
       </div>

@@ -152,7 +152,7 @@ export function DoctorTimeOffPanel({
             Time off
           </CardTitle>
           <CardDescription>
-            Block whole days or hours when you are not seeing patients. Uses your profile timezone.
+            Block whole days or hours when you are not seeing patients. All times in IST.
           </CardDescription>
         </div>
         {!readOnly && (

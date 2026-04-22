@@ -8,6 +8,7 @@ import { appointmentsApi } from '../../../services';
 import type { Patient } from '../../../types';
 import { cn } from '@/lib/utils';
 import { PatientSearchSelect } from '../PatientSearchSelect';
+import { DISPLAY_TIMEZONE } from '../../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../../utils/doctorSchedule';
 
 export interface BookingModalProps {
@@ -20,7 +21,7 @@ export interface BookingModalProps {
   /** When set, the patient field defaults to this id if present in the list. */
   defaultPatientId?: string | null;
   onSuccess: (bookedSlotStart?: string) => void;
-  /** Doctor IANA zone for the slot subtitle */
+  /** @deprecated Unused; subtitles always use Asia/Kolkata (IST). */
   timeZone: string;
   onSubmittingChange?: (submitting: boolean) => void;
 }
@@ -33,7 +34,7 @@ export function BookingModal({
   patients,
   defaultPatientId = null,
   onSuccess,
-  timeZone,
+  timeZone: _timeZone,
   onSubmittingChange,
 }: BookingModalProps) {
   const [patientId, setPatientId] = useState('');
@@ -144,7 +145,7 @@ export function BookingModal({
             Book appointment
           </h2>
           <p id="day-cal-book-desc" className="text-sm text-muted-foreground mt-0.5">
-            {formatAppointmentDateTimeWithZoneLabel(slotStart, timeZone)}. Choose a patient, then confirm.
+            {formatAppointmentDateTimeWithZoneLabel(slotStart, DISPLAY_TIMEZONE)}. Choose a patient, then confirm.
           </p>
         </div>
         <div className="space-y-4 px-4 py-4">

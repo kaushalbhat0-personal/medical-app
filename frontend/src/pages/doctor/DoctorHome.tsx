@@ -8,16 +8,20 @@ import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState } from '../../components/common';
 import type { Appointment } from '../../types';
 import { UserPlus, CalendarPlus, Receipt } from 'lucide-react';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 import {
   appointmentCalendarDayYmd,
   calendarTodayYmdInZone,
   formatSlotTimeWithZoneLabel,
+  slotInstantUtcMs,
 } from '../../utils/doctorSchedule';
 
-function isAppointmentToday(a: Appointment, doctorTz: string): boolean {
+function isAppointmentToday(a: Appointment): boolean {
   const t = a.appointment_time || a.scheduled_at;
   if (!t) return false;
-  return appointmentCalendarDayYmd(t, doctorTz) === calendarTodayYmdInZone(doctorTz);
+  return (
+    appointmentCalendarDayYmd(t, DISPLAY_TIMEZONE) === calendarTodayYmdInZone(DISPLAY_TIMEZONE)
+  );
 }
 
 export function DoctorHome() {
@@ -29,21 +33,18 @@ export function DoctorHome() {
   const loading = aptLoading || patLoading;
   const error = aptError || patError;
 
-  const now = useMemo(() => new Date(), []);
-  const doctorTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
-
   const todaysAppointments = useMemo(
-    () => appointments.filter((a) => isAppointmentToday(a, doctorTz)),
-    [appointments, doctorTz]
+    () => appointments.filter((a) => isAppointmentToday(a)),
+    [appointments]
   );
 
   const upcoming = useMemo(() => {
-    const t = now.getTime();
+    const t = Date.now();
     return appointments.filter((a) => {
       const at = a.appointment_time || a.scheduled_at;
-      return at && new Date(at).getTime() >= t && a.status === 'scheduled';
+      return at && slotInstantUtcMs(at) >= t && a.status === 'scheduled';
     }).length;
-  }, [appointments, now]);
+  }, [appointments]);
 
   if (error) {
     return (
@@ -196,7 +197,7 @@ export function DoctorHome() {
                     <span className="text-xs text-muted-foreground">
                       {formatSlotTimeWithZoneLabel(
                         a.appointment_time || a.scheduled_at || '',
-                        doctorTz
+                        DISPLAY_TIMEZONE
                       )}
                     </span>
                   </div>

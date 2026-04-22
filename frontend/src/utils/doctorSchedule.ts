@@ -2,26 +2,28 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import { DISPLAY_TIMEZONE } from '../constants/time';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 /**
- * Calendar YYYY-MM-DD for an instant (default: now) in an IANA zone.
+ * Calendar YYYY-MM-DD for an instant (default: now) in the display zone.
  * Prefer `calendarTodayYmdInZone` for "today" and `appointmentCalendarDayYmd` for API ISO strings.
  */
-export function ymdInTimeZone(iana: string, d: Date = new Date()): string {
-  const tz = iana || 'UTC';
+export function ymdInTimeZone(_iana: string, d?: Date): string {
+  const tz = DISPLAY_TIMEZONE;
+  const ms = d != null ? d.getTime() : dayjs.utc().valueOf();
   try {
-    return dayjs.utc(d.getTime()).tz(tz).format('YYYY-MM-DD');
+    return dayjs.utc(ms).tz(tz).format('YYYY-MM-DD');
   } catch {
-    return dayjs.utc(d.getTime()).format('YYYY-MM-DD');
+    return dayjs.utc(ms).format('YYYY-MM-DD');
   }
 }
 
-/** Today's calendar date in `iana` from the current instant (UTC-safe). */
-export function calendarTodayYmdInZone(iana: string): string {
-  const tz = iana || 'UTC';
+/** Today's calendar date in the display zone from the current instant (UTC-safe). */
+export function calendarTodayYmdInZone(_iana: string): string {
+  const tz = DISPLAY_TIMEZONE;
   try {
     return dayjs.utc().tz(tz).format('YYYY-MM-DD');
   } catch {
@@ -29,8 +31,8 @@ export function calendarTodayYmdInZone(iana: string): string {
   }
 }
 
-export function addDaysYmd(ymd: string, iana: string, deltaDays: number): string {
-  const tz = iana || 'UTC';
+export function addDaysYmd(ymd: string, _iana: string, deltaDays: number): string {
+  const tz = DISPLAY_TIMEZONE;
   const anchor = dayjs.tz(`${ymd} 12:00:00`, tz);
   if (!anchor.isValid()) {
     const fallback = dayjs.utc(`${ymd}T12:00:00Z`);
@@ -42,11 +44,11 @@ export function addDaysYmd(ymd: string, iana: string, deltaDays: number): string
 /** True 9:00 → 17:00 window for that calendar day in the zone (DST-safe total length). */
 export function getCalendarViewWindow(
   dateYmd: string,
-  iana: string,
+  _iana: string,
   startWall = '09:00',
   endWall = '17:00'
 ): { viewStart: Dayjs; viewEnd: Dayjs; totalMinutes: number } {
-  const tz = iana || 'UTC';
+  const tz = DISPLAY_TIMEZONE;
   const viewStart = dayjs.tz(`${dateYmd} ${startWall}`, tz);
   const viewEnd = dayjs.tz(`${dateYmd} ${endWall}`, tz);
   const raw = viewEnd.diff(viewStart, 'minute', true);
@@ -120,12 +122,12 @@ export function nowLinePercentInView(
 /** Every wall hour 9…17 that falls in [viewStart, viewEnd] with % from view top. */
 export function listHourGridTicks(
   dateYmd: string,
-  iana: string,
+  _iana: string,
   viewStart: Dayjs,
   viewEnd: Dayjs,
   totalMinutes: number
 ): { hour: number; label: string; topPct: number }[] {
-  const tz = iana || 'UTC';
+  const tz = DISPLAY_TIMEZONE;
   const out: { hour: number; label: string; topPct: number }[] = [];
   for (let h = 9; h <= 17; h += 1) {
     const t = dayjs.tz(`${dateYmd} ${String(h).padStart(2, '0')}:00:00`, tz);
@@ -138,9 +140,9 @@ export function listHourGridTicks(
   return out;
 }
 
-/** Minutes from local midnight in `iana` for the UTC instant `iso` (slot start from API). */
-export function wallMinutesInZone(iso: string, iana: string): number {
-  const tz = iana || 'UTC';
+/** Minutes from local midnight in the display zone for the UTC instant `iso` (slot start from API). */
+export function wallMinutesInZone(iso: string, _iana: string): number {
+  const tz = DISPLAY_TIMEZONE;
   try {
     const x = dayjs.utc(iso).tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;
@@ -151,10 +153,10 @@ export function wallMinutesInZone(iso: string, iana: string): number {
   }
 }
 
-/** Short timezone label for a wall time (e.g. IST, EST). Uses the instant for DST correctness. */
-export function timeZoneAbbreviation(iana: string, refMs?: number): string {
-  const z = (iana || 'UTC').trim() || 'UTC';
-  const ref = refMs != null && !Number.isNaN(refMs) ? refMs : Date.now();
+/** Short timezone label for a wall time (e.g. IST). Uses the instant for DST correctness. */
+export function timeZoneAbbreviation(_iana: string, refMs?: number): string {
+  const z = DISPLAY_TIMEZONE;
+  const ref = refMs != null && !Number.isNaN(refMs) ? refMs : dayjs.utc().valueOf();
   try {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' }).formatToParts(
       new Date(ref)
@@ -165,9 +167,9 @@ export function timeZoneAbbreviation(iana: string, refMs?: number): string {
   }
 }
 
-/** Calendar YYYY-MM-DD in the doctor zone for a UTC instant from the API. */
-export function appointmentCalendarDayYmd(iso: string, iana: string): string {
-  const tz = iana || 'UTC';
+/** Calendar YYYY-MM-DD in the display zone for a UTC instant from the API. */
+export function appointmentCalendarDayYmd(iso: string, _iana: string): string {
+  const tz = DISPLAY_TIMEZONE;
   const u = dayjs.utc(iso);
   if (!u.isValid()) return '';
   try {
@@ -177,10 +179,10 @@ export function appointmentCalendarDayYmd(iso: string, iana: string): string {
   }
 }
 
-/** Format a slot start for display in the doctor's local zone (API times are UTC). */
-export function formatSlotTime(iso: string, iana: string): string {
+/** Format a slot start for display (API times are UTC). */
+export function formatSlotTime(iso: string, _iana: string): string {
   if (!iso?.trim()) return '—';
-  const tz = iana || 'UTC';
+  const tz = DISPLAY_TIMEZONE;
   try {
     return dayjs.utc(iso).tz(tz).format('h:mm A');
   } catch {
@@ -188,16 +190,14 @@ export function formatSlotTime(iso: string, iana: string): string {
   }
 }
 
-export function formatSlotTimeWithZoneLabel(iso: string, iana: string): string {
+export function formatSlotTimeWithZoneLabel(iso: string, _iana: string): string {
   if (!iso?.trim()) return '—';
-  const time = formatSlotTime(iso, iana);
-  const abbr = timeZoneAbbreviation(iana, dayjs.utc(iso).valueOf());
-  return `${time} (${abbr})`;
+  return formatSlotTime(iso, DISPLAY_TIMEZONE);
 }
 
-export function formatSlotDateTimeLine(iso: string, iana: string): string {
+export function formatSlotDateTimeLine(iso: string, _iana: string): string {
   if (!iso?.trim()) return '—';
-  const tz = iana || 'UTC';
+  const tz = DISPLAY_TIMEZONE;
   try {
     return dayjs.utc(iso).tz(tz).format('ddd, MMM D — h:mm A');
   } catch {
@@ -205,25 +205,23 @@ export function formatSlotDateTimeLine(iso: string, iana: string): string {
   }
 }
 
-/** Longer line for lists: date, time, and short zone (e.g. Wed, Apr 23 — 10:00 AM (IST)). */
-export function formatAppointmentDateTimeWithZoneLabel(iso: string, iana: string): string {
+/** Longer line for lists: date and time in IST (no separate zone badge). */
+export function formatAppointmentDateTimeWithZoneLabel(iso: string, _iana: string): string {
   if (!iso?.trim()) return '—';
-  const line = formatSlotDateTimeLine(iso, iana);
-  const abbr = timeZoneAbbreviation(iana, dayjs.utc(iso).valueOf());
-  return `${line} (${abbr})`;
+  return formatSlotDateTimeLine(iso, DISPLAY_TIMEZONE);
 }
 
 /**
- * "Today" / "Yesterday" / long date for grouping headings, using the doctor's calendar
+ * "Today" / "Yesterday" / long date for grouping headings, using the display calendar
  * (not the browser's local date).
  */
-export function relativeCalendarDayHeadingInZone(iso: string, iana: string): string {
-  const tz = iana || 'UTC';
+export function relativeCalendarDayHeadingInZone(iso: string, _iana: string): string {
+  const tz = DISPLAY_TIMEZONE;
   try {
     const d = dayjs.utc(iso).tz(tz);
-    const todayYmd = calendarTodayYmdInZone(tz);
+    const todayYmd = calendarTodayYmdInZone(DISPLAY_TIMEZONE);
     const ymd = d.format('YYYY-MM-DD');
-    const yestYmd = addDaysYmd(todayYmd, iana, -1);
+    const yestYmd = addDaysYmd(todayYmd, DISPLAY_TIMEZONE, -1);
     if (ymd === todayYmd) return 'Today';
     if (ymd === yestYmd) return 'Yesterday';
     return d.format('dddd, MMMM D, YYYY');
@@ -239,28 +237,28 @@ export function relativeCalendarDayTitleInZone(iso: string, iana: string): strin
   return h;
 }
 
-/** e.g. "All times in IST (Asia/Kolkata)" for the schedule footnote. */
-export function formatTimeZoneCaption(iana: string): string {
-  const z = (iana || 'UTC').trim();
-  let short = z;
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' }).formatToParts(
-      new Date()
-    );
-    const tzName = parts.find((p) => p.type === 'timeZoneName')?.value;
-    if (tzName) short = tzName;
-  } catch {
-    short = z.replace(/_/g, ' ');
-  }
-  return `All times in ${short} (${z})`;
+/** Footnote for schedule views (India-first; no UTC or IANA parenthetical). */
+export function formatTimeZoneCaption(_iana?: string): string {
+  void _iana;
+  return 'All times in IST';
 }
 
-export function formatNextAvailablePhrase(iso: string, slotDayYmd: string, doctorTodayYmd: string, iana: string): string {
-  const time = formatSlotTime(iso, iana);
-  if (slotDayYmd === doctorTodayYmd) return `Today at ${time}`;
-  if (addDaysYmd(doctorTodayYmd, iana, 1) === slotDayYmd) return `Tomorrow at ${time}`;
+export function formatNextAvailablePhrase(
+  iso: string,
+  _slotDayYmd: string,
+  _doctorTodayYmd: string,
+  _iana: string
+): string {
+  void _slotDayYmd;
+  void _doctorTodayYmd;
+  void _iana;
+  const todayYmd = calendarTodayYmdInZone(DISPLAY_TIMEZONE);
+  const slotDayYmd = appointmentCalendarDayYmd(iso, DISPLAY_TIMEZONE);
+  const time = formatSlotTime(iso, DISPLAY_TIMEZONE);
+  if (slotDayYmd === todayYmd) return `Today at ${time}`;
+  if (addDaysYmd(todayYmd, DISPLAY_TIMEZONE, 1) === slotDayYmd) return `Tomorrow at ${time}`;
   try {
-    const day = dayjs.utc(iso).tz(iana).format('ddd, MMM D');
+    const day = dayjs.utc(iso).tz(DISPLAY_TIMEZONE).format('ddd, MMM D');
     return `${day} at ${time}`;
   } catch {
     return time;
@@ -268,16 +266,14 @@ export function formatNextAvailablePhrase(iso: string, slotDayYmd: string, docto
 }
 
 /** @deprecated use listHourGridTicks; kept for any imports */
-export function formatHourLabelForDate(hour: number, dateYmd: string, iana: string): string {
-  const tz = iana || 'UTC';
+export function formatHourLabelForDate(hour: number, dateYmd: string, _iana: string): string {
+  const tz = DISPLAY_TIMEZONE;
   const pad = (n: number) => String(n).padStart(2, '0');
   const s = `${dateYmd} ${pad(hour)}:00:00`;
   try {
     return dayjs.tz(s, tz).format('h:mm A');
   } catch {
-    const d = new Date();
-    d.setHours(hour, 0, 0, 0);
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return dayjs.utc(`${dateYmd}T${pad(hour)}:00:00`).tz(DISPLAY_TIMEZONE).format('h:mm A');
   }
 }
 
@@ -302,9 +298,9 @@ export function isSlotInstantInTheFuture(isoStart: string): boolean {
   return t.valueOf() > Date.now();
 }
 
-/** "Now" as minutes from midnight in the doctor's zone. */
-export function nowWallMinutes(iana: string): number {
-  const tz = iana || 'UTC';
+/** "Now" as minutes from midnight in the display zone. */
+export function nowWallMinutes(_iana: string): number {
+  const tz = DISPLAY_TIMEZONE;
   try {
     const x = dayjs.utc().tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;

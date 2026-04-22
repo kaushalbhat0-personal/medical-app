@@ -8,6 +8,7 @@ import { useAppointments, type AppointmentFilters } from '../hooks';
 import { createAppointmentHandler } from '../handlers';
 import { appointmentsApi } from '../services';
 import { EMPTY_APPOINTMENT } from '../constants';
+import { DISPLAY_TIMEZONE } from '../constants/time';
 import { formatPatientName, formatDoctorName } from '../utils';
 import { formatAppointmentDateTimeWithZoneLabel } from '../utils/doctorSchedule';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea, Button, Card as CommonCard } from '../components/common';
@@ -332,7 +333,7 @@ export function Appointments() {
                     <TableCell className="text-muted-foreground">
                       {formatAppointmentDateTimeWithZoneLabel(
                         appointmentTime || '',
-                        apt.doctor?.timezone || 'UTC'
+                        DISPLAY_TIMEZONE
                       )}
                     </TableCell>
                     <TableCell>

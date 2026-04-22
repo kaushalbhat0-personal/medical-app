@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appointmentCalendarDayYmd,
   assignOverlapLanesPure,
@@ -22,26 +22,43 @@ describe('slotKey', () => {
 });
 
 describe('formatSlotTime', () => {
-  it('renders API UTC instant in doctor IANA zone (12:00 UTC → 5:30 PM IST)', () => {
+  it('renders API instant in IST (12:00 UTC → 5:30 PM IST)', () => {
     expect(formatSlotTime('2035-06-15T12:00:00.000Z', 'Asia/Kolkata')).toBe('5:30 PM');
+  });
+
+  it('maps late UTC evening to next calendar day midnight IST (regression)', () => {
+    expect(formatSlotTime('2026-04-23T18:30:00.000Z', 'UTC')).toBe('12:00 AM');
   });
 });
 
 describe('appointmentCalendarDayYmd', () => {
-  it('uses doctor-local calendar day (UTC evening → next day in Asia/Kolkata)', () => {
+  it('uses IST calendar day (UTC evening → next day in Asia/Kolkata)', () => {
     expect(appointmentCalendarDayYmd('2026-04-23T18:30:00.000Z', 'Asia/Kolkata')).toBe('2026-04-24');
+  });
+
+  it('ignores a non-IST profile zone and still uses IST for the calendar day', () => {
+    expect(appointmentCalendarDayYmd('2026-04-23T18:30:00.000Z', 'America/New_York')).toBe('2026-04-24');
   });
 });
 
 describe('formatNextAvailablePhrase', () => {
-  it('says Today when slot instant maps to doctor local calendar today', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('says Today when slot instant maps to IST calendar today', () => {
+    vi.setSystemTime(new Date('2026-04-24T10:00:00.000Z'));
     const iso = '2026-04-24T03:30:00.000Z';
     const slotDay = appointmentCalendarDayYmd(iso, 'Asia/Kolkata');
     expect(slotDay).toBe('2026-04-24');
     expect(formatNextAvailablePhrase(iso, slotDay, '2026-04-24', 'Asia/Kolkata')).toMatch(/^Today at /);
   });
 
-  it('says Tomorrow when slot is next doctor-local day', () => {
+  it('says Tomorrow when slot is the next IST calendar day', () => {
+    vi.setSystemTime(new Date('2026-04-23T10:00:00.000Z'));
     const iso = '2026-04-24T03:30:00.000Z';
     const slotDay = appointmentCalendarDayYmd(iso, 'Asia/Kolkata');
     expect(formatNextAvailablePhrase(iso, slotDay, '2026-04-23', 'Asia/Kolkata')).toMatch(/^Tomorrow at /);

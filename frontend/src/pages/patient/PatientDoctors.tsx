@@ -14,6 +14,7 @@ import {
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
 } from '../../services';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 import {
   calendarTodayYmdInZone,
   dedupeDoctorSlots,
@@ -69,8 +70,7 @@ export function PatientDoctors() {
   const slotsRequestIdRef = useRef(0);
   const slotsFetchAbortRef = useRef<AbortController | null>(null);
 
-  const doctorTz = (bookingDoctor?.timezone || 'UTC').trim() || 'UTC';
-  const doctorTodayYmd = useMemo(() => calendarTodayYmdInZone(doctorTz), [doctorTz]);
+  const doctorTodayYmd = useMemo(() => calendarTodayYmdInZone(DISPLAY_TIMEZONE), []);
 
   useModalFocusTrap(dialogRef, confirmOpen && Boolean(bookingDoctor));
 
@@ -250,8 +250,7 @@ export function PatientDoctors() {
   const selectDoctor = (d: Doctor) => {
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookingDoctor(d);
-    const tz = (d.timezone || 'UTC').trim() || 'UTC';
-    setBookDate(calendarTodayYmdInZone(tz));
+    setBookDate(calendarTodayYmdInZone(DISPLAY_TIMEZONE));
     setSlots([]);
     setSlotsError(null);
     setSelectedSlotStart(null);
@@ -467,7 +466,7 @@ export function PatientDoctors() {
                         : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
-                    {formatSlotTimeWithZoneLabel(slot.start, doctorTz)}
+                    {formatSlotTimeWithZoneLabel(slot.start, DISPLAY_TIMEZONE)}
                   </button>
                 );
               })}
@@ -519,7 +518,7 @@ export function PatientDoctors() {
                 <span className="text-muted-foreground">
                   {bookDate} ·{' '}
                   {selectedSlotStart
-                    ? formatSlotTimeWithZoneLabel(selectedSlotStart, doctorTz)
+                    ? formatSlotTimeWithZoneLabel(selectedSlotStart, DISPLAY_TIMEZONE)
                     : '—'}
                 </span>
               </p>

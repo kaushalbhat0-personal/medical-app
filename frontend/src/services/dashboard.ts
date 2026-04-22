@@ -62,7 +62,7 @@ export const dashboardApi = {
   },
 
   /**
-   * Last 7 days paid revenue by UTC date — GET /api/v1/admin/dashboard/revenue-trend
+   * Last 7 days paid revenue by day — GET /api/v1/admin/dashboard/revenue-trend
    */
   getAdminRevenueTrend: async (): Promise<AdminRevenueTrendItem[]> => {
     const response = await api.get('/admin/dashboard/revenue-trend');

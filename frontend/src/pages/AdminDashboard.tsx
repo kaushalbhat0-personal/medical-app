@@ -89,7 +89,7 @@ function RevenueLineChart({
           ))}
         </div>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">Date (UTC)</p>
+      <p className="mt-2 text-center text-xs text-muted-foreground">Date</p>
     </div>
   );
 }
@@ -204,7 +204,7 @@ export function AdminDashboard() {
           <Card className="rounded-xl border border-border shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Revenue (7 days)</CardTitle>
-              <p className="text-sm text-muted-foreground">Paid bill amounts by day (UTC)</p>
+              <p className="text-sm text-muted-foreground">Paid bill amounts by day</p>
             </CardHeader>
             <CardContent>
               {revenueTrend.length === 0 ? (

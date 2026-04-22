@@ -11,6 +11,7 @@ import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState, EmptyState } from '../../components/common';
 import { billingApi } from '../../services';
 import type { Appointment, Bill } from '../../types';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 
 function appointmentTimeMs(a: Appointment): number {
@@ -156,7 +157,6 @@ export function DoctorBillsPage() {
     return <ErrorState title="Could not load bills" description="" error={error} onRetry={refetch} />;
   }
 
-  const billApptDisplayTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
   const listLoading = loading || aptLoading;
 
   return (
@@ -266,7 +266,7 @@ export function DoctorBillsPage() {
                     <option key={String(a.id)} value={String(a.id)}>
                       {formatAppointmentDateTimeWithZoneLabel(
                         a.appointment_time || a.scheduled_at || '',
-                        billApptDisplayTz
+                        DISPLAY_TIMEZONE
                       )}{' '}
                       — {patientName(patientNameById, String(a.patient_id))}
                     </option>
