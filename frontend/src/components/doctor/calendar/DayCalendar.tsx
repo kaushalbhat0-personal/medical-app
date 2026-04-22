@@ -217,7 +217,7 @@ export function DayCalendar({
 
   const dayLoadIdRef = useRef(0);
   const dayLoadAbortRef = useRef<AbortController | null>(null);
-  const slotBtnRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+  const slotBtnRefs = useRef<Map<string, HTMLElement | null>>(new Map());
 
   useEffect(() => {
     try {
