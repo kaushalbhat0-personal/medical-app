@@ -88,17 +88,25 @@ def redis_delete(key: str) -> None:
         logger.warning("redis_delete failed: %s", e)
 
 
+def _scan_cursor_done(cursor) -> bool:
+    """Upstash may return the next cursor as int or str (finished when zero)."""
+    try:
+        return int(cursor) == 0
+    except (TypeError, ValueError):
+        return str(cursor) in ("0", "")
+
+
 def redis_delete_pattern(pattern: str) -> None:
     if not _redis_ready():
         return
-    # SCAN cursor MATCH pattern COUNT 100 -> REST path segments
-    enc_pat = quote(pattern, safe="*?-:")
-    cursor = 0
+    base = _base_url()
+    cursor: str | int = "0"
     while True:
         try:
             res = requests.get(
-                f"{_base_url()}/scan/{cursor}/MATCH/{enc_pat}/COUNT/100",
+                f"{base}/scan/{cursor}",
                 headers=HEADERS,
+                params={"match": pattern, "count": 100},
                 timeout=_REQUEST_TIMEOUT,
             )
             res.raise_for_status()
@@ -109,20 +117,17 @@ def redis_delete_pattern(pattern: str) -> None:
         result = data.get("result")
         if not result or not isinstance(result, (list, tuple)) or len(result) < 2:
             break
-        try:
-            cursor = int(result[0])
-        except (TypeError, ValueError):
-            break
-        keys = result[1] or []
-        for k in keys:
+        cursor, keys = result[0], result[1] or []
+        print("Deleting keys:", keys)
+        for key in keys:
             try:
                 dres = requests.get(
-                    f"{_base_url()}/del/{_encode_key(k)}",
+                    f"{base}/del/{_encode_key(key)}",
                     headers=HEADERS,
                     timeout=_REQUEST_TIMEOUT,
                 )
                 dres.raise_for_status()
             except requests.RequestException as e:
                 logger.warning("redis_delete_pattern del failed: %s", e)
-        if cursor == 0:
+        if _scan_cursor_done(cursor):
             break
