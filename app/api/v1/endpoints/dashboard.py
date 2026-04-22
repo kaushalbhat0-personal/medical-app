@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_scoped_tenant_id
 from app.core.database import get_db
+from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
 from app.models.user import User
 from app.schemas.dashboard import (
     AdminDashboardMetricsResponse,
@@ -64,9 +65,7 @@ def get_admin_dashboard_metrics(
 ) -> AdminDashboardMetricsResponse:
     dashboard_service.authorize_admin_dashboard_access(current_user)
     if x_tenant_id is None:
-        raise HTTPException(
-            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
-        )
+        raise HTTPException(status_code=400, detail=MISSING_X_TENANT_ID_MSG)
     tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
     logger.info("TENANT ID: %s", tenant_id)
     metrics = dashboard_service.get_admin_dashboard_metrics(db, tenant_id)
@@ -89,9 +88,7 @@ def get_admin_revenue_trend(
 ) -> list[RevenueTrendItem]:
     dashboard_service.authorize_admin_dashboard_access(current_user)
     if x_tenant_id is None:
-        raise HTTPException(
-            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
-        )
+        raise HTTPException(status_code=400, detail=MISSING_X_TENANT_ID_MSG)
     tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
     logger.info("TENANT ID: %s", tenant_id)
     rows = dashboard_service.get_revenue_trend(db, tenant_id)
@@ -117,9 +114,7 @@ def get_admin_doctor_performance(
 ) -> list[DoctorPerformanceItem]:
     dashboard_service.authorize_admin_dashboard_access(current_user)
     if x_tenant_id is None:
-        raise HTTPException(
-            status_code=400, detail="X-Tenant-ID header is required for dashboard metrics"
-        )
+        raise HTTPException(status_code=400, detail=MISSING_X_TENANT_ID_MSG)
     tenant_id = dashboard_service.resolve_admin_metrics_tenant_id(db, current_user, x_tenant_id)
     logger.info("TENANT ID: %s", tenant_id)
     rows = dashboard_service.get_doctor_performance(db, tenant_id)

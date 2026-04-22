@@ -4,7 +4,7 @@ import { tenantsApi } from '../../services';
 import type { Tenant, User } from '../../types';
 import { isSuperAdminRole } from '../../utils/roles';
 import {
-  TENANT_ID_STORAGE_KEY,
+  getActiveTenantId,
   TENANT_ID_STORAGE_EVENT,
   setActiveTenantId,
 } from '../../utils/tenantIdForRequest';
@@ -20,7 +20,7 @@ export function Topbar({ user, onLogout, onMenuToggle }: TopbarProps) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(TENANT_ID_STORAGE_KEY) : null
+    typeof window !== 'undefined' ? getActiveTenantId() : null
   );
   const switcherRef = useRef<HTMLDivElement>(null);
 
@@ -42,7 +42,7 @@ export function Topbar({ user, onLogout, onMenuToggle }: TopbarProps) {
 
   useEffect(() => {
     const sync = () => {
-      setActiveTenantIdState(localStorage.getItem(TENANT_ID_STORAGE_KEY));
+      setActiveTenantIdState(getActiveTenantId());
     };
     window.addEventListener(TENANT_ID_STORAGE_EVENT, sync);
     window.addEventListener('storage', sync);
@@ -68,6 +68,7 @@ export function Topbar({ user, onLogout, onMenuToggle }: TopbarProps) {
   const onSelectTenant = (t: Tenant) => {
     setActiveTenantId(t.id);
     setMenuOpen(false);
+    window.location.assign('/admin/dashboard');
   };
 
   return (
@@ -80,6 +81,15 @@ export function Topbar({ user, onLogout, onMenuToggle }: TopbarProps) {
         >
           <Menu className="h-5 w-5" />
         </button>
+
+        {showSwitcher && activeTenantId && (
+          <span className="hidden sm:inline text-sm text-muted-foreground truncate max-w-[220px]">
+            Managing:{' '}
+            <span className="font-medium text-foreground">
+              {selectedTenant?.name ?? (tenants.length ? 'Unknown organization' : '…')}
+            </span>
+          </span>
+        )}
 
         {showSwitcher && (
           <div className="relative min-w-0 max-w-[min(100%,280px)]" ref={switcherRef}>

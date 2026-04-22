@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { tenantsApi } from '../services';
 import type { Tenant } from '../types';
-import { TENANT_ID_STORAGE_KEY, setActiveTenantId } from '../utils/tenantIdForRequest';
+import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
 
 type OrgType = 'clinic' | 'hospital';
@@ -24,9 +24,7 @@ type OrgType = 'clinic' | 'hospital';
 export function AdminTenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeId, setActiveId] = useState<string | null>(() =>
-    localStorage.getItem(TENANT_ID_STORAGE_KEY)
-  );
+  const [activeId, setActiveId] = useState<string | null>(() => getActiveTenantId());
 
   const [modalOpen, setModalOpen] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -73,6 +71,7 @@ export function AdminTenantsPage() {
       await load();
       setActiveTenantId(created.id);
       setActiveId(created.id);
+      window.location.assign('/admin/dashboard');
     } catch {
       // toasts handled by api interceptor where applicable
     } finally {
@@ -84,6 +83,7 @@ export function AdminTenantsPage() {
     setActiveTenantId(tenant.id);
     setActiveId(tenant.id);
     toast.success(`Active organization: ${tenant.name}`);
+    window.location.assign('/admin/dashboard');
   };
 
   return (

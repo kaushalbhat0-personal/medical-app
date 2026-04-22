@@ -9,6 +9,8 @@ from app.models.tenant import Tenant, UserTenant
 from app.models.user import User, UserRole
 from app.services.exceptions import ForbiddenError, ValidationError
 
+MISSING_X_TENANT_ID_MSG = "X-Tenant-ID header is required for scoped operations"
+
 
 def get_current_tenant_id(user: User, db: Session) -> UUID | None:
     """
@@ -78,7 +80,7 @@ def resolve_tenant_id_for_scoped_request(
 
     if user.role == UserRole.super_admin:
         if x_tenant_id is None:
-            raise ValidationError("X-Tenant-ID header is required")
+            raise ValidationError(MISSING_X_TENANT_ID_MSG)
         row = db.get(Tenant, x_tenant_id)
         if row is None:
             raise ValidationError("Tenant not found")

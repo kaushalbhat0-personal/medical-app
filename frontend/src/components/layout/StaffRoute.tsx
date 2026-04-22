@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { roleFromToken } from '../../utils/jwtPayload';
 import { doctorHomePath, isDoctorRole, isPatientRole, patientHomePath } from '../../utils/roles';
+import { SuperAdminTenantGate } from './SuperAdminTenantGate';
 
 interface StaffRouteProps {
   user: User | null;
@@ -17,5 +18,5 @@ export function StaffRoute({ user, children }: StaffRouteProps) {
   if (isDoctorRole(role)) {
     return <Navigate to={doctorHomePath()} replace />;
   }
-  return <>{children}</>;
+  return <SuperAdminTenantGate user={user}>{children}</SuperAdminTenantGate>;
 }

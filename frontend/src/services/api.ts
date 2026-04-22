@@ -114,6 +114,9 @@ api.interceptors.response.use(
       if (window.location.pathname !== '/login') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('activeTenantId');
+        localStorage.removeItem('tenant_id');
+        localStorage.removeItem('adminSelectedTenantId');
         toast.error('Session expired. Please log in again.');
         navigateTo('/login');
       }

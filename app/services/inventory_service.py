@@ -21,6 +21,7 @@ from app.schemas.inventory import (
     StockAdjustRequest,
     StockReduceRequest,
 )
+from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
 from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import assert_authorized, log_rbac_mutation_violation
 
@@ -39,7 +40,7 @@ def _authorize_item_tenant(
     tenant_id: UUID | None,
 ) -> None:
     if tenant_id is None:
-        raise ValidationError("X-Tenant-ID header is required")
+        raise ValidationError(MISSING_X_TENANT_ID_MSG)
     if current_user.role == UserRole.super_admin:
         if item.tenant_id != tenant_id:
             raise ForbiddenError("Item is not in the selected organization")
@@ -55,7 +56,7 @@ def _authorize_item_tenant(
 
 def _resolve_item_tenant_for_create(request_tenant_id: UUID | None) -> UUID:
     if request_tenant_id is None:
-        raise ValidationError("X-Tenant-ID header is required")
+        raise ValidationError(MISSING_X_TENANT_ID_MSG)
     return request_tenant_id
 
 
@@ -109,7 +110,7 @@ def get_bulk_stock(
         filter_tenant = doctor.tenant_id
     else:
         if tenant_id is None:
-            raise ValidationError("X-Tenant-ID header is required")
+            raise ValidationError(MISSING_X_TENANT_ID_MSG)
         filter_tenant = tenant_id
 
     join_cond = and_(
@@ -294,7 +295,7 @@ def list_items(
 ) -> list[InventoryItem]:
     _forbid_patients(current_user)
     if tenant_id is None:
-        raise ValidationError("X-Tenant-ID header is required")
+        raise ValidationError(MISSING_X_TENANT_ID_MSG)
     q = select(InventoryItem).where(InventoryItem.tenant_id == tenant_id)
 
     if type_filter:

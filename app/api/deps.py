@@ -11,7 +11,7 @@ from app.api.http_exceptions import (
 )
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.core.tenant_context import resolve_tenant_id_for_scoped_request
+from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
 from app.crud import crud_user
 from app.models.doctor import Doctor
 from app.models.user import User
@@ -170,7 +170,7 @@ def get_scoped_tenant_id(
 ) -> UUID:
     tid = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
     if tid is None:
-        raise ValidationError("X-Tenant-ID header is required")
+        raise ValidationError(MISSING_X_TENANT_ID_MSG)
     return tid
 
 
@@ -181,7 +181,7 @@ def get_scoped_tenant_id_active(
 ) -> UUID:
     tid = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
     if tid is None:
-        raise ValidationError("X-Tenant-ID header is required")
+        raise ValidationError(MISSING_X_TENANT_ID_MSG)
     return tid
 
 

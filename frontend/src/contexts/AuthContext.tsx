@@ -291,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('activeTenantId');
     localStorage.removeItem('tenant_id');
     localStorage.removeItem('adminSelectedTenantId');
     setIsAuthenticated(false);

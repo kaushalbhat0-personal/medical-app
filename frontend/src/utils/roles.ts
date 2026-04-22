@@ -1,3 +1,5 @@
+import { getActiveTenantId } from './tenantIdForRequest';
+
 /** Backend sends role enum as lowercase string (e.g. patient, admin, doctor). */
 export function isPatientRole(role: string | null | undefined): boolean {
   return role?.toLowerCase() === 'patient';
@@ -33,5 +35,8 @@ export function doctorHomePath(): string {
 export function postLoginHomePath(role: string | null | undefined): string {
   if (isPatientRole(role)) return patientHomePath();
   if (isDoctorRole(role)) return doctorHomePath();
+  if (isSuperAdminRole(role)) {
+    return getActiveTenantId() ? '/admin/dashboard' : '/admin/tenants';
+  }
   return staffHomePath();
 }
