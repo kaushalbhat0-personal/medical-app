@@ -104,7 +104,7 @@ function PageSkeleton() {
 export function DoctorPatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isIndependent, isReadOnly, selfDoctor } = useDoctorWorkspace();
+  const { isIndependent, isReadOnly } = useDoctorWorkspace();
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
