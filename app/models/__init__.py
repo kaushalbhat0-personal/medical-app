@@ -1,9 +1,14 @@
 from app.models.appointment import Appointment, AppointmentCreationIdempotency
 from app.models.billing import Billing, BillingEvent
-from app.models.doctor import Doctor
+from app.models.doctor import Doctor, DoctorCreationIdempotency
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 from app.models.patient import Patient
-from app.models.tenant import Tenant, TenantType, UserTenant
+from app.models.tenant import (
+    Tenant,
+    TenantCreationIdempotency,
+    TenantType,
+    UserTenant,
+)
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -11,6 +16,7 @@ __all__ = [
     "UserRole",
     "Patient",
     "Doctor",
+    "DoctorCreationIdempotency",
     "DoctorAvailability",
     "DoctorTimeOff",
     "Appointment",
@@ -18,6 +24,7 @@ __all__ = [
     "Billing",
     "BillingEvent",
     "Tenant",
+    "TenantCreationIdempotency",
     "TenantType",
     "UserTenant",
 ]

@@ -2,11 +2,24 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, Enum, Index, String, func, text
+from sqlalchemy.dialects.postgresql import CITEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from app.core.database import Base
+
+
+class _CIEmail(TypeDecorator):
+    """PostgreSQL citext; SQLite uses plain String (tests) with LOWER() unique index."""
+
+    impl = String(320)
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(CITEXT())
+        return dialect.type_descriptor(String(320))
 
 
 class UserRole(str, enum.Enum):
@@ -19,6 +32,8 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    # SQLite: functional unique index. PostgreSQL: see alembic (citext + ux_users_email_ci).
+    __table_args__ = (Index("ux_users_email_lower", text("lower(email)"), unique=True),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -26,9 +41,7 @@ class User(Base):
         default=uuid.uuid4,
     )
     email: Mapped[str] = mapped_column(
-        String(320),
-        unique=True,
-        index=True,
+        _CIEmail(),
         nullable=False,
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)

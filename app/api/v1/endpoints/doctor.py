@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -22,6 +22,7 @@ from app.schemas.doctor import (
     DoctorUpdate,
 )
 from app.services import doctor_availability_service, doctor_service, doctor_slot_service
+from app.services.exceptions import ValidationError
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -31,33 +32,28 @@ def create_doctor(
     payload: DoctorCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     target_tenant_id: UUID | None = Query(
         default=None,
         alias="tenant_id",
-        description="Required for super_admin: target tenant for the new doctor profile",
+        description="Required for super_admin without primary tenant: target tenant for the new doctor profile",
     ),
 ) -> DoctorRead:
-    with db.begin():
-        effective_tenant_id = get_current_tenant_id(current_user, db)
-        if effective_tenant_id is None:
-            if current_user.role != UserRole.super_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Tenant context is required to create a doctor profile",
-                )
-            if target_tenant_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Query parameter tenant_id is required for super administrator doctor creation",
-                )
+    effective_tenant_id = get_current_tenant_id(current_user, db)
+    if effective_tenant_id is None:
+        if current_user.role == UserRole.super_admin and target_tenant_id is not None:
             effective_tenant_id = target_tenant_id
-        doctor = doctor_service.create_doctor(
-            db,
-            payload,
-            tenant_id=effective_tenant_id,
-            user_id=None,
-            current_user=current_user,
-        )
+        else:
+            raise ValidationError("Tenant context is required to create a doctor profile")
+    doctor = doctor_service.create_doctor(
+        db,
+        payload,
+        tenant_id=effective_tenant_id,
+        user_id=None,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+    )
+    db.commit()
     db.refresh(doctor)
     doctor_service.hydrate_doctor_availability_flags(db, [doctor])
     return doctor

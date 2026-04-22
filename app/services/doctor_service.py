@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -11,13 +14,15 @@ from app.crud import crud_doctor, crud_doctor_availability, crud_tenant, crud_us
 
 from app.models.doctor import Doctor
 
-from app.models.tenant import TenantType
+from app.models.tenant import Tenant, TenantType
 
 from app.models.user import User, UserRole
 
+from app.core.tenant_context import get_current_tenant_id
+
 from app.schemas.doctor import DoctorCreate, DoctorUpdate
 
-from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 
 from app.services.security_audit import (
 
@@ -62,7 +67,192 @@ def _validate_experience_years(experience_years: int | None) -> None:
         raise ValidationError("Experience years must be greater than or equal to 0")
 
 
+def _doctor_creation_payload_hash(doctor_in: DoctorCreate) -> str:
+    body = doctor_in.model_dump(mode="json")
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+
+def create_hospital_doctor_with_login(
+    db: Session,
+    doctor_in: DoctorCreate,
+    current_user: User,
+    tenant_id: UUID,
+    idempotency_key: str | None = None,
+) -> Doctor:
+    """
+    Admin/super_admin: create User (doctor) + user_tenant + Doctor in one transaction with optional idempotency.
+    """
+    authorize_doctor_create(current_user)
+    if db.get(Tenant, tenant_id) is None:
+        raise ValidationError("Tenant not found")
+
+    if idempotency_key is not None:
+        idempotency_key = idempotency_key.strip() or None
+
+    body_hash = _doctor_creation_payload_hash(doctor_in)
+    if idempotency_key:
+        existing = crud_doctor.get_doctor_idempotency_record(
+            db, current_user.id, idempotency_key
+        )
+        if existing is not None:
+            if existing.request_hash != body_hash:
+                raise ConflictError(
+                    "Idempotency key reused with different request payload"
+                )
+            doctor = get_doctor_or_404(db, existing.doctor_id)
+            if doctor.user_id is not None:
+                u = crud_user.get_user(db, doctor.user_id)
+                setattr(doctor, "linked_user_email", u.email if u is not None else None)
+            else:
+                setattr(doctor, "linked_user_email", None)
+            hydrate_doctor_availability_flags(db, [doctor])
+            return doctor
+
+    _validate_experience_years(doctor_in.experience_years)
+
+    doctor_data = doctor_in.model_dump()
+    account_email = doctor_data.pop("account_email", None)
+    account_password = doctor_data.pop("account_password", None)
+    doctor_data.pop("tenant_id", None)
+    doctor_data.pop("user_id", None)
+    if doctor_data.get("timezone") is None:
+        doctor_data.pop("timezone", None)
+    else:
+        doctor_data["timezone"] = _normalize_timezone_string(doctor_data["timezone"])
+
+    if not account_email or not str(account_email).strip() or not account_password:
+        raise ValidationError(
+            "account_email and account_password are required to create a doctor with a login"
+        )
+    pwd = str(account_password)
+    if len(pwd) < 8:
+        raise ValidationError("Password must be at least 8 characters")
+    email_norm = str(account_email).strip().lower()
+
+    if crud_user.get_user_by_email(db, email_norm):
+        raise ValidationError("Email already registered")
+
+    doctor_data["tenant_id"] = tenant_id
+
+    if current_user.role != UserRole.super_admin:
+        user_tenant = get_current_tenant_id(current_user, db)
+        if user_tenant is None:
+            raise ForbiddenError("Tenant context is required to create a doctor profile")
+        assert_authorized(
+            "create",
+            "doctor",
+            current_user,
+            user_tenant,
+            resource_tenant_id=tenant_id,
+        )
+
+    try:
+        hashed = hash_password(pwd)
+        try:
+            new_user = crud_user.create_user_tx(
+                db,
+                {
+                    "email": email_norm,
+                    "hashed_password": hashed,
+                    "role": UserRole.doctor,
+                    "force_password_reset": True,
+                },
+            )
+        except IntegrityError:
+            raise ValidationError("Email already registered") from None
+
+        crud_tenant.create_user_tenant_tx(
+            db,
+            user_id=new_user.id,
+            tenant_id=tenant_id,
+            role="doctor",
+            is_primary=True,
+        )
+        doctor_data["user_id"] = new_user.id
+        doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+        if idempotency_key:
+            try:
+                crud_doctor.record_doctor_idempotency(
+                    db,
+                    user_id=current_user.id,
+                    idempotency_key=idempotency_key,
+                    request_hash=body_hash,
+                    doctor_id=doctor.id,
+                )
+            except IntegrityError as e:
+                db.rollback()
+                existing = crud_doctor.get_doctor_idempotency_record(
+                    db, current_user.id, idempotency_key
+                )
+                if existing is not None and existing.request_hash == body_hash:
+                    doctor2 = get_doctor_or_404(db, existing.doctor_id)
+                    u = crud_user.get_user(db, doctor2.user_id) if doctor2.user_id else None
+                    setattr(doctor2, "linked_user_email", u.email if u else None)
+                    hydrate_doctor_availability_flags(db, [doctor2])
+                    return doctor2
+                msg = str(getattr(e, "orig", e))
+                if "uq_doctor_idempotency_user_key" in msg or (
+                    "doctor_creation_idempotency" in msg.lower()
+                ):
+                    existing2 = crud_doctor.get_doctor_idempotency_record(
+                        db, current_user.id, idempotency_key
+                    )
+                    if existing2 is not None and existing2.request_hash == body_hash:
+                        doctor3 = get_doctor_or_404(db, existing2.doctor_id)
+                        u3 = crud_user.get_user(db, doctor3.user_id) if doctor3.user_id else None
+                        setattr(doctor3, "linked_user_email", u3.email if u3 else None)
+                        hydrate_doctor_availability_flags(db, [doctor3])
+                        return doctor3
+                raise
+    except IntegrityError as e:
+        db.rollback()
+        msg = str(getattr(e, "orig", e))
+        if any(
+            k in msg
+            for k in (
+                "ux_users_email_lower",
+                "ux_users_email_ci",
+                "ix_users_email",
+                "users_email",
+            )
+        ) or (
+            "UNIQUE" in msg.upper() and "user" in msg.lower() and "email" in msg.lower()
+        ):
+            raise ValidationError("Email already registered") from e
+        if (
+            "ix_doctors_user_id" in msg
+            or "uq_doctors_user_id" in msg
+            or (
+                "doctors" in msg.lower()
+                and "user_id" in msg.lower()
+                and "UNIQUE" in msg.upper()
+            )
+        ):
+            raise ValidationError(
+                "A doctor profile already exists for this user"
+            ) from e
+        raise
+
+    db.refresh(doctor)
+    u = crud_user.get_user(db, doctor.user_id) if doctor.user_id else None
+    setattr(doctor, "linked_user_email", u.email if u else None)
+    hydrate_doctor_availability_flags(db, [doctor])
+
+    logger.info(
+        "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s",
+        doctor.user_id,
+        doctor.id,
+        doctor.tenant_id,
+    )
+    log_audit_mutation(
+        "create",
+        current_user,
+        "doctor",
+        doctor.id,
+        doctor.tenant_id,
+    )
+    return doctor
 
 
 def authorize_doctor_create(current_user: User) -> None:
@@ -223,6 +413,8 @@ def create_doctor(
 
     current_user: User | None = None,
 
+    idempotency_key: str | None = None,
+
 ) -> Doctor:
 
     if current_user is not None:
@@ -318,38 +510,21 @@ def create_doctor(
         and tenant_id is not None
         and current_user is not None
         and current_user.role in (UserRole.admin, UserRole.super_admin)
+        and account_email
+        and str(account_email).strip()
+        and account_password
     ):
-        if not account_email or not str(account_email).strip() or not account_password:
-            raise ValidationError(
-                "account_email and account_password are required to create a doctor with a login"
-            )
-        pwd = str(account_password)
-        if len(pwd) < 8:
-            raise ValidationError("account_password must be at least 8 characters")
-        email_normalized = str(account_email).lower().strip()
-        if crud_user.get_user_by_email(db, email_normalized):
-            raise ValidationError("Email already registered")
-        hashed = hash_password(pwd)
-        new_user = crud_user.create_user_tx(
-            db,
-            {
-                "email": email_normalized,
-                "hashed_password": hashed,
-                "role": UserRole.doctor,
-                "force_password_reset": True,
-            },
+        return create_hospital_doctor_with_login(
+            db, doctor_in, current_user, tenant_id, idempotency_key=idempotency_key
         )
-        crud_tenant.create_user_tenant_tx(
-            db,
-            user_id=new_user.id,
-            tenant_id=tenant_id,
-            role="doctor",
-            is_primary=True,
-        )
-        resolved_user_id = new_user.id
-        logger.info(
-            "[DOCTOR ACCOUNT] user_id=%s force_password_reset=true; change password on first login",
-            new_user.id,
+
+    if (
+        resolved_user_id is None
+        and current_user is not None
+        and current_user.role in (UserRole.admin, UserRole.super_admin)
+    ):
+        raise ValidationError(
+            "account_email and account_password are required to create a doctor with a login"
         )
 
     if resolved_user_id is not None:
@@ -375,18 +550,15 @@ def create_doctor(
 
         if current_user.role != UserRole.super_admin:
 
+            user_tenant = get_current_tenant_id(current_user, db)
+            if user_tenant is None:
+                raise ForbiddenError("Tenant context is required to create a doctor profile")
             assert_authorized(
-
                 "create",
-
                 "doctor",
-
                 current_user,
-
-                tenant_id,
-
+                user_tenant,
                 resource_tenant_id=doctor.tenant_id,
-
             )
 
         log_audit_mutation(

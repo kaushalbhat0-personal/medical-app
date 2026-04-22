@@ -4,8 +4,37 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.doctor import Doctor
+from app.models.doctor import Doctor, DoctorCreationIdempotency
 from app.models.tenant import Tenant
+
+
+def get_doctor_idempotency_record(
+    db: Session, user_id: UUID, idempotency_key: str
+) -> DoctorCreationIdempotency | None:
+    stmt = select(DoctorCreationIdempotency).where(
+        DoctorCreationIdempotency.user_id == user_id,
+        DoctorCreationIdempotency.idempotency_key == idempotency_key,
+    )
+    return db.scalars(stmt).first()
+
+
+def record_doctor_idempotency(
+    db: Session,
+    *,
+    user_id: UUID,
+    idempotency_key: str,
+    request_hash: str,
+    doctor_id: UUID,
+) -> DoctorCreationIdempotency:
+    row = DoctorCreationIdempotency(
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+        doctor_id=doctor_id,
+    )
+    db.add(row)
+    db.flush()
+    return row
 
 
 def create_doctor(db: Session, doctor_data: dict[str, Any]) -> Doctor:

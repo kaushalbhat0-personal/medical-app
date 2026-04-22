@@ -1,12 +1,93 @@
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models.tenant import Tenant, TenantType, UserTenant
+from app.models.tenant import Tenant, TenantCreationIdempotency, TenantType, UserTenant
+from app.models.user import User
+
+
+def get_by_name(db: Session, name: str) -> Tenant | None:
+    n = name.strip().lower()
+    stmt = select(Tenant).where(func.lower(Tenant.name) == n).limit(1)
+    return db.scalars(stmt).first()
+
+
+def get_by_slug(db: Session, slug: str) -> Tenant | None:
+    s = slug.strip().lower()
+    stmt = select(Tenant).where(Tenant.slug == s).limit(1)
+    return db.scalars(stmt).first()
+
+
+def get_tenant_idempotency_record(
+    db: Session, user_id: UUID, idempotency_key: str
+) -> TenantCreationIdempotency | None:
+    stmt = select(TenantCreationIdempotency).where(
+        TenantCreationIdempotency.user_id == user_id,
+        TenantCreationIdempotency.idempotency_key == idempotency_key,
+    )
+    return db.scalars(stmt).first()
+
+
+def record_tenant_idempotency(
+    db: Session,
+    *,
+    user_id: UUID,
+    idempotency_key: str,
+    request_hash: str,
+    tenant_id: UUID,
+) -> TenantCreationIdempotency:
+    row = TenantCreationIdempotency(
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+        tenant_id=tenant_id,
+    )
+    db.add(row)
+    db.flush()
+    db.refresh(row)
+    return row
+
+
+def delete_expired_tenant_idempotency_records(
+    db: Session, *, older_than_days: int = 7
+) -> int:
+    """Remove stale idempotency rows (run from cron/worker). Returns rows deleted."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+    stmt = delete(TenantCreationIdempotency).where(
+        TenantCreationIdempotency.created_at < cutoff
+    )
+    result = db.execute(stmt)
+    return int(result.rowcount or 0)
+
+
+def get_primary_admin_email_for_tenant(db: Session, tenant_id: UUID) -> str | None:
+    stmt = (
+        select(User.email)
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .where(
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_primary == True,  # noqa: E712
+        )
+        .limit(1)
+    )
+    email = db.scalars(stmt).first()
+    if email is not None:
+        return str(email)
+    stmt = (
+        select(User.email)
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .where(
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.role == "admin",
+        )
+        .limit(1)
+    )
+    alt = db.scalars(stmt).first()
+    return str(alt) if alt is not None else None
 
 
 def create_tenant_tx(
@@ -15,8 +96,19 @@ def create_tenant_tx(
     name: str,
     type: TenantType | str = TenantType.hospital,
     is_active: bool = True,
+    address: str | None = None,
+    phone: str | None = None,
+    slug: str | None = None,
 ) -> Tenant:
-    tenant = Tenant(name=name, type=str(type), is_active=is_active)
+    type_str: str = type.value if isinstance(type, TenantType) else str(type)
+    tenant = Tenant(
+        name=name,
+        type=type_str,
+        is_active=is_active,
+        address=address,
+        phone=phone,
+        slug=slug,
+    )
     db.add(tenant)
     db.flush()
     db.refresh(tenant)

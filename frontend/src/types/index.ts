@@ -13,9 +13,16 @@ export interface User {
 export interface Tenant {
   id: string;
   name: string;
+  /** URL-safe tenant key when set (e.g. apollo-hospital-pune) */
+  slug?: string | null;
   type: string;
   is_active: boolean;
+  /** Shown for tenants that have contact info (may be null for legacy rows) */
+  address?: string | null;
+  phone?: string | null;
   created_at: string;
+  /** Present on POST /tenants create response (initial admin login email, normalized) */
+  admin_email?: string | null;
 }
 
 export interface Patient {

@@ -2,7 +2,17 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,7 +27,15 @@ class TenantType(str, enum.Enum):
 
 class Tenant(Base):
     __tablename__ = "tenants"
-    __table_args__ = (Index("ix_tenants_type", "type"),)
+    __table_args__ = (
+        Index("ix_tenants_type", "type"),
+        Index("ux_tenants_name_lower", text("lower(name)"), unique=True),
+        Index("ux_tenants_slug", "slug", unique=True),
+        CheckConstraint(
+            "phone IS NULL OR length(phone) <= 50",
+            name="chk_tenants_phone_length",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -25,12 +43,15 @@ class Tenant(Base):
         default=uuid.uuid4,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str | None] = mapped_column(String(255), nullable=True)
     type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
         default=TenantType.hospital,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -44,6 +65,40 @@ class Tenant(Base):
     )
 
     user_associations = relationship("UserTenant", back_populates="tenant")
+
+
+class TenantCreationIdempotency(Base):
+    """Idempotency-Key + body hash for POST /tenants (hospital) deduplication."""
+
+    __tablename__ = "tenant_creation_idempotency"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_tenant_idempotency_user_key"),
+        Index("ix_tenant_idempotency_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
 class UserTenant(Base):

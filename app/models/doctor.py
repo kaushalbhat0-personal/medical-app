@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,8 @@ from app.core.database import Base
 
 class Doctor(Base):
     __tablename__ = "doctors"
+
+    __table_args__ = (UniqueConstraint("user_id", name="uq_doctors_user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -23,8 +25,6 @@ class Doctor(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
-        unique=True,
-        index=True,
     )
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -58,3 +58,37 @@ class Doctor(Base):
     )
     tenant = relationship("Tenant")
     user = relationship("User", foreign_keys=[user_id])
+
+
+class DoctorCreationIdempotency(Base):
+    """Idempotency-Key + body hash for POST /doctors (admin creates doctor with login)."""
+
+    __tablename__ = "doctor_creation_idempotency"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_doctor_idempotency_user_key"),
+        Index("ix_doctor_idempotency_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("doctors.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )

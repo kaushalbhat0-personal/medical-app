@@ -6,11 +6,10 @@ import os
 import sys
 from collections.abc import AsyncIterator, Iterator
 
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
-
 import pytest
 import pytest_asyncio
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 # Single shared in-memory SQLite (default :memory: would be empty per connection).
 _DEFAULT_TEST_DB = "sqlite+pysqlite:///:memory:"
@@ -41,6 +40,17 @@ def _make_test_engine(url: str):
             poolclass=StaticPool,
         )
     return create_engine(url)
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not any(m.name == "postgres" for m in item.iter_markers()):
+        return
+    url = os.environ.get("DATABASE_URL", "")
+    if "postgresql" not in url and "postgres" not in url:
+        pytest.skip(
+            "Postgres tests: set PYTEST_DATABASE_URL to a postgresql+psycopg2 (or postgresql) URL, "
+            "e.g. postgresql+psycopg2://user:pass@localhost:5432/medical_test, then: pytest -m postgres"
+        )
 
 
 @pytest.fixture(autouse=True)

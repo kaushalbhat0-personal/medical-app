@@ -165,7 +165,9 @@ def create_appointment(
         )
         if existing is not None:
             if existing.request_hash != body_hash:
-                raise ConflictError("Idempotency-Key reused with a different request body")
+                raise ConflictError(
+                    "Idempotency key reused with different request payload"
+                )
             return get_appointment_or_404(db, existing.appointment_id)
 
     _validate_patient_and_doctor_exist(
