@@ -10,9 +10,19 @@ dayjs.extend(timezone);
 export function ymdInTimeZone(iana: string, d: Date = new Date()): string {
   const tz = iana || 'UTC';
   try {
-    return dayjs(d).tz(tz).format('YYYY-MM-DD');
+    return dayjs.utc(d.getTime()).tz(tz).format('YYYY-MM-DD');
   } catch {
-    return dayjs(d).format('YYYY-MM-DD');
+    return dayjs.utc(d.getTime()).format('YYYY-MM-DD');
+  }
+}
+
+/** Today's calendar date in `iana` from the current instant (UTC-safe). */
+export function calendarTodayYmdInZone(iana: string): string {
+  const tz = iana || 'UTC';
+  try {
+    return dayjs.utc().tz(tz).format('YYYY-MM-DD');
+  } catch {
+    return dayjs.utc().format('YYYY-MM-DD');
   }
 }
 
@@ -99,7 +109,7 @@ export function nowLinePercentInView(
   totalMinutes: number
 ): number | null {
   if (dateYmd !== doctorTodayYmd) return null;
-  const now = dayjs();
+  const now = dayjs.utc();
   if (now.isBefore(viewStart) || now.isAfter(viewEnd)) return null;
   const m = now.diff(viewStart, 'minute', true);
   return (m / totalMinutes) * 100;
@@ -156,10 +166,12 @@ export function timeZoneAbbreviation(iana: string, refMs?: number): string {
 /** Calendar YYYY-MM-DD in the doctor zone for a UTC instant from the API. */
 export function appointmentCalendarDayYmd(iso: string, iana: string): string {
   const tz = iana || 'UTC';
+  const u = dayjs.utc(iso);
+  if (!u.isValid()) return '';
   try {
-    return dayjs.utc(iso).tz(tz).format('YYYY-MM-DD');
+    return u.tz(tz).format('YYYY-MM-DD');
   } catch {
-    return ymdInTimeZone(tz, new Date(iso));
+    return u.format('YYYY-MM-DD');
   }
 }
 
@@ -177,7 +189,7 @@ export function formatSlotTime(iso: string, iana: string): string {
 export function formatSlotTimeWithZoneLabel(iso: string, iana: string): string {
   if (!iso?.trim()) return '—';
   const time = formatSlotTime(iso, iana);
-  const abbr = timeZoneAbbreviation(iana, new Date(iso).getTime());
+  const abbr = timeZoneAbbreviation(iana, dayjs.utc(iso).valueOf());
   return `${time} (${abbr})`;
 }
 
@@ -195,7 +207,7 @@ export function formatSlotDateTimeLine(iso: string, iana: string): string {
 export function formatAppointmentDateTimeWithZoneLabel(iso: string, iana: string): string {
   if (!iso?.trim()) return '—';
   const line = formatSlotDateTimeLine(iso, iana);
-  const abbr = timeZoneAbbreviation(iana, new Date(iso).getTime());
+  const abbr = timeZoneAbbreviation(iana, dayjs.utc(iso).valueOf());
   return `${line} (${abbr})`;
 }
 
@@ -207,7 +219,7 @@ export function relativeCalendarDayHeadingInZone(iso: string, iana: string): str
   const tz = iana || 'UTC';
   try {
     const d = dayjs.utc(iso).tz(tz);
-    const todayYmd = ymdInTimeZone(tz, new Date());
+    const todayYmd = calendarTodayYmdInZone(tz);
     const ymd = d.format('YYYY-MM-DD');
     const yestYmd = addDaysYmd(todayYmd, iana, -1);
     if (ymd === todayYmd) return 'Today';
@@ -270,16 +282,29 @@ export function formatHourLabelForDate(hour: number, dateYmd: string, iana: stri
 export function isSlotInPast(isoStart: string, selectedYmd: string, doctorTodayYmd: string): boolean {
   if (selectedYmd < doctorTodayYmd) return true;
   if (selectedYmd > doctorTodayYmd) return false;
-  const t = new Date(isoStart).getTime();
-  if (Number.isNaN(t)) return true;
-  return t <= Date.now();
+  const t = dayjs.utc(isoStart);
+  if (!t.isValid()) return true;
+  return t.valueOf() <= Date.now();
+}
+
+/** Compare UTC slot instant to clock now (for booking validation). */
+export function isSlotInstantInThePast(isoStart: string): boolean {
+  const t = dayjs.utc(isoStart);
+  if (!t.isValid()) return true;
+  return t.valueOf() <= Date.now();
+}
+
+export function isSlotInstantInTheFuture(isoStart: string): boolean {
+  const t = dayjs.utc(isoStart);
+  if (!t.isValid()) return false;
+  return t.valueOf() > Date.now();
 }
 
 /** "Now" as minutes from midnight in the doctor's zone. */
 export function nowWallMinutes(iana: string): number {
   const tz = iana || 'UTC';
   try {
-    const x = dayjs().tz(tz);
+    const x = dayjs.utc().tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;
   } catch {
     const n = new Date();
@@ -303,6 +328,11 @@ export function parseAndClampDateParam(raw: string | null, minYmd: string): stri
  */
 export function slotKey(iso: string): string {
   return dayjs.utc(iso).second(0).millisecond(0).toISOString();
+}
+
+/** Milliseconds since epoch for a UTC slot start ISO string. */
+export function slotInstantUtcMs(iso: string): number {
+  return dayjs.utc(iso).valueOf();
 }
 
 export function dedupeDoctorSlots<T extends { start: string }>(slots: T[]): T[] {

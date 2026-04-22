@@ -24,6 +24,8 @@ import {
 } from '../../../services';
 import type { Appointment, Patient } from '../../../types';
 import {
+  addDaysYmd,
+  appointmentCalendarDayYmd,
   dedupeDoctorSlots,
   formatNextAvailablePhrase,
   formatSlotTime,
@@ -34,6 +36,7 @@ import {
   nowLinePercentInView,
   parseAndClampDateParam,
   slotBlockInView,
+  slotInstantUtcMs,
   slotKey,
   ymdInTimeZone,
 } from '../../../utils/doctorSchedule';
@@ -42,14 +45,6 @@ import { SwipeableSlotActions } from './SwipeableSlotActions';
 
 const CALENDAR_VIEW_STORAGE_KEY = 'calendar_view';
 type CalendarViewMode = 'grid' | 'list';
-
-/** Date math for the browser date input when shifting by days. */
-function ymdFromLocalDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 type PlacedSlot = {
   slot: DoctorSlot;
@@ -70,7 +65,7 @@ function assignPlacementLanes(
   const out: PlacedSlot[] = [];
   for (const s of sorted) {
     const dur = s.duration_minutes ?? 30;
-    const t0 = new Date(s.start).getTime();
+    const t0 = slotInstantUtcMs(s.start);
     const t1 = t0 + dur * 60_000;
     const block = slotBlockInView(s.start, dur, viewStart, viewEnd, totalMinutes);
     if (block.clippedOut) {
@@ -111,7 +106,7 @@ function placeSlotsInView(slots: DoctorSlot[], viewStart: import('dayjs').Dayjs,
 
 function slotTimeRangeMs(s: DoctorSlot): { t0: number; t1: number } {
   const dur = s.duration_minutes ?? 30;
-  const t0 = new Date(s.start).getTime();
+  const t0 = slotInstantUtcMs(s.start);
   return { t0, t1: t0 + dur * 60_000 };
 }
 
@@ -298,7 +293,7 @@ export function DayCalendar({
         return;
       }
       const refToday = ymdInTimeZone(tz);
-      const dayYmd = ymdInTimeZone(tz, new Date(slot.start));
+      const dayYmd = appointmentCalendarDayYmd(slot.start, tz);
       if (isSlotInPast(slot.start, dayYmd, refToday)) {
         setNextAvail(null);
         setNextAvailLoading(false);
@@ -414,7 +409,7 @@ export function DayCalendar({
       if (String(a.doctor_id) !== String(doctorId)) continue;
       const raw = a.appointment_time || a.scheduled_at;
       if (!raw) continue;
-      if (ymdInTimeZone(tz, new Date(raw)) !== date) continue;
+      if (appointmentCalendarDayYmd(raw, tz) !== date) continue;
       m.set(slotKey(raw), a);
     }
     return m;
@@ -510,9 +505,7 @@ export function DayCalendar({
   }, [navSlotKeys]);
 
   const shiftDate = (delta: number) => {
-    const d = new Date(date + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    setDateParam(ymdFromLocalDate(d));
+    setDateParam(addDaysYmd(date, tz, delta));
   };
 
   const showGrid = isDesktop && viewMode === 'grid';

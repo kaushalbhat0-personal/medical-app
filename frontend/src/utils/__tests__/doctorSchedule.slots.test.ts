@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assignOverlapLanesPure, dedupeDoctorSlots, slotKey } from '../doctorSchedule';
+import {
+  assignOverlapLanesPure,
+  dedupeDoctorSlots,
+  formatSlotTime,
+  slotKey,
+} from '../doctorSchedule';
 
 describe('slotKey', () => {
   it('zeros sub-second noise to match backend minute boundaries', () => {
@@ -11,6 +16,12 @@ describe('slotKey', () => {
   it('is stable across DST-style ISO strings (UTC normalization)', () => {
     const winter = '2026-01-15T15:30:00+00:00';
     expect(slotKey(winter)).toBe('2026-01-15T15:30:00.000Z');
+  });
+});
+
+describe('formatSlotTime', () => {
+  it('renders API UTC instant in doctor IANA zone (12:00 UTC → 5:30 PM IST)', () => {
+    expect(formatSlotTime('2035-06-15T12:00:00.000Z', 'Asia/Kolkata')).toBe('5:30 PM');
   });
 });
 

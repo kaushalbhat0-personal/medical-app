@@ -14,31 +14,19 @@ import {
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
 } from '../../services';
-import { dedupeDoctorSlots, formatSlotTimeWithZoneLabel, slotKey } from '../../utils/doctorSchedule';
+import {
+  calendarTodayYmdInZone,
+  dedupeDoctorSlots,
+  formatSlotTimeWithZoneLabel,
+  isSlotInstantInTheFuture,
+  isSlotInstantInThePast,
+  slotKey,
+} from '../../utils/doctorSchedule';
 import { useLinkedPatient, useModalFocusTrap } from '../../hooks';
 import type { Doctor } from '../../types';
 import { formatDoctorName } from '../../utils';
 import { ErrorState } from '../../components/common';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY } from '../../constants/patient';
-
-function localDateInputValue(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function selectedSlotIsFuture(isoStart: string): boolean {
-  const d = new Date(isoStart);
-  if (Number.isNaN(d.getTime())) return false;
-  return d.getTime() > Date.now();
-}
-
-function isSlotInThePast(isoStart: string): boolean {
-  const d = new Date(isoStart);
-  if (Number.isNaN(d.getTime())) return true;
-  return d.getTime() <= Date.now();
-}
 
 function SlotsSkeleton() {
   return (
@@ -81,12 +69,12 @@ export function PatientDoctors() {
   const slotsRequestIdRef = useRef(0);
   const slotsFetchAbortRef = useRef<AbortController | null>(null);
 
-  const minBookDate = useMemo(() => localDateInputValue(new Date()), []);
-  const todayCalendarStr = localDateInputValue(new Date());
+  const doctorTz = (bookingDoctor?.timezone || 'UTC').trim() || 'UTC';
+  const doctorTodayYmd = useMemo(() => calendarTodayYmdInZone(doctorTz), [doctorTz]);
 
   useModalFocusTrap(dialogRef, confirmOpen && Boolean(bookingDoctor));
 
-  const slotOk = selectedSlotStart != null && selectedSlotIsFuture(selectedSlotStart);
+  const slotOk = selectedSlotStart != null && isSlotInstantInTheFuture(selectedSlotStart);
   const bookingReady =
     Boolean(patientId) && Boolean(bookDate) && Boolean(bookingIdempotencyKey) && slotOk;
 
@@ -262,7 +250,8 @@ export function PatientDoctors() {
   const selectDoctor = (d: Doctor) => {
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookingDoctor(d);
-    setBookDate(minBookDate);
+    const tz = (d.timezone || 'UTC').trim() || 'UTC';
+    setBookDate(calendarTodayYmdInZone(tz));
     setSlots([]);
     setSlotsError(null);
     setSelectedSlotStart(null);
@@ -282,7 +271,7 @@ export function PatientDoctors() {
       toast.error('Please select a date and time slot.');
       return;
     }
-    if (!selectedSlotIsFuture(selectedSlotStart)) {
+    if (!isSlotInstantInTheFuture(selectedSlotStart)) {
       toast.error('Choose a valid time in the future.');
       return;
     }
@@ -431,7 +420,7 @@ export function PatientDoctors() {
           <Input
             id="book-date"
             type="date"
-            min={minBookDate}
+            min={doctorTodayYmd}
             className="h-11"
             value={bookDate}
             onChange={(e) => {
@@ -456,7 +445,7 @@ export function PatientDoctors() {
           {bookDate && patientId && !slotsLoading && slots.length > 0 && (
             <div role="listbox" aria-label="Times" className="grid grid-cols-3 gap-2">
               {slots.map((slot) => {
-                const pastOnToday = bookDate === todayCalendarStr && isSlotInThePast(slot.start);
+                const pastOnToday = bookDate === doctorTodayYmd && isSlotInstantInThePast(slot.start);
                 const sk = slotKey(slot.start);
                 const selected = selectedSlotStart != null && slotKey(selectedSlotStart) === sk;
                 const disabled = !slot.available || submitting || pastOnToday;
@@ -478,7 +467,7 @@ export function PatientDoctors() {
                         : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
-                    {formatSlotTimeWithZoneLabel(slot.start, bookingDoctor?.timezone || 'UTC')}
+                    {formatSlotTimeWithZoneLabel(slot.start, doctorTz)}
                   </button>
                 );
               })}
@@ -530,7 +519,7 @@ export function PatientDoctors() {
                 <span className="text-muted-foreground">
                   {bookDate} ·{' '}
                   {selectedSlotStart
-                    ? formatSlotTimeWithZoneLabel(selectedSlotStart, bookingDoctor?.timezone || 'UTC')
+                    ? formatSlotTimeWithZoneLabel(selectedSlotStart, doctorTz)
                     : '—'}
                 </span>
               </p>

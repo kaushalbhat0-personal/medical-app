@@ -8,13 +8,16 @@ import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState } from '../../components/common';
 import type { Appointment } from '../../types';
 import { UserPlus, CalendarPlus, Receipt } from 'lucide-react';
-import { appointmentCalendarDayYmd, formatSlotTimeWithZoneLabel, ymdInTimeZone } from '../../utils/doctorSchedule';
+import {
+  appointmentCalendarDayYmd,
+  calendarTodayYmdInZone,
+  formatSlotTimeWithZoneLabel,
+} from '../../utils/doctorSchedule';
 
-function isAppointmentToday(a: Appointment, ref: Date, doctorTz: string): boolean {
+function isAppointmentToday(a: Appointment, doctorTz: string): boolean {
   const t = a.appointment_time || a.scheduled_at;
   if (!t) return false;
-  const refYmd = ymdInTimeZone(doctorTz, ref);
-  return appointmentCalendarDayYmd(t, doctorTz) === refYmd;
+  return appointmentCalendarDayYmd(t, doctorTz) === calendarTodayYmdInZone(doctorTz);
 }
 
 export function DoctorHome() {
@@ -30,8 +33,8 @@ export function DoctorHome() {
   const doctorTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
 
   const todaysAppointments = useMemo(
-    () => appointments.filter((a) => isAppointmentToday(a, now, doctorTz)),
-    [appointments, now, doctorTz]
+    () => appointments.filter((a) => isAppointmentToday(a, doctorTz)),
+    [appointments, doctorTz]
   );
 
   const upcoming = useMemo(() => {
