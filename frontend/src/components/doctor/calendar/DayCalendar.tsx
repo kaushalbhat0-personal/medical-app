@@ -26,6 +26,7 @@ import type { Appointment, Patient } from '../../../types';
 import {
   addDaysYmd,
   appointmentCalendarDayYmd,
+  calendarTodayYmdInZone,
   dedupeDoctorSlots,
   formatNextAvailablePhrase,
   formatSlotTime,
@@ -38,7 +39,6 @@ import {
   slotBlockInView,
   slotInstantUtcMs,
   slotKey,
-  ymdInTimeZone,
 } from '../../../utils/doctorSchedule';
 import { BookingModal } from './BookingModal';
 import { SwipeableSlotActions } from './SwipeableSlotActions';
@@ -204,7 +204,7 @@ export function DayCalendar({
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(0);
   const [bookingBusy, setBookingBusy] = useState(false);
-  const [nextAvail, setNextAvail] = useState<{ label: string; dayYmd: string } | null | undefined>(undefined);
+  const [nextAvailSlot, setNextAvailSlot] = useState<DoctorSlot | null | undefined>(undefined);
   const [nextAvailLoading, setNextAvailLoading] = useState(false);
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => {
     if (typeof window === 'undefined') return 'grid';
@@ -225,8 +225,20 @@ export function DayCalendar({
 
   const doctorTodayYmd = useMemo(() => {
     void nowTick;
-    return ymdInTimeZone(tz);
+    return calendarTodayYmdInZone(tz);
   }, [tz, nowTick]);
+
+  const nextAvail = useMemo(() => {
+    if (nextAvailSlot === undefined) return undefined;
+    if (hasAvailabilityWindows === false) return undefined;
+    if (!nextAvailSlot || !nextAvailSlot.available) return null;
+    const dayYmd = appointmentCalendarDayYmd(nextAvailSlot.start, tz);
+    if (isSlotInPast(nextAvailSlot.start, dayYmd, doctorTodayYmd)) return null;
+    return {
+      label: formatNextAvailablePhrase(nextAvailSlot.start, dayYmd, doctorTodayYmd, tz),
+      dayYmd,
+    };
+  }, [nextAvailSlot, hasAvailabilityWindows, tz, doctorTodayYmd]);
 
   const minYmd = doctorTodayYmd;
   const date = useMemo(() => {
@@ -270,10 +282,10 @@ export function DayCalendar({
   const isToday = date === doctorTodayYmd;
 
   useEffect(() => {
-    if (!isToday) return;
+    if (!doctorId) return;
     const id = window.setInterval(() => setNowTick((n) => n + 1), 30_000);
     return () => window.clearInterval(id);
-  }, [isToday]);
+  }, [doctorId]);
 
   const nowLinePct = useMemo(
     () => nowLinePercentInView(date, doctorTodayYmd, viewStart, viewEnd, totalMinutes),
@@ -283,36 +295,26 @@ export function DayCalendar({
   const applyNextFromResponse = useCallback(
     (slot: DoctorSlot | null) => {
       if (hasAvailabilityWindows === false) {
-        setNextAvail(undefined);
+        setNextAvailSlot(undefined);
         setNextAvailLoading(false);
         return;
       }
       if (!slot || !slot.available) {
-        setNextAvail(null);
+        setNextAvailSlot(null);
         setNextAvailLoading(false);
         return;
       }
-      const refToday = ymdInTimeZone(tz);
-      const dayYmd = appointmentCalendarDayYmd(slot.start, tz);
-      if (isSlotInPast(slot.start, dayYmd, refToday)) {
-        setNextAvail(null);
-        setNextAvailLoading(false);
-        return;
-      }
-      setNextAvail({
-        label: formatNextAvailablePhrase(slot.start, dayYmd, refToday, tz),
-        dayYmd,
-      });
+      setNextAvailSlot(slot);
       setNextAvailLoading(false);
     },
-    [hasAvailabilityWindows, tz]
+    [hasAvailabilityWindows]
   );
 
   const loadDaySchedule = useCallback(
     async (opts?: { skipSlotsCache?: boolean }) => {
       if (!doctorId) return;
       if (hasAvailabilityWindows === false) {
-        setNextAvail(undefined);
+        setNextAvailSlot(undefined);
         setNextAvailLoading(false);
       } else {
         setNextAvailLoading(true);
@@ -323,7 +325,7 @@ export function DayCalendar({
       dayLoadAbortRef.current = ac;
       setLoading(true);
       setError(null);
-      const fromYmd = ymdInTimeZone(tz);
+      const fromYmd = calendarTodayYmdInZone(tz);
       try {
         const data = await doctorsApi.getScheduleDay(doctorId, date, {
           fromYmd,
@@ -343,7 +345,7 @@ export function DayCalendar({
         setError('Could not load slots for this day.');
         setSlots([]);
         if (hasAvailabilityWindows !== false) {
-          setNextAvail(null);
+          setNextAvailSlot(null);
         }
         setNextAvailLoading(false);
       } finally {

@@ -6,7 +6,10 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-/** Calendar YYYY-MM-DD for the given instant in an IANA zone (e.g. doctor "today"). */
+/**
+ * Calendar YYYY-MM-DD for an instant (default: now) in an IANA zone.
+ * Prefer `calendarTodayYmdInZone` for "today" and `appointmentCalendarDayYmd` for API ISO strings.
+ */
 export function ymdInTimeZone(iana: string, d: Date = new Date()): string {
   const tz = iana || 'UTC';
   try {
@@ -28,13 +31,12 @@ export function calendarTodayYmdInZone(iana: string): string {
 
 export function addDaysYmd(ymd: string, iana: string, deltaDays: number): string {
   const tz = iana || 'UTC';
-  try {
-    return dayjs.tz(`${ymd} 12:00:00`, tz).add(deltaDays, 'day').format('YYYY-MM-DD');
-  } catch {
-    const d = new Date(ymd + 'T12:00:00');
-    d.setDate(d.getDate() + deltaDays);
-    return dayjs(d).format('YYYY-MM-DD');
+  const anchor = dayjs.tz(`${ymd} 12:00:00`, tz);
+  if (!anchor.isValid()) {
+    const fallback = dayjs.utc(`${ymd}T12:00:00Z`);
+    return fallback.isValid() ? fallback.add(deltaDays, 'day').format('YYYY-MM-DD') : ymd;
   }
+  return anchor.add(deltaDays, 'day').format('YYYY-MM-DD');
 }
 
 /** True 9:00 → 17:00 window for that calendar day in the zone (DST-safe total length). */
@@ -143,9 +145,9 @@ export function wallMinutesInZone(iso: string, iana: string): number {
     const x = dayjs.utc(iso).tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;
   } catch {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 0;
-    return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    const x = dayjs.utc(iso);
+    if (!x.isValid()) return 0;
+    return x.hour() * 60 + x.minute() + x.second() / 60;
   }
 }
 
@@ -307,13 +309,13 @@ export function nowWallMinutes(iana: string): number {
     const x = dayjs.utc().tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;
   } catch {
-    const n = new Date();
-    return n.getHours() * 60 + n.getMinutes() + n.getSeconds() / 60;
+    const x = dayjs.utc();
+    return x.hour() * 60 + x.minute() + x.second() / 60;
   }
 }
 
 function isYmd(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T12:00:00'));
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && dayjs.utc(`${s}T12:00:00Z`).isValid();
 }
 
 export function parseAndClampDateParam(raw: string | null, minYmd: string): string | null {

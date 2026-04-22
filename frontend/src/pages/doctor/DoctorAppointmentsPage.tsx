@@ -163,7 +163,7 @@ export function DoctorAppointmentsPage() {
                 appointments={appointments}
                 bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
-                doctorTimeZone={selfDoctor.timezone || 'UTC'}
+                doctorTimeZone={(selfDoctor.timezone || 'UTC').trim() || 'UTC'}
                 onBooked={() => void refetch()}
               />
             </CardContent>

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appointmentCalendarDayYmd,
   assignOverlapLanesPure,
   dedupeDoctorSlots,
+  formatNextAvailablePhrase,
   formatSlotTime,
   slotKey,
 } from '../doctorSchedule';
@@ -22,6 +24,27 @@ describe('slotKey', () => {
 describe('formatSlotTime', () => {
   it('renders API UTC instant in doctor IANA zone (12:00 UTC → 5:30 PM IST)', () => {
     expect(formatSlotTime('2035-06-15T12:00:00.000Z', 'Asia/Kolkata')).toBe('5:30 PM');
+  });
+});
+
+describe('appointmentCalendarDayYmd', () => {
+  it('uses doctor-local calendar day (UTC evening → next day in Asia/Kolkata)', () => {
+    expect(appointmentCalendarDayYmd('2026-04-23T18:30:00.000Z', 'Asia/Kolkata')).toBe('2026-04-24');
+  });
+});
+
+describe('formatNextAvailablePhrase', () => {
+  it('says Today when slot instant maps to doctor local calendar today', () => {
+    const iso = '2026-04-24T03:30:00.000Z';
+    const slotDay = appointmentCalendarDayYmd(iso, 'Asia/Kolkata');
+    expect(slotDay).toBe('2026-04-24');
+    expect(formatNextAvailablePhrase(iso, slotDay, '2026-04-24', 'Asia/Kolkata')).toMatch(/^Today at /);
+  });
+
+  it('says Tomorrow when slot is next doctor-local day', () => {
+    const iso = '2026-04-24T03:30:00.000Z';
+    const slotDay = appointmentCalendarDayYmd(iso, 'Asia/Kolkata');
+    expect(formatNextAvailablePhrase(iso, slotDay, '2026-04-23', 'Asia/Kolkata')).toMatch(/^Tomorrow at /);
   });
 });
 
