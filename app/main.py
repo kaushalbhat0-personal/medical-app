@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.tenancy import ensure_default_tenant_exists
 from app.core.rate_limit import (
     AuthenticatedWritePostRateLimitMiddleware,
     PublicEndpointRateLimitMiddleware,
@@ -33,7 +34,8 @@ async def lifespan(_app: FastAPI):
 
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        logger.info("Application startup: database connectivity OK")
+        ensure_default_tenant_exists()
+        logger.info("Application startup: database connectivity OK; default tenant ensured")
     except Exception:
         logger.exception("Application startup failed — full traceback above")
         raise

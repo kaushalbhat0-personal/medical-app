@@ -100,6 +100,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
+    op.execute(
+        sa.text(
+            """
+            INSERT INTO tenants (id, name, type, is_active)
+            VALUES (
+                '00000000-0000-0000-0000-000000000001'::uuid,
+                'Default',
+                'hospital',
+                true
+            )
+            ON CONFLICT (id) DO NOTHING
+            """
+        )
+    )
+
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
