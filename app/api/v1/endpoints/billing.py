@@ -8,8 +8,9 @@ from app.api.deps import (
     get_acting_doctor_optional_active,
     get_current_active_user,
     get_current_user,
+    get_optional_scoped_tenant_id,
+    get_optional_scoped_tenant_id_active,
 )
-from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.billing import BillingStatus
 from app.models.doctor import Doctor
@@ -26,8 +27,8 @@ def create_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> BillingRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return billing_service.create_bill(
         db, payload, current_user, tenant_id, acting_doctor=acting_doctor
     )
@@ -43,8 +44,8 @@ def read_bills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[BillingRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return billing_service.get_bills(
         db,
         current_user,
@@ -64,8 +65,8 @@ def read_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> BillingRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     bill = billing_service.get_bill_or_404(db, bill_id)
     billing_service.authorize_bill_read(
         db, bill, current_user, tenant_id, acting_doctor=acting_doctor
@@ -80,8 +81,8 @@ def update_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> BillingRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return billing_service.update_bill(
         db, bill_id, payload, current_user, tenant_id, acting_doctor=acting_doctor
     )
@@ -119,12 +120,12 @@ def pay_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> BillingRead:
     """Mark a bill as paid."""
     from app.schemas.billing import BillingUpdate
     from app.models.billing import BillingStatus
 
-    tenant_id = get_current_tenant_id(current_user, db)
     update_data = BillingUpdate(status=BillingStatus.paid)
     return billing_service.update_bill(
         db, bill_id, update_data, current_user, tenant_id, acting_doctor=acting_doctor
@@ -137,9 +138,9 @@ def delete_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> Response:
     """Soft delete a bill."""
-    tenant_id = get_current_tenant_id(current_user, db)
     billing_service.soft_delete_bill(
         db, bill_id, current_user, tenant_id, acting_doctor=acting_doctor
     )

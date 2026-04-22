@@ -123,16 +123,6 @@ def authorize_bill_create(
                 current_user, "billing", action="create_bill"
             )
             raise
-        try:
-            doctor_service.ensure_self_managed_doctor(doc)
-        except ForbiddenError:
-            log_rbac_mutation_violation(
-                current_user,
-                "billing",
-                action="create_bill",
-                tenant_type=doc.tenant.type if doc.tenant else None,
-            )
-            raise
         if appointment.doctor_id != doc.id:
             log_rbac_mutation_violation(
                 current_user,
@@ -274,9 +264,7 @@ def get_bills(
     elif current_user.role == UserRole.patient:
         eff_user_id = current_user.id
         eff_patient_id = None
-    elif current_user.role == UserRole.super_admin:
-        eff_tenant_id = None
-    elif current_user.role in (UserRole.admin, UserRole.staff):
+    elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
         pass
 
     return crud_billing.get_bills(

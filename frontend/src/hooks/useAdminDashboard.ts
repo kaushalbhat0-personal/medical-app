@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dashboardApi } from '../services';
+import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
 import type {
   AdminDashboardMetrics,
   AdminDoctorPerformanceRow,
@@ -63,6 +64,14 @@ export function useAdminDashboard(): UseAdminDashboardResult {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const onTenantChange = () => {
+      void load();
+    };
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, onTenantChange);
+    return () => window.removeEventListener(TENANT_ID_STORAGE_EVENT, onTenantChange);
   }, [load]);
 
   return {

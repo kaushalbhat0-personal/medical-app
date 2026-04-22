@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { TENANT_ID_STORAGE_EVENT } from '../../utils/tenantIdForRequest';
 
 /**
  * Generic data fetching hook with loading and error states
@@ -54,6 +55,14 @@ export function useFetch<T>(
   useEffect(() => {
     fetchData(false);
   }, [fetchData, paramsKey]);
+
+  useEffect(() => {
+    const onTenantScopeChange = () => {
+      void fetchData(true);
+    };
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, onTenantScopeChange);
+    return () => window.removeEventListener(TENANT_ID_STORAGE_EVENT, onTenantScopeChange);
+  }, [fetchData]);
 
   return { data, loading, refetching, error, refetch: () => fetchData(true) };
 }

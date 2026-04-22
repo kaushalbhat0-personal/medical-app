@@ -14,12 +14,9 @@ import { DoctorWorkspaceProvider, useDoctorWorkspace } from '../../contexts/Doct
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { isManagedOrgTenant } from '../../utils/tenantType';
-
 function DoctorLayoutInner() {
   const { user, logout } = useAuth();
-  const { isIndependent, isReadOnly, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
-  const managedOrg = isManagedOrgTenant(selfDoctor?.tenant_type);
+  const { isIndependent, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
 
   const tabs = [
     { to: '/doctor/home', label: 'Overview', icon: Home },
@@ -44,9 +41,7 @@ function DoctorLayoutInner() {
               <p className="text-xs text-muted-foreground truncate">
                 {isIndependent
                   ? 'Your practice — patients, schedule & billing'
-                  : managedOrg
-                    ? 'Organization — view care assigned to you'
-                    : 'Your schedule, patients & billing'}
+                  : 'Sign in to your organization to manage care in your tenant'}
               </p>
             </div>
           </div>
@@ -65,14 +60,14 @@ function DoctorLayoutInner() {
                     {selfDoctor.tenant_name}
                   </Badge>
                 )}
-                {isIndependent && (
-                  <Badge variant="outline" className="hidden lg:inline-flex">
-                    Independent
-                  </Badge>
-                )}
-                {managedOrg && !isIndependent && (
-                  <Badge variant="outline" className="hidden lg:inline-flex text-muted-foreground">
-                    View only
+                {(selfDoctor?.tenant_organization_label || selfDoctor?.tenant_type) && (
+                  <Badge
+                    variant="outline"
+                    className="hidden lg:inline-flex normal-case"
+                    title="Organization (derived from doctor count when available)"
+                  >
+                    {selfDoctor.tenant_organization_label ??
+                      selfDoctor.tenant_type?.replace(/_/g, ' ')}
                   </Badge>
                 )}
               </div>
@@ -126,15 +121,6 @@ function DoctorLayoutInner() {
         >
           Your user account is not clearly linked to a single doctor record in this organization. The portal stays in view-only
           mode; ask an administrator to confirm your email on your doctor profile.
-        </p>
-      )}
-      {isReadOnly && managedOrg && !profilePartial && !loading && !error && (
-        <p
-          className="text-sm text-muted-foreground bg-muted/40 border-b border-border/60 py-2 px-4"
-          role="status"
-        >
-          Organization account: you can view patients and appointments that involve you. Creating patients, booking on behalf of
-          others, and billing are managed in the main staff app for your facility.
         </p>
       )}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">

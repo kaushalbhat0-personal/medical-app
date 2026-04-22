@@ -10,7 +10,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.tenant import Tenant, UserTenant
+from app.models.tenant import Tenant, TenantType, UserTenant
 from app.models.user import User, UserRole
 from tests.factories import create_tenant, create_user
 
@@ -20,14 +20,12 @@ async def test_create_hospital_creates_admin_user_and_mapping(
     client: AsyncClient, db_session: Session
 ) -> None:
     db = db_session
-    home = create_tenant(db, name="super home")
     super_email = f"sa_{uuid.uuid4().hex[:8]}@example.com"
     create_user(
         db,
         email=super_email,
         password="SuperAdmin9!",
         role=UserRole.super_admin,
-        tenant_id=home.id,
     )
     db.commit()
 
@@ -69,6 +67,7 @@ async def test_create_hospital_creates_admin_user_and_mapping(
     user = db.scalars(select(User).where(User.email == expected_email)).one()
     assert user.role == UserRole.admin
     assert user.force_password_reset is True
+    assert user.tenant_id == tid
 
     ut = db.scalars(
         select(UserTenant).where(
@@ -91,14 +90,12 @@ async def test_create_hospital_duplicate_name_race(
     (true parallel e2e is best validated against PostgreSQL).
     """
     db = db_session
-    home = create_tenant(db, name="super home race")
     super_email = f"sa_race_{uuid.uuid4().hex[:8]}@example.com"
     create_user(
         db,
         email=super_email,
         password="SuperAdmin9!",
         role=UserRole.super_admin,
-        tenant_id=home.id,
     )
     db.commit()
 
@@ -141,14 +138,12 @@ async def test_create_hospital_idempotency_key_returns_same_tenant(
     client: AsyncClient, db_session: Session
 ) -> None:
     db = db_session
-    home = create_tenant(db, name="super home idem")
     super_email = f"sa_idem_{uuid.uuid4().hex[:8]}@example.com"
     create_user(
         db,
         email=super_email,
         password="SuperAdmin9!",
         role=UserRole.super_admin,
-        tenant_id=home.id,
     )
     db.commit()
 
@@ -177,3 +172,147 @@ async def test_create_hospital_idempotency_key_returns_same_tenant(
     assert r2.status_code == 201
     assert r1.json()["id"] == r2.json()["id"]
     assert r1.json()["admin_email"] == r2.json()["admin_email"]
+
+
+@pytest.mark.asyncio
+async def test_create_org_minimal_clinic_no_admin(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_min_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    suffix = uuid.uuid4().hex[:8]
+    clinic_name = f"Minimal Clinic {suffix}"
+    resp = await client.post(
+        "/api/v1/tenants",
+        json={"name": clinic_name, "type": "clinic"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["name"] == clinic_name
+    assert data["type"] == "clinic"
+    assert data.get("admin_email") is None
+    tid = UUID(data["id"])
+    tenant = db.get(Tenant, tid)
+    assert tenant is not None
+
+
+@pytest.mark.asyncio
+async def test_super_admin_list_includes_clinics(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_list_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    suffix = uuid.uuid4().hex[:8]
+    create_tenant(db, name=f"List Clinic {suffix}", tenant_type=TenantType.clinic)
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    resp = await client.get(
+        "/api/v1/tenants",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    types = {row["type"] for row in resp.json()}
+    assert "clinic" in types
+
+
+@pytest.mark.asyncio
+async def test_get_tenant_by_id_super_admin(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_get_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    suffix = uuid.uuid4().hex[:8]
+    t = create_tenant(db, name=f"Detail Clinic {suffix}", tenant_type=TenantType.clinic)
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    resp = await client.get(
+        f"/api/v1/tenants/{t.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["id"] == str(t.id)
+    assert resp.json()["name"] == t.name
+
+
+@pytest.mark.asyncio
+async def test_super_admin_post_users_creates_tenant_admin(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_users_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    org = create_tenant(db, name=f"Org {uuid.uuid4().hex[:6]}")
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    new_admin_email = f"adm_{uuid.uuid4().hex[:8]}@Example.COM"
+    r = await client.post(
+        "/api/v1/users",
+        json={
+            "email": new_admin_email,
+            "password": "AdminPass9!",
+            "role": "admin",
+            "tenant_id": str(org.id),
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["email"] == new_admin_email.lower().strip()
+    u = db_session.get(User, UUID(body["id"]))
+    assert u is not None
+    assert u.tenant_id == org.id
+    assert u.role == UserRole.admin

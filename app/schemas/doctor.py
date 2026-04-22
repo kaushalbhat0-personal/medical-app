@@ -33,6 +33,11 @@ class DoctorRead(BaseModel):
     experience_years: int
     tenant_id: UUID | None = None
     tenant_type: str | None = None
+    tenant_organization_label: str | None = Field(
+        default=None,
+        description='Derived from active doctors in the tenant: "Clinic/Hospital" or '
+        '"Individual Doctor". Complements raw tenant_type.',
+    )
     tenant_name: str | None = None
     created_at: datetime
     timezone: str = Field(

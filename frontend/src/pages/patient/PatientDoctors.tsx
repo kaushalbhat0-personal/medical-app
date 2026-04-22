@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,8 @@ function DoctorsGridSkeleton() {
 
 export function PatientDoctors() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preselectDoctorId = (location.state as { preselectDoctorId?: string } | null)?.preselectDoctorId;
   const { patientId, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLinkedPatient();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,7 +260,7 @@ export function PatientDoctors() {
     return () => window.removeEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
   }, [bookingDoctor, refetchSlots]);
 
-  const selectDoctor = (d: Doctor) => {
+  const selectDoctor = useCallback((d: Doctor) => {
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookingDoctor(d);
     setBookDate(calendarTodayYmdInZone(DISPLAY_TIMEZONE));
@@ -266,7 +268,27 @@ export function PatientDoctors() {
     setSlotsError(null);
     setSelectedSlotStart(null);
     setConfirmOpen(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!preselectDoctorId || patientLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await doctorsApi.getOne(preselectDoctorId);
+        if (cancelled) return;
+        selectDoctor(d);
+      } catch {
+        /* doctor missing or network; stay on list */
+      }
+      if (!cancelled) {
+        navigate('/patient/doctors', { replace: true, state: {} });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preselectDoctorId, patientLoading, navigate, selectDoctor]);
 
   const confirmBooking = async () => {
     if (!bookingDoctor || !patientId) {

@@ -198,6 +198,11 @@ export const doctorsApi = {
     };
   },
 
+  getOne: async (id: string, options?: { signal?: AbortSignal }): Promise<Doctor> => {
+    const response = await api.get(`/doctors/${id}`, { signal: options?.signal });
+    return response.data as Doctor;
+  },
+
   getAll: async (params?: { search?: string; skip?: number; limit?: number }): Promise<Doctor[]> => {
     try {
       const response = await api.get('/doctors', { params: { skip: 0, limit: 100, ...params } });

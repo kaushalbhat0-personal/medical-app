@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.tenant import Tenant, TenantCreationIdempotency, TenantType, UserTenant
-from app.models.user import User
+from app.models.user import User, UserRole
 
 
 def get_by_name(db: Session, name: str) -> Tenant | None:
@@ -143,6 +143,10 @@ def create_user_tenant_tx(
     ut = UserTenant(user_id=user_id, tenant_id=tenant_id, role=role, is_primary=is_primary)
     db.add(ut)
     db.flush()
+    if is_primary:
+        user = db.get(User, user_id)
+        if user is not None and user.role != UserRole.super_admin:
+            user.tenant_id = tenant_id
     db.refresh(ut)
     return ut
 

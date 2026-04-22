@@ -3,9 +3,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, get_current_user
+from app.api.deps import (
+    get_current_active_user,
+    get_current_user,
+    get_optional_scoped_tenant_id,
+    get_optional_scoped_tenant_id_active,
+)
 from app.core.database import get_db
-from app.core.tenant_context import get_current_tenant_id
 from app.models.inventory import InventoryItemType
 from app.models.user import User
 from app.schemas.inventory import (
@@ -37,8 +41,8 @@ def get_bulk_stock(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[BulkStockRow] | dict[str, int]:
-    tenant_id = get_current_tenant_id(current_user, db)
     rows = inventory_service.get_bulk_stock(
         tenant_id,
         doctor_id=doctor_id,
@@ -57,8 +61,8 @@ def get_one_stock(
     doctor_id: UUID | None = Query(default=None, description="Doctor id for doctor-level stock; omit for tenant level"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> StockRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     quantity = inventory_service.get_stock(
         db,
         item_id,
@@ -74,8 +78,8 @@ def create_inventory_item(
     payload: InventoryItemCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> InventoryItemRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     item = inventory_service.create_item(db, payload, current_user, tenant_id)
     return InventoryItemRead.model_validate(item)
 
@@ -88,8 +92,8 @@ def list_inventory_items(
     active_only: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[InventoryItemRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     items = inventory_service.list_items(
         db,
         current_user,
@@ -108,8 +112,8 @@ def update_inventory_item(
     payload: InventoryItemUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> InventoryItemRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     item = inventory_service.update_item(db, item_id, payload, current_user, tenant_id)
     return InventoryItemRead.model_validate(item)
 
@@ -119,8 +123,8 @@ def stock_add(
     body: StockAddRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> StockOperationResult:
-    tenant_id = get_current_tenant_id(current_user, db)
     movement_id, qty = inventory_service.add_stock(db, body, current_user, tenant_id)
     return StockOperationResult(
         item_id=body.item_id,
@@ -135,8 +139,8 @@ def stock_reduce(
     body: StockReduceRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> StockOperationResult:
-    tenant_id = get_current_tenant_id(current_user, db)
     movement_id, qty = inventory_service.reduce_stock(db, body, current_user, tenant_id)
     return StockOperationResult(
         item_id=body.item_id,
@@ -151,8 +155,8 @@ def stock_adjust(
     body: StockAdjustRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> StockOperationResult:
-    tenant_id = get_current_tenant_id(current_user, db)
     movement_id, qty = inventory_service.adjust_stock(db, body, current_user, tenant_id)
     return StockOperationResult(
         item_id=body.item_id,

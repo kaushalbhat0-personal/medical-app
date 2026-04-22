@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
-from app.core.tenancy import DEFAULT_TENANT_ID
 from app.models.billing import Billing
 from app.models.doctor import Doctor
 from app.models.inventory import (
@@ -39,20 +38,25 @@ def _authorize_item_tenant(
     current_user: User,
     tenant_id: UUID | None,
 ) -> None:
+    if tenant_id is None:
+        raise ValidationError("X-Tenant-ID header is required")
     if current_user.role == UserRole.super_admin:
+        if item.tenant_id != tenant_id:
+            raise ForbiddenError("Item is not in the selected organization")
         return
-    if tenant_id is not None:
-        assert_authorized(
-            "access",
-            "inventory",
-            current_user,
-            tenant_id,
-            resource_tenant_id=item.tenant_id,
-        )
+    assert_authorized(
+        "access",
+        "inventory",
+        current_user,
+        tenant_id,
+        resource_tenant_id=item.tenant_id,
+    )
 
 
 def _resolve_item_tenant_for_create(request_tenant_id: UUID | None) -> UUID:
-    return request_tenant_id or DEFAULT_TENANT_ID
+    if request_tenant_id is None:
+        raise ValidationError("X-Tenant-ID header is required")
+    return request_tenant_id
 
 
 def get_item_or_404(db: Session, item_id: UUID) -> InventoryItem:
@@ -92,8 +96,7 @@ def get_bulk_stock(
 ) -> list[tuple[UUID, int]]:
     """
     One-query stock for all items in the tenant (optionally doctor-scoped).
-    Items without a stock row get quantity 0. Super admin with tenant_id None and
-    no doctor_id lists all items across all tenants; otherwise tenant is enforced.
+    Items without a stock row get quantity 0.
     """
     _forbid_patients(current_user)
     filter_tenant: UUID | None = tenant_id
@@ -105,9 +108,9 @@ def get_bulk_stock(
             raise ValidationError("Doctor does not belong to the current tenant")
         filter_tenant = doctor.tenant_id
     else:
-        if current_user.role != UserRole.super_admin and tenant_id is None:
-            log_rbac_mutation_violation(current_user, "inventory", action="get_bulk_stock")
-            raise ForbiddenError("Tenant scope required")
+        if tenant_id is None:
+            raise ValidationError("X-Tenant-ID header is required")
+        filter_tenant = tenant_id
 
     join_cond = and_(
         InventoryStock.item_id == InventoryItem.id,
@@ -121,8 +124,7 @@ def get_bulk_stock(
         InventoryStock,
         join_cond,
     )
-    if filter_tenant is not None:
-        q = q.where(InventoryItem.tenant_id == filter_tenant)
+    q = q.where(InventoryItem.tenant_id == filter_tenant)
     if item_ids is not None and len(item_ids) > 0:
         q = q.where(InventoryItem.id.in_(item_ids))
     q = q.order_by(InventoryItem.name.asc())
@@ -231,14 +233,13 @@ def create_item(
 ) -> InventoryItem:
     _forbid_patients(current_user)
     effective_tenant = _resolve_item_tenant_for_create(tenant_id)
-    if current_user.role != UserRole.super_admin and tenant_id is not None:
-        assert_authorized(
-            "create",
-            "inventory",
-            current_user,
-            tenant_id,
-            resource_tenant_id=effective_tenant,
-        )
+    assert_authorized(
+        "create",
+        "inventory",
+        current_user,
+        tenant_id,
+        resource_tenant_id=effective_tenant,
+    )
 
     item = InventoryItem(
         tenant_id=effective_tenant,
@@ -292,14 +293,9 @@ def list_items(
     active_only: bool = False,
 ) -> list[InventoryItem]:
     _forbid_patients(current_user)
-    q = select(InventoryItem)
-    if current_user.role != UserRole.super_admin:
-        if tenant_id is None:
-            log_rbac_mutation_violation(current_user, "inventory", action="list_items")
-            raise ForbiddenError("Tenant scope required")
-        q = q.where(InventoryItem.tenant_id == tenant_id)
-    elif tenant_id is not None:
-        q = q.where(InventoryItem.tenant_id == tenant_id)
+    if tenant_id is None:
+        raise ValidationError("X-Tenant-ID header is required")
+    q = select(InventoryItem).where(InventoryItem.tenant_id == tenant_id)
 
     if type_filter:
         q = q.where(InventoryItem.type == type_filter)

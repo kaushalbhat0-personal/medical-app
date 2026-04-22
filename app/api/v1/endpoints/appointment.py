@@ -8,8 +8,9 @@ from app.api.deps import (
     get_acting_doctor_optional_active,
     get_current_active_user,
     get_current_user,
+    get_optional_scoped_tenant_id,
+    get_optional_scoped_tenant_id_active,
 )
-from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.doctor import Doctor
 from app.models.user import User
@@ -27,8 +28,8 @@ def create_appointment(
     current_user: User = Depends(get_current_active_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> AppointmentRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     appt, idempotent_replay = appointment_service.create_appointment(
         db,
         payload,
@@ -51,8 +52,8 @@ def read_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[AppointmentRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return appointment_service.get_appointments(
         db,
         current_user,
@@ -71,8 +72,8 @@ def read_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> AppointmentRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     appointment = appointment_service.get_appointment_or_404(db, appointment_id)
     appointment_service.authorize_appointment_read(
         db,
@@ -92,8 +93,8 @@ def update_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> AppointmentRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return appointment_service.update_appointment(
         db,
         appointment_id,
@@ -110,8 +111,8 @@ def delete_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> AppointmentRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return appointment_service.delete_appointment(
         db,
         appointment_id,

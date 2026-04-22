@@ -19,6 +19,8 @@ export {
 export type { DoctorAvailabilityWindow } from '../types';
 export { dashboardApi } from './dashboard';
 export { tenantsApi } from './tenants';
+export { publicDiscoveryApi } from './publicDiscovery';
+export { usersApi, type OrganizationUserCreatePayload } from './users';
 export {
   inventoryApi,
   type InventoryItemDTO,

@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     health,
     inventory,
     patient,
+    public_discovery,
     tenant,
     users,
 )
@@ -17,6 +18,7 @@ api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
+api_router.include_router(public_discovery.router)
 api_router.include_router(patient.router)
 api_router.include_router(tenant.router)
 api_router.include_router(doctor.router)

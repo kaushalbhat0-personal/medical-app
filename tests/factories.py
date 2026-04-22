@@ -59,15 +59,30 @@ def create_user(
     email: str,
     password: str,
     role: UserRole,
-    tenant_id: UUID,
+    tenant_id: UUID | None = None,
     force_password_reset: bool = False,
 ) -> User:
+    if role == UserRole.super_admin:
+        u = User(
+            email=email,
+            hashed_password=hash_password(password),
+            role=role,
+            is_active=True,
+            force_password_reset=force_password_reset,
+            tenant_id=None,
+        )
+        db.add(u)
+        db.flush()
+        return u
+    if tenant_id is None:
+        raise ValueError("tenant_id is required for non-super_admin users")
     u = User(
         email=email,
         hashed_password=hash_password(password),
         role=role,
         is_active=True,
         force_password_reset=force_password_reset,
+        tenant_id=tenant_id,
     )
     db.add(u)
     db.flush()
@@ -159,7 +174,7 @@ def seed_bookable_doctor_and_patient(
     patient_password: str,
     doctor_force_password_reset: bool = False,
 ) -> tuple[Doctor, Patient, datetime]:
-    tenant = create_tenant(db, tenant_type=TenantType.independent_doctor)
+    tenant = create_tenant(db, tenant_type=TenantType.clinic)
     doc_user = create_user(
         db,
         email=doctor_email,

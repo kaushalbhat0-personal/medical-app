@@ -1,12 +1,16 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_current_user_optional
 from app.core.database import get_db
 from app.crud import crud_tenant
-from app.models.user import User
+from app.models.tenant import Tenant
+from app.models.user import User, UserRole
 from app.schemas.tenant import TenantCreate, TenantPublicRead
 from app.services import tenant_service
+from app.services.exceptions import ForbiddenError, NotFoundError
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -22,7 +26,7 @@ def create_tenant(
     current_user: User = Depends(get_current_active_user),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> TenantPublicRead:
-    tenant, admin_email = tenant_service.create_hospital_tenant(
+    tenant, admin_email = tenant_service.create_tenant(
         db, payload, current_user, idempotency_key=idempotency_key
     )
     return TenantPublicRead.model_validate(tenant).model_copy(update={"admin_email": admin_email})
@@ -33,8 +37,39 @@ def read_tenants(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> list[TenantPublicRead]:
-    # Public listing: hospitals only (marketplace discovery)
-    # NOTE: this endpoint is intentionally unauthenticated.
-    return crud_tenant.list_tenants(db, type="hospital", is_active=True, skip=skip, limit=limit)
+    """
+    Super admins (authenticated) see all active hospitals and clinics.
+    Everyone else gets the public hospital list (e.g. patient marketplace).
+    """
+    if (
+        current_user is not None
+        and current_user.is_active
+        and current_user.role == UserRole.super_admin
+    ):
+        rows = crud_tenant.list_tenants(
+            db, type=None, is_active=True, skip=skip, limit=limit
+        )
+    else:
+        rows = crud_tenant.list_tenants(
+            db, type="hospital", is_active=True, skip=skip, limit=limit
+        )
+    return [TenantPublicRead.model_validate(t) for t in rows]
 
+
+@router.get("/{tenant_id}", response_model=TenantPublicRead)
+def read_tenant(
+    tenant_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> TenantPublicRead:
+    if current_user.role != UserRole.super_admin:
+        raise ForbiddenError("Only super administrators can load tenant details")
+    tenant = db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise NotFoundError("Tenant not found")
+    admin_email = crud_tenant.get_primary_admin_email_for_tenant(db, tenant.id)
+    return TenantPublicRead.model_validate(tenant).model_copy(
+        update={"admin_email": admin_email}
+    )

@@ -1,6 +1,6 @@
 import { api } from './api';
 import { safeArray } from '../utils';
-import type { Patient } from '../types';
+import type { Patient, PatientMyDoctor } from '../types';
 
 export interface CreatePatientData {
   name: string;
@@ -61,5 +61,10 @@ export const patientsApi = {
       console.error('[patientsApi.delete] Error:', error);
       throw error;
     }
+  },
+
+  getMyDoctors: async (): Promise<PatientMyDoctor[]> => {
+    const response = await api.get('/patients/me/doctors');
+    return safeArray<PatientMyDoctor>(response.data);
   },
 };

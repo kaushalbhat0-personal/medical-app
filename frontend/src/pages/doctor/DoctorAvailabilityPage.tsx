@@ -319,8 +319,8 @@ export function DoctorAvailabilityPage() {
           <CardHeader className="py-3">
             <CardTitle className="text-base">Organization-managed</CardTitle>
             <CardDescription>
-              Editing weekly windows is only available for independent practices. You can still review how hours appear
-              when listed.
+              Your account is not linked to a clear doctor record in this organization. You can still review how hours appear
+              when listed; ask an admin to confirm your email on your profile.
             </CardDescription>
           </CardHeader>
         </Card>

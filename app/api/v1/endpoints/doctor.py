@@ -8,9 +8,12 @@ from app.api.deps import (
     get_current_active_user,
     get_current_user,
     get_current_user_optional,
+    get_optional_scoped_tenant_id,
+    get_optional_scoped_tenant_id_active,
+    get_scoped_tenant_id,
 )
 from app.core.database import get_db
-from app.core.tenant_context import get_current_tenant_id
+from app.core.tenant_context import resolve_tenant_id_for_scoped_request
 from app.models.user import User, UserRole
 from app.schemas.doctor import (
     DoctorAvailabilityCopyRequest,
@@ -28,7 +31,6 @@ from app.schemas.doctor import (
     DoctorUpdate,
 )
 from app.services import doctor_availability_service, doctor_service, doctor_slot_service
-from app.services.exceptions import ValidationError
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -38,19 +40,9 @@ def create_doctor(
     payload: DoctorCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    effective_tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
-    target_tenant_id: UUID | None = Query(
-        default=None,
-        alias="tenant_id",
-        description="Required for super_admin without primary tenant: target tenant for the new doctor profile",
-    ),
 ) -> DoctorRead:
-    effective_tenant_id = get_current_tenant_id(current_user, db)
-    if effective_tenant_id is None:
-        if current_user.role == UserRole.super_admin and target_tenant_id is not None:
-            effective_tenant_id = target_tenant_id
-        else:
-            raise ValidationError("Tenant context is required to create a doctor profile")
     doctor = doctor_service.create_doctor(
         db,
         payload,
@@ -72,10 +64,14 @@ def read_doctors(
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
 ) -> list[DoctorRead]:
-    tenant_id = (
-        get_current_tenant_id(current_user, db) if current_user is not None else None
-    )
+    if current_user is None:
+        tenant_id = None
+    elif current_user.role == UserRole.patient:
+        tenant_id = None
+    else:
+        tenant_id = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
     return doctor_service.get_doctors(
         db,
         current_user,
@@ -96,8 +92,8 @@ def read_doctor_slots(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[DoctorSlotRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return doctor_slot_service.get_doctor_slots_for_date(db, doctor_id, on_date, current_user, tenant_id)
 
 
@@ -122,8 +118,8 @@ def read_doctor_schedule_day(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> DoctorScheduleDayRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     slots, full_off, next_s = doctor_slot_service.get_doctor_schedule_day(
         db,
         doctor_id,
@@ -146,8 +142,8 @@ def list_doctor_availability_windows(
     doctor_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> list[DoctorAvailabilityRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return doctor_availability_service.list_availability_windows(
         db, doctor_id, current_user, tenant_id
     )
@@ -163,8 +159,8 @@ def read_doctor_day_meta(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> DoctorDayMeta:
-    tenant_id = get_current_tenant_id(current_user, db)
     full_day = doctor_slot_service.get_doctor_day_meta(db, doctor_id, on_date, current_user, tenant_id)
     return DoctorDayMeta(full_day_time_off=full_day)
 
@@ -185,8 +181,8 @@ def read_doctor_next_available_slot(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> DoctorSlotRead | None:
-    tenant_id = get_current_tenant_id(current_user, db)
     return doctor_slot_service.get_next_available_slot_for_doctor(
         db, doctor_id, from_date, current_user, tenant_id, horizon_days=horizon_days
     )
@@ -202,8 +198,8 @@ def create_doctor_availability_window(
     payload: DoctorAvailabilityCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DoctorAvailabilityRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         row = doctor_availability_service.create_availability_window(
             db, doctor_id, payload, current_user, tenant_id
@@ -226,8 +222,8 @@ def copy_doctor_availability_windows(
     payload: DoctorAvailabilityCopyRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> list[DoctorAvailabilityRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         doctor_availability_service.copy_availability_to_days(
             db, doctor_id, payload, current_user, tenant_id
@@ -251,8 +247,8 @@ def update_doctor_availability_window(
     payload: DoctorAvailabilityUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DoctorAvailabilityRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         row = doctor_availability_service.update_availability_window(
             db, doctor_id, window_id, payload, current_user, tenant_id
@@ -274,8 +270,8 @@ def delete_doctor_availability_window(
     window_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> Response:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         doctor_availability_service.delete_availability_window(
             db, doctor_id, window_id, current_user, tenant_id
@@ -303,8 +299,8 @@ def list_doctor_time_off(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> list[DoctorTimeOffRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return doctor_availability_service.list_time_off(
         db, doctor_id, current_user, tenant_id, from_date=from_date, to_date=to_date
     )
@@ -320,8 +316,8 @@ def create_doctor_time_off(
     payload: DoctorTimeOffCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DoctorTimeOffRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         row = doctor_availability_service.create_time_off(
             db, doctor_id, payload, current_user, tenant_id
@@ -344,8 +340,8 @@ def update_doctor_time_off(
     payload: DoctorTimeOffUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DoctorTimeOffRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         row = doctor_availability_service.update_time_off(
             db, doctor_id, time_off_id, payload, current_user, tenant_id
@@ -367,8 +363,8 @@ def delete_doctor_time_off(
     time_off_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> Response:
-    tenant_id = get_current_tenant_id(current_user, db)
     try:
         doctor_availability_service.delete_time_off(
             db, doctor_id, time_off_id, current_user, tenant_id
@@ -385,8 +381,8 @@ def read_doctor(
     doctor_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> DoctorRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
     doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
     doctor_service.hydrate_doctor_availability_flags(db, [doctor])
@@ -399,8 +395,8 @@ def update_doctor(
     payload: DoctorUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DoctorRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return doctor_service.update_doctor(db, doctor_id, payload, current_user, tenant_id)
 
 
@@ -409,7 +405,7 @@ def delete_doctor(
     doctor_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> Response:
-    tenant_id = get_current_tenant_id(current_user, db)
     doctor_service.delete_doctor(db, doctor_id, current_user, tenant_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

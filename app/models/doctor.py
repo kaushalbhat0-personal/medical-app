@@ -28,7 +28,7 @@ class Doctor(Base):
     )
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="SET NULL"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")

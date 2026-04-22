@@ -10,6 +10,32 @@ export interface User {
   force_password_reset?: boolean;
 }
 
+/** GET /public/tenants — marketplace tenant with doctor count */
+export interface PublicTenantDiscovery {
+  id: string;
+  name: string;
+  doctor_count: number;
+  type: string;
+  /** Derived: "Clinic/Hospital" vs "Individual Doctor" from active doctor count */
+  organization_label: string;
+  sole_doctor: PublicTenantDoctorBrief | null;
+}
+
+/** GET /public/tenants/{id}/doctors */
+export interface PublicTenantDoctorBrief {
+  id: string;
+  name: string;
+  specialization: string;
+}
+
+/** GET /patients/me/doctors */
+export interface PatientMyDoctor {
+  id: string;
+  name: string;
+  specialization: string;
+  tenant_id: string;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -90,8 +116,10 @@ export interface Doctor {
   has_availability_windows?: boolean;
   /** Login email for the linked user account (admin-created doctors) */
   linked_user_email?: string | null;
-  /** From GET /doctors (DoctorRead); used for org vs independent UI. */
+  /** From GET /doctors (DoctorRead); tenant type label for the UI. */
   tenant_type?: string | null;
+  /** Derived from active doctor count in tenant; complements tenant_type. */
+  tenant_organization_label?: string | null;
   tenant_name?: string | null;
   tenant_id?: string | null;
 }

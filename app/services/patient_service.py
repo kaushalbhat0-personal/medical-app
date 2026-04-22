@@ -1,15 +1,17 @@
 import logging
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
 from app.services import doctor_service
 from app.models.patient import Patient
 from app.models.user import User, UserRole
-from app.schemas.patient import PatientCreate, PatientUpdate
+from app.schemas.patient import PatientCreate, PatientMyDoctorRead, PatientUpdate
 from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
     assert_authorized,
@@ -43,22 +45,10 @@ def authorize_patient_create(
         return
     if current_user.role == UserRole.doctor:
         try:
-            doc = acting_doctor or doctor_service.require_doctor_profile(
-                db, current_user
-            )
+            _ = acting_doctor or doctor_service.require_doctor_profile(db, current_user)
         except ForbiddenError:
             log_rbac_mutation_violation(
                 current_user, "patient", action="create_patient"
-            )
-            raise
-        try:
-            doctor_service.ensure_self_managed_doctor(doc)
-        except ForbiddenError:
-            log_rbac_mutation_violation(
-                current_user,
-                "patient",
-                action="create_patient",
-                tenant_type=doc.tenant.type if doc.tenant else None,
             )
             raise
         return
@@ -116,6 +106,34 @@ def get_patient_by_user_id(db: Session, user_id: UUID) -> Patient:
     return patient
 
 
+def list_my_doctors(db: Session, current_user: User) -> list[PatientMyDoctorRead]:
+    if current_user.role != UserRole.patient:
+        raise ForbiddenError("Only patients can list their doctors")
+    patient = crud_patient.get_patient_by_user_id(db, current_user.id)
+    if patient is None:
+        return []
+    appt_doctor_ids = (
+        select(Appointment.doctor_id)
+        .where(
+            Appointment.patient_id == patient.id,
+            Appointment.is_deleted == False,  # noqa: E712
+            Appointment.status != AppointmentStatus.cancelled,
+        )
+        .distinct()
+    )
+    stmt = (
+        select(Doctor)
+        .where(
+            Doctor.id.in_(appt_doctor_ids),
+            Doctor.is_active == True,  # noqa: E712
+            Doctor.is_deleted == False,  # noqa: E712
+        )
+        .order_by(Doctor.name.asc())
+    )
+    doctors = list(db.scalars(stmt).all())
+    return [PatientMyDoctorRead.model_validate(d) for d in doctors]
+
+
 def authorize_patient_access(
     db: Session,
     patient: Patient,
@@ -153,9 +171,16 @@ def authorize_patient_access(
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
-        if doctor_service.doctor_is_independent(doc):
-            if patient.created_by == current_user.id:
-                return
+        if (
+            patient.tenant_id is not None
+            and doc.tenant_id is not None
+            and patient.tenant_id == doc.tenant_id
+        ):
+            return
+        if patient.created_by == current_user.id and (
+            patient.tenant_id is None or patient.tenant_id == doc.tenant_id
+        ):
+            return
         if crud_patient.patient_has_appointment_with_doctor(
             db, patient.id, doc.id
         ):
@@ -164,7 +189,6 @@ def authorize_patient_access(
             current_user,
             "patient",
             action=rbac_action,
-            tenant_type=doc.tenant.type if doc.tenant else None,
         )
         raise ForbiddenError("Not allowed to modify this patient")
 
@@ -196,7 +220,6 @@ def get_patients(
     acting_doctor: Doctor | None = None,
 ) -> list[Patient]:
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
-    created_by: UUID | None = None
     user_id: UUID | None = None
     effective_tenant_id = tenant_id
 
@@ -206,17 +229,15 @@ def get_patients(
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
-        linked_doctor_id = doc.id
-        if doctor_service.doctor_is_independent(doc):
-            doctor_created_by_user_id = current_user.id
+        effective_tenant_id = doc.tenant_id
+        linked_doctor_id = None
+        doctor_created_by_user_id = None
     elif current_user.role == UserRole.patient:
         user_id = current_user.id
         # Own profile is keyed by user_id; patient rows may not carry tenant_id
         effective_tenant_id = None
-    elif current_user.role == UserRole.admin:
+    elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
         pass  # tenant filter only (caller supplies tenant_id)
-    elif current_user.role == UserRole.super_admin:
-        effective_tenant_id = None
 
     return crud_patient.get_patients(
         db,
@@ -224,7 +245,7 @@ def get_patients(
         limit=limit,
         search=search,
         tenant_id=effective_tenant_id,
-        created_by=created_by,
+        created_by=None,
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
         doctor_created_by_user_id=doctor_created_by_user_id,

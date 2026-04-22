@@ -53,7 +53,7 @@ export function SignupDoctor() {
       <Card padding="lg" className="w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold text-text-primary">Create doctor account</h1>
-          <p className="text-sm text-text-secondary mt-1">Opens an independent practice tenant</p>
+          <p className="text-sm text-text-secondary mt-1">Creates your clinic workspace (same model as any tenant)</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Input label="Email" type="email" error={errors.email?.message} disabled={isSubmitting} {...register('email')} />

@@ -1,7 +1,4 @@
-"""RBAC: only independent_doctor tenants may have doctors create patients and bills.
-
-Managed tenants (hospital, clinic, etc.) use appointment-linked access only.
-"""
+"""RBAC: doctors are always scoped to a tenant; permissions use tenant_id, not tenant *type*."""
 
 from __future__ import annotations
 
@@ -74,11 +71,11 @@ def _doctor_user_and_billing_for_tenant(
     return doc_user, billing_in
 
 
-def test_independent_doctor_can_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.independent_doctor)
+def test_clinic_doctor_can_create_patient(db_session: Session) -> None:
+    tenant = _tenant(db_session, TenantType.clinic)
     doc_user = create_user(
         db_session,
-        email=f"inddoc_{uuid.uuid4().hex[:8]}@test.local",
+        email=f"clinicdoc_{uuid.uuid4().hex[:8]}@test.local",
         password="DocPass123!",
         role=UserRole.doctor,
         tenant_id=tenant.id,
@@ -89,8 +86,10 @@ def test_independent_doctor_can_create_patient(db_session: Session) -> None:
     patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
 
 
-def test_hospital_doctor_cannot_see_unrelated_patient(db_session: Session) -> None:
-    """Managed-tenant doctors only see patients they are linked to (not full tenant roster)."""
+def test_hospital_doctor_sees_same_tenant_patient_without_personal_appointment(
+    db_session: Session,
+) -> None:
+    """All doctors in a tenant may access patients with the same tenant_id."""
     tenant = _tenant(db_session, TenantType.hospital)
     doc_a_user = create_user(
         db_session,
@@ -136,18 +135,49 @@ def test_hospital_doctor_cannot_see_unrelated_patient(db_session: Session) -> No
     )
     db_session.commit()
 
-    with pytest.raises(ForbiddenError, match="Not allowed to modify this patient"):
-        patient_service.authorize_patient_read(
-            db_session, patient, doc_a_user, tenant_id=tenant.id
-        )
+    patient_service.authorize_patient_read(
+        db_session, patient, doc_a_user, tenant_id=tenant.id
+    )
 
     listed = patient_service.get_patients(
         db_session, doc_a_user, tenant_id=tenant.id, limit=100
     )
-    assert patient.id not in {p.id for p in listed}
+    assert patient.id in {p.id for p in listed}
 
 
-def test_hospital_doctor_cannot_create_patient(db_session: Session) -> None:
+def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> None:
+    tenant_a = _tenant(db_session, TenantType.hospital)
+    tenant_b = _tenant(db_session, TenantType.hospital)
+    doc_user = create_user(
+        db_session,
+        email=f"cross_a_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=tenant_a.id,
+    )
+    create_doctor_profile(db_session, tenant_id=tenant_a.id, user_id=doc_user.id)
+    pat_user = create_user(
+        db_session,
+        email=f"cross_b_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=tenant_b.id,
+    )
+    patient = create_patient_profile(
+        db_session,
+        tenant_id=tenant_b.id,
+        user_id=pat_user.id,
+        created_by=pat_user.id,
+    )
+    db_session.commit()
+
+    with pytest.raises(ForbiddenError, match="Resource is not in your tenant"):
+        patient_service.authorize_patient_read(
+            db_session, patient, doc_user, tenant_id=tenant_a.id
+        )
+
+
+def test_hospital_doctor_can_create_patient(db_session: Session) -> None:
     tenant = _tenant(db_session, TenantType.hospital)
     doc_user = create_user(
         db_session,
@@ -159,60 +189,31 @@ def test_hospital_doctor_cannot_create_patient(db_session: Session) -> None:
     create_doctor_profile(db_session, tenant_id=tenant.id, user_id=doc_user.id)
     db_session.commit()
 
-    with pytest.raises(ForbiddenError, match="Only independent doctors can perform this action"):
-        patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
+    patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
 
 
-def test_independent_doctor_can_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.independent_doctor)
+def test_hospital_doctor_can_create_bill(db_session: Session) -> None:
+    tenant = _tenant(db_session, TenantType.hospital)
     doc_user, billing_in = _doctor_user_and_billing_for_tenant(
-        db_session, tenant, "ib"
+        db_session, tenant, "hb"
     )
     billing_service.authorize_bill_create(
         db_session, billing_in, doc_user, tenant_id=tenant.id
     )
 
 
-def test_hospital_doctor_cannot_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.hospital)
-    doc_user, billing_in = _doctor_user_and_billing_for_tenant(
-        db_session, tenant, "hb"
-    )
-    with pytest.raises(ForbiddenError, match="Only independent doctors can perform this action"):
-        billing_service.authorize_bill_create(
-            db_session, billing_in, doc_user, tenant_id=tenant.id
-        )
-
-
-def test_clinic_doctor_cannot_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
-    doc_user = create_user(
-        db_session,
-        email=f"clinicdoc_{uuid.uuid4().hex[:8]}@test.local",
-        password="DocPass123!",
-        role=UserRole.doctor,
-        tenant_id=tenant.id,
-    )
-    create_doctor_profile(db_session, tenant_id=tenant.id, user_id=doc_user.id)
-    db_session.commit()
-
-    with pytest.raises(ForbiddenError, match="Only independent doctors can perform this action"):
-        patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
-
-
-def test_clinic_doctor_cannot_create_bill(db_session: Session) -> None:
+def test_clinic_doctor_can_create_bill(db_session: Session) -> None:
     tenant = _tenant(db_session, TenantType.clinic)
     doc_user, billing_in = _doctor_user_and_billing_for_tenant(
         db_session, tenant, "cb"
     )
-    with pytest.raises(ForbiddenError, match="Only independent doctors can perform this action"):
-        billing_service.authorize_bill_create(
-            db_session, billing_in, doc_user, tenant_id=tenant.id
-        )
+    billing_service.authorize_bill_create(
+        db_session, billing_in, doc_user, tenant_id=tenant.id
+    )
 
 
 def test_doctor_without_profile_cannot_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.independent_doctor)
+    tenant = _tenant(db_session, TenantType.clinic)
     doc_user = create_user(
         db_session,
         email=f"nodoc_{uuid.uuid4().hex[:8]}@test.local",
@@ -227,7 +228,7 @@ def test_doctor_without_profile_cannot_create_patient(db_session: Session) -> No
 
 
 def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.independent_doctor)
+    tenant = _tenant(db_session, TenantType.clinic)
     doc_user_no_profile = create_user(
         db_session,
         email=f"nodocb_{uuid.uuid4().hex[:8]}@test.local",

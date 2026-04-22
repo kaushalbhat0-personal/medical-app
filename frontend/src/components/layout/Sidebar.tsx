@@ -10,11 +10,12 @@ import {
   Home,
   Receipt,
   Package,
+  Building2,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { isAdminRole, isPatientRole } from '../../utils/roles';
+import { isAdminRole, isPatientRole, isSuperAdminRole } from '../../utils/roles';
 import { NavItem } from './NavItem';
 
 interface SidebarProps {
@@ -43,8 +44,12 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
   const staffNavItems = useMemo(() => {
     if (!isAdminRole(user?.role)) return staffNavBase;
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
+    const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
-    return [staffNavBase[0], adminItem, inventoryItem, ...staffNavBase.slice(1)];
+    const mid = isSuperAdminRole(user?.role)
+      ? [adminItem, tenantsItem, inventoryItem]
+      : [adminItem, inventoryItem];
+    return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
   }, [user?.role]);
 
   const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;

@@ -232,7 +232,7 @@ export function DoctorPatientDetailPage() {
     return (
       <ErrorState
         title="Access denied"
-        description="You can only open patients you are linked to through an appointment, or that you created (independent practice). Ask your admin if you believe this is a mistake."
+        description="You can open patients in your organization or those linked to you by appointment. If this looks wrong, ask an administrator."
       />
     );
   }

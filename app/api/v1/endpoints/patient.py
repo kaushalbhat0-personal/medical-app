@@ -8,15 +8,24 @@ from app.api.deps import (
     get_acting_doctor_optional_active,
     get_current_active_user,
     get_current_user,
+    get_optional_scoped_tenant_id,
+    get_optional_scoped_tenant_id_active,
 )
-from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.doctor import Doctor
 from app.models.user import User
-from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
+from app.schemas.patient import PatientCreate, PatientMyDoctorRead, PatientRead, PatientUpdate
 from app.services import patient_service
 
 router = APIRouter(prefix="/patients", tags=["patients"])
+
+
+@router.get("/me/doctors", response_model=list[PatientMyDoctorRead])
+def read_my_doctors(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> list[PatientMyDoctorRead]:
+    return patient_service.list_my_doctors(db, current_user)
 
 
 @router.post("", response_model=PatientRead, status_code=201)
@@ -25,8 +34,8 @@ def create_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
 ) -> PatientRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return patient_service.create_patient(
         db, payload, current_user, tenant_id, acting_doctor=acting_doctor
     )
@@ -40,8 +49,8 @@ def read_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[PatientRead]:
-    tenant_id = get_current_tenant_id(current_user, db)
     return patient_service.get_patients(
         db,
         current_user,
@@ -59,8 +68,8 @@ def read_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> PatientRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     patient = patient_service.get_patient_or_404(db, patient_id)
     patient_service.authorize_patient_read(
         db,
@@ -80,8 +89,8 @@ def update_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> PatientRead:
-    tenant_id = get_current_tenant_id(current_user, db)
     return patient_service.update_patient(
         db,
         patient_id,
@@ -98,8 +107,8 @@ def delete_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> Response:
-    tenant_id = get_current_tenant_id(current_user, db)
     patient_service.delete_patient(
         db, patient_id, current_user, tenant_id, acting_doctor=acting_doctor
     )

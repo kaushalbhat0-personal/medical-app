@@ -45,7 +45,6 @@ def create_availability_window(
 ) -> DoctorAvailability:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     if doctor.tenant_id is None:
         raise ValidationError("Doctor tenant is not set")
     if payload.start_time >= payload.end_time:
@@ -76,7 +75,6 @@ def update_availability_window(
 ) -> DoctorAvailability:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     window = crud_doctor_availability.get_availability_window(db, window_id)
     if window is None or window.doctor_id != doctor_id:
         raise NotFoundError("Availability window not found")
@@ -110,7 +108,6 @@ def delete_availability_window(
 ) -> None:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     window = crud_doctor_availability.get_availability_window(db, window_id)
     if window is None or window.doctor_id != doctor_id:
         raise NotFoundError("Availability window not found")
@@ -126,7 +123,6 @@ def copy_availability_to_days(
 ) -> None:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     if doctor.tenant_id is None:
         raise ValidationError("Doctor tenant is not set")
 
@@ -141,7 +137,6 @@ def copy_availability_to_days(
             raise ValidationError("Window is too short to fit a slot of this duration")
 
     target_days = sorted({d for d in payload.target_days if d != payload.source_day and 0 <= d <= 6})
-    print("COPY FROM:", payload.source_day, "TO:", target_days)
 
     for dow in target_days:
         crud_doctor_availability.replace_availability_day_from_templates(
@@ -199,7 +194,6 @@ def create_time_off(
 ) -> DoctorTimeOff:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     if doctor.tenant_id is None:
         raise ValidationError("Doctor tenant is not set")
     _assert_time_off_shape(payload.start_time, payload.end_time)
@@ -225,7 +219,6 @@ def update_time_off(
 ) -> DoctorTimeOff:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     row = crud_doctor_availability.get_time_off(db, time_off_id)
     if row is None or row.doctor_id != doctor_id:
         raise NotFoundError("Time off entry not found")
@@ -252,7 +245,6 @@ def delete_time_off(
 ) -> None:
     doctor = doctor_service.get_doctor_or_404_with_tenant(db, doctor_id)
     doctor_service.authorize_doctor_update(db, doctor, current_user, tenant_id)
-    doctor_service.ensure_self_managed_doctor(doctor)
     row = crud_doctor_availability.get_time_off(db, time_off_id)
     if row is None or row.doctor_id != doctor_id:
         raise NotFoundError("Time off entry not found")

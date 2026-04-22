@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.security import create_access_token
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import ResetPasswordRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services import auth_service
@@ -23,9 +23,8 @@ def _build_token_payload(user) -> dict:
     - **what** the user can see (`role`)
     - **which tenant** to scope requests to (`tenant_id`, when applicable)
 
-    We include `tenant_id` to support multi-tenant routing on the client and server.
-    If a user has multiple tenant associations, we pick the primary association if present,
-    otherwise we fall back to the first association for a deterministic token.
+    ``super_admin`` has no fixed tenant (client sends ``X-Tenant-ID`` per request).
+    Otherwise we prefer ``users.tenant_id``, then legacy ``user_tenant`` primary row.
     """
     payload = {
         "sub": str(user.id),
@@ -33,6 +32,11 @@ def _build_token_payload(user) -> dict:
         "role": user.role.value if user.role else "admin",
         "tenant_id": None,
     }
+    if user.role == UserRole.super_admin:
+        return payload
+    if user.tenant_id is not None:
+        payload["tenant_id"] = str(user.tenant_id)
+        return payload
     if user.tenant_associations:
         primary = next(
             (ta for ta in user.tenant_associations if ta.is_primary),

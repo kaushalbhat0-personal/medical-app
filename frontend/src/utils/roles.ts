@@ -13,6 +13,10 @@ export function isAdminRole(role: string | null | undefined): boolean {
   return r === 'admin' || r === 'super_admin';
 }
 
+export function isSuperAdminRole(role: string | null | undefined): boolean {
+  return role?.toLowerCase() === 'super_admin';
+}
+
 export function staffHomePath(): string {
   return '/dashboard';
 }

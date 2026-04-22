@@ -31,14 +31,12 @@ async def test_create_hospital_concurrent_name_collision_single_201(
     client: AsyncClient, db_session: Session
 ) -> None:
     db = db_session
-    home = create_tenant(db, name="pg concurrent home")
     super_email = f"sa_pg_conc_{uuid.uuid4().hex[:8]}@example.com"
     create_user(
         db,
         email=super_email,
         password="SuperAdmin9!",
         role=UserRole.super_admin,
-        tenant_id=home.id,
     )
     db.commit()
 

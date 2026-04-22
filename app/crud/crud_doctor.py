@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.doctor import Doctor, DoctorCreationIdempotency
@@ -122,6 +122,25 @@ def update_doctor(
     db.commit()
     db.refresh(doctor)
     return doctor
+
+
+def count_active_doctors_by_tenant_ids(
+    db: Session,
+    tenant_ids: list[UUID],
+) -> dict[UUID, int]:
+    """Active, non-deleted doctor counts per tenant (for derived org labels)."""
+    if not tenant_ids:
+        return {}
+    stmt = (
+        select(Doctor.tenant_id, func.count(Doctor.id))
+        .where(
+            Doctor.tenant_id.in_(tenant_ids),
+            Doctor.is_active == True,  # noqa: E712
+            Doctor.is_deleted == False,  # noqa: E712
+        )
+        .group_by(Doctor.tenant_id)
+    )
+    return {row[0]: int(row[1]) for row in db.execute(stmt).all()}
 
 
 def delete_doctor(db: Session, doctor: Doctor) -> None:

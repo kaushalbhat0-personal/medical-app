@@ -10,4 +10,14 @@ export const tenantsApi = {
     }
     return safeArray<Tenant>(response.data);
   },
+
+  getById: async (tenantId: string): Promise<Tenant> => {
+    const response = await api.get(`/tenants/${tenantId}`);
+    return response.data as Tenant;
+  },
+
+  create: async (payload: { name: string; type: 'clinic' | 'hospital' }): Promise<Tenant> => {
+    const response = await api.post('/tenants', payload);
+    return response.data as Tenant;
+  },
 };

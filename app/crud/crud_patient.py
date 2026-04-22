@@ -92,15 +92,7 @@ def get_patients(
         if tenant_id is not None:
             stmt = stmt.where(Patient.tenant_id == tenant_id)
     elif tenant_id is not None:
-        # Patients are global; admin visibility is based on tenant appointments (join)
-        stmt = (
-            stmt.distinct()
-            .join(Patient.appointments)
-            .where(
-                Appointment.tenant_id == tenant_id,
-                Appointment.is_deleted == False,
-            )
-        )
+        stmt = stmt.where(Patient.tenant_id == tenant_id)
     if created_by is not None:
         stmt = stmt.where(Patient.created_by == created_by)
     stmt = stmt.offset(skip).limit(limit)

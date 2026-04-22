@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.organization_display import organization_label_from_active_doctor_count
 from app.core.security import hash_password
 from app.crud import crud_doctor, crud_doctor_availability, crud_tenant, crud_user
 
@@ -264,7 +265,11 @@ def authorize_doctor_create(current_user: User) -> None:
 
         raise ForbiddenError("Doctors cannot create doctor profiles")
 
-    if current_user.role not in (UserRole.admin, UserRole.super_admin):
+    if current_user.role not in (
+        UserRole.admin,
+        UserRole.super_admin,
+        UserRole.staff,
+    ):
 
         log_rbac_mutation_violation(current_user, "doctor")
 
@@ -402,6 +407,64 @@ def authorize_doctor_delete(
 
 
 
+def create_independent_doctor(
+    db: Session,
+    doctor_in: DoctorCreate,
+    user_id: UUID,
+    *,
+    current_user: User | None = None,
+) -> Doctor:
+    """
+    Doctor self-signup: create a single-tenant org (clinic) and a doctor row linked to the user.
+    The tenant is named "{name} Clinic"; type is always ``clinic`` (same model as multi-doctor clinics).
+    """
+    if current_user is not None:
+        authorize_doctor_create(current_user)
+
+    _validate_experience_years(doctor_in.experience_years)
+    doctor_data = doctor_in.model_dump()
+    doctor_data.pop("account_email", None)
+    doctor_data.pop("account_password", None)
+    doctor_data.pop("tenant_id", None)
+    doctor_data.pop("user_id", None)
+    if doctor_data.get("timezone") is None:
+        doctor_data.pop("timezone", None)
+    else:
+        doctor_data["timezone"] = _normalize_timezone_string(doctor_data["timezone"])
+
+    tenant = crud_tenant.create_tenant_tx(
+        db,
+        name=f"{doctor_in.name} Clinic",
+        type=TenantType.clinic,
+        is_active=True,
+    )
+    crud_tenant.create_user_tenant_tx(
+        db,
+        user_id=user_id,
+        tenant_id=tenant.id,
+        role="doctor",
+        is_primary=True,
+    )
+    doctor_data["tenant_id"] = tenant.id
+    doctor_data["user_id"] = user_id
+    doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+    logger.info(
+        "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s (independent clinic tenant)",
+        user_id,
+        doctor.id,
+        doctor.tenant_id,
+    )
+    if current_user is not None:
+        log_audit_mutation(
+            "create",
+            current_user,
+            "doctor",
+            doctor.id,
+            doctor.tenant_id,
+        )
+    return doctor
+
+
 def create_doctor(
 
     db: Session,
@@ -424,6 +487,10 @@ def create_doctor(
 
 
 
+    if tenant_id is None and user_id is not None:
+
+        return create_independent_doctor(db, doctor_in, user_id, current_user=current_user)
+
     _validate_experience_years(doctor_in.experience_years)
 
     doctor_data = doctor_in.model_dump()
@@ -435,65 +502,6 @@ def create_doctor(
         doctor_data.pop("timezone", None)
     else:
         doctor_data["timezone"] = _normalize_timezone_string(doctor_data["timezone"])
-
-    if tenant_id is None and user_id is not None:
-
-        tenant = crud_tenant.create_tenant_tx(
-
-            db,
-
-            name=f"Dr. {doctor_in.name}",
-
-            type=TenantType.independent_doctor,
-
-            is_active=True,
-
-        )
-
-        crud_tenant.create_user_tenant_tx(
-
-            db,
-
-            user_id=user_id,
-
-            tenant_id=tenant.id,
-
-            role="doctor",
-
-            is_primary=True,
-
-        )
-
-        doctor_data["tenant_id"] = tenant.id
-
-        doctor_data["user_id"] = user_id
-
-        doctor = crud_doctor.create_doctor_tx(db, doctor_data)
-
-        logger.info(
-            "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s",
-            user_id,
-            doctor.id,
-            doctor.tenant_id,
-        )
-
-        if current_user is not None:
-
-            log_audit_mutation(
-
-                "create",
-
-                current_user,
-
-                "doctor",
-
-                doctor.id,
-
-                doctor.tenant_id,
-
-            )
-
-        return doctor
 
 
 
@@ -510,7 +518,8 @@ def create_doctor(
         resolved_user_id is None
         and tenant_id is not None
         and current_user is not None
-        and current_user.role in (UserRole.admin, UserRole.super_admin)
+        and current_user.role
+        in (UserRole.admin, UserRole.super_admin, UserRole.staff)
         and account_email
         and str(account_email).strip()
         and account_password
@@ -522,7 +531,8 @@ def create_doctor(
     if (
         resolved_user_id is None
         and current_user is not None
-        and current_user.role in (UserRole.admin, UserRole.super_admin)
+        and current_user.role
+        in (UserRole.admin, UserRole.super_admin, UserRole.staff)
     ):
         raise ValidationError(
             "account_email and account_password are required to create a doctor with a login"
@@ -594,7 +604,7 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
 
 
 def get_doctor_or_404_with_tenant(db: Session, doctor_id: UUID) -> Doctor:
-    """Doctor row with `tenant` loaded; used for tenant-type checks (e.g. self-managed only)."""
+    """Doctor row with `tenant` loaded for RBAC and tenant scoping."""
     stmt = (
         select(Doctor)
         .where(Doctor.id == doctor_id, Doctor.is_deleted == False)
@@ -623,21 +633,6 @@ def get_acting_doctor_or_none(db: Session, current_user: User) -> Doctor | None:
     return require_doctor_profile(db, current_user)
 
 
-def ensure_self_managed_doctor(doctor: Doctor) -> None:
-    """``independent_doctor`` tenants only (self-managed practice). ``doctor.tenant`` must be loaded."""
-    if doctor.tenant is None:
-        raise ForbiddenError("Doctor tenant is not set")
-    if doctor.tenant.type != TenantType.independent_doctor.value:
-        raise ForbiddenError("Only independent doctors can perform this action")
-
-
-def require_self_managed_doctor(db: Session, current_user: User) -> Doctor:
-    """Only ``independent_doctor`` tenants may perform patient/bill creation and similar actions."""
-    doctor = require_doctor_profile(db, current_user)
-    ensure_self_managed_doctor(doctor)
-    return doctor
-
-
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
     """Resolve the doctor row by doctors.user_id only (no legacy id == user.id fallback)."""
     doctor = crud_doctor.get_doctor_by_user_id(db, user_id)
@@ -647,21 +642,6 @@ def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
         raise ForbiddenError("Doctor profile not found for this user")
 
     return doctor
-
-
-def doctor_is_independent(doctor: Doctor) -> bool:
-    """True if the doctor's tenant is ``independent_doctor``. ``doctor.tenant`` must be loaded."""
-    if doctor.tenant is None:
-        raise ForbiddenError("Doctor tenant is not set")
-    return doctor.tenant.type == TenantType.independent_doctor.value
-
-
-def is_independent_doctor(db: Session, current_user: User) -> bool:
-    """Resolves the doctor by user and checks tenant type."""
-    return doctor_is_independent(require_doctor_profile(db, current_user))
-
-
-
 
 
 def get_doctors(
@@ -710,12 +690,6 @@ def get_doctors(
 
         eff_tenant_id = None
 
-    elif current_user is not None and current_user.role == UserRole.super_admin:
-
-        eff_tenant_id = None
-
-
-
     doctors = crud_doctor.get_doctors(
 
         db,
@@ -734,6 +708,11 @@ def get_doctors(
 
     hydrate_doctor_availability_flags(db, doctors)
 
+    tenant_ids = {d.tenant_id for d in doctors if d.tenant_id is not None}
+    org_counts = (
+        crud_doctor.count_active_doctors_by_tenant_ids(db, list(tenant_ids)) if tenant_ids else {}
+    )
+
     for d in doctors:
 
         tenant = getattr(d, "tenant", None)
@@ -743,6 +722,8 @@ def get_doctors(
             setattr(d, "tenant_name", tenant.name)
 
             setattr(d, "tenant_type", tenant.type)
+            n = org_counts.get(d.tenant_id, 0) if d.tenant_id is not None else 0
+            setattr(d, "tenant_organization_label", organization_label_from_active_doctor_count(n))
 
         u = getattr(d, "user", None)
         setattr(d, "linked_user_email", u.email if u is not None else None)

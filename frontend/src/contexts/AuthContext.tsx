@@ -20,6 +20,7 @@ import { authApi, formatLoginError, patientsApi } from '../services';
 import { roleFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
 import { isPatientRole } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
+import { setActiveTenantId } from '../utils/tenantIdForRequest';
 
 interface AuthContextValue {
   user: User | null;
@@ -208,6 +209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true);
       const userData = buildUserFromRegister(response);
       localStorage.setItem('user', JSON.stringify(userData));
+      if (userData.role !== 'super_admin' && userData.tenant_id) {
+        setActiveTenantId(String(userData.tenant_id));
+      }
       if (isPatientRole(userData.role)) {
         skipPatientProfileEffectRef.current = true;
       }
@@ -250,6 +254,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const userData = buildUserFromLogin(credentials, response);
         localStorage.setItem('user', JSON.stringify(userData));
+        if (userData.role !== 'super_admin' && userData.tenant_id) {
+          setActiveTenantId(String(userData.tenant_id));
+        }
         if (isPatientRole(userData.role)) {
           skipPatientProfileEffectRef.current = true;
         }
@@ -284,6 +291,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tenant_id');
+    localStorage.removeItem('adminSelectedTenantId');
     setIsAuthenticated(false);
     setUser(null);
     setPatientId(null);

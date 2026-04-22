@@ -340,9 +340,7 @@ def get_appointments(
         patient = patient_service.get_patient_by_user_id(db, current_user.id)
         eff_patient_id = patient.id
         eff_doctor_id = None
-    elif current_user.role == UserRole.super_admin:
-        eff_tenant_id = None
-    elif current_user.role in (UserRole.admin, UserRole.staff):
+    elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
         pass
 
     appointments = crud_appointment.get_appointments(

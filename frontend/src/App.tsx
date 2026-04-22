@@ -10,6 +10,7 @@ import { roleFromToken } from './utils/jwtPayload';
 import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AdminRoute } from './components/layout/AdminRoute';
+import { SuperAdminRoute } from './components/layout/SuperAdminRoute';
 import { StaffRoute } from './components/layout/StaffRoute';
 import { PatientRoute } from './components/layout/PatientRoute';
 import { PatientLayout } from './components/layout/PatientLayout';
@@ -24,6 +25,7 @@ import { Doctors } from './pages/Doctors';
 import { Appointments } from './pages/Appointments';
 import { Billing } from './pages/Billing';
 import { PatientHome } from './pages/patient/PatientHome';
+import { PatientClinicDoctors } from './pages/patient/PatientClinicDoctors';
 import { PatientDoctors } from './pages/patient/PatientDoctors';
 import { PatientAppointments } from './pages/patient/PatientAppointments';
 import { PatientBills } from './pages/patient/PatientBills';
@@ -35,6 +37,7 @@ import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
 import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
+import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
 import { ResetPassword } from './pages/ResetPassword';
@@ -194,6 +197,23 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/admin/tenants"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <SuperAdminRoute user={user}>
+                  <AppLayout user={user} onLogout={logout}>
+                    <AnimatedPage>
+                      <AdminTenantsPage />
+                    </AnimatedPage>
+                  </AppLayout>
+                </SuperAdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
@@ -346,6 +366,14 @@ function AnimatedRoutes() {
             element={
               <AnimatedPage>
                 <PatientHome />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="clinic/:tenantId"
+            element={
+              <AnimatedPage>
+                <PatientClinicDoctors />
               </AnimatedPage>
             }
           />

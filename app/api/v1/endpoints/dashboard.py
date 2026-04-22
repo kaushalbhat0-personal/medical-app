@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_scoped_tenant_id
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.dashboard import (
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @router.get("", response_model=DashboardResponse)
 def get_dashboard(
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    tenant_id: UUID = Depends(get_scoped_tenant_id),
 ) -> DashboardResponse:
     """
     Get dashboard statistics including:
@@ -34,7 +34,7 @@ def get_dashboard(
     """
     logger.info("Dashboard endpoint hit - fetching stats")
 
-    stats = dashboard_service.get_dashboard_stats(db)
+    stats = dashboard_service.get_dashboard_stats_for_tenant(db, tenant_id)
 
     logger.info(
         "Dashboard stats returned - patients: %s, doctors: %s, today_appointments: %s, revenue: %s",

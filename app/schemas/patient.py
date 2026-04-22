@@ -31,3 +31,14 @@ class PatientUpdate(BaseModel):
     gender: str | None = None
     phone: str | None = None
     clinical_notes: str | None = None
+
+
+class PatientMyDoctorRead(BaseModel):
+    """Doctors the patient has booked (non-cancelled appointments), past or upcoming."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    specialization: str
+    tenant_id: UUID

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -11,10 +11,12 @@ from app.api.http_exceptions import (
 )
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.core.tenant_context import resolve_tenant_id_for_scoped_request
 from app.crud import crud_user
 from app.models.doctor import Doctor
 from app.models.user import User
 from app.services import doctor_service
+from app.services.exceptions import ValidationError
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(
@@ -27,6 +29,14 @@ oauth2_scheme_optional = OAuth2PasswordBearer(
 class TokenPayload:
     user_id: UUID
     role: str
+    tenant_id: UUID | None
+
+
+@dataclass(frozen=True)
+class CurrentTenantContext:
+    """Resolved RBAC tenant scope for the authenticated principal (see ``resolve_tenant_id_for_scoped_request``)."""
+
+    user: User
     tenant_id: UUID | None
 
 
@@ -133,3 +143,61 @@ def get_current_doctor(
 ) -> Doctor:
     """Doctor profile for the current user; use on doctor-only routes."""
     return doctor_service.require_doctor_profile(db, current_user)
+
+
+def get_optional_scoped_tenant_id(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> UUID | None:
+    """Tenant scope for routes that patients may call with ``tenant_id=None`` (e.g. slot reads)."""
+    return resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+
+
+def get_optional_scoped_tenant_id_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> UUID | None:
+    """Like ``get_optional_scoped_tenant_id`` but requires an active user (mutations)."""
+    return resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+
+
+def get_scoped_tenant_id(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> UUID:
+    tid = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+    if tid is None:
+        raise ValidationError("X-Tenant-ID header is required")
+    return tid
+
+
+def get_scoped_tenant_id_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> UUID:
+    tid = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+    if tid is None:
+        raise ValidationError("X-Tenant-ID header is required")
+    return tid
+
+
+def get_current_tenant_context(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> CurrentTenantContext:
+    tenant_id = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+    return CurrentTenantContext(user=current_user, tenant_id=tenant_id)
+
+
+def get_current_tenant_context_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> CurrentTenantContext:
+    tenant_id = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+    return CurrentTenantContext(user=current_user, tenant_id=tenant_id)

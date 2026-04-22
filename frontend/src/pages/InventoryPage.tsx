@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useDoctorWorkspace } from '../contexts/DoctorWorkspaceContext';
+import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import {
   inventoryApi,
@@ -128,6 +129,12 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
 
   useEffect(() => {
     void loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    const onTenant = () => void loadAll();
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, onTenant);
+    return () => window.removeEventListener(TENANT_ID_STORAGE_EVENT, onTenant);
   }, [loadAll]);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.user import UserRole
 from app.schemas.doctor import DoctorCreate
@@ -16,6 +16,22 @@ class UserCreate(BaseModel):
     patient_profile: PatientCreate | None = None
 
 
+class OrganizationUserCreate(BaseModel):
+    """Super-admin provisioning: tenant-bound admin or staff account."""
+
+    email: str
+    password: str = Field(min_length=8)
+    role: UserRole
+    tenant_id: UUID
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_org_staff(cls, v: UserRole) -> UserRole:
+        if v not in (UserRole.admin, UserRole.staff):
+            raise ValueError("role must be admin or staff")
+        return v
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +39,7 @@ class UserRead(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    tenant_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -45,6 +62,7 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    tenant_id: UUID | None = None
     full_name: str = ""
 
     def __init__(self, **data):

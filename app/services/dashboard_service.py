@@ -12,6 +12,7 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, BillingStatus
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.services.exceptions import ForbiddenError, ValidationError
 
@@ -54,8 +55,61 @@ def get_dashboard_stats(db: Session) -> dict:
     }
 
 
+def get_dashboard_stats_for_tenant(db: Session, tenant_id: UUID) -> dict:
+    """Staff dashboard KPIs scoped to a single tenant (matches GET /dashboard with X-Tenant-ID)."""
+    total_patients = (
+        db.query(Patient).filter(Patient.tenant_id == tenant_id).count()
+    )
+    total_doctors = (
+        db.query(Doctor)
+        .filter(
+            Doctor.tenant_id == tenant_id,
+            Doctor.is_deleted == False,  # noqa: E712
+        )
+        .count()
+    )
+
+    ist = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(ist)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+
+    today_appointments = (
+        db.query(Appointment)
+        .filter(
+            Appointment.tenant_id == tenant_id,
+            Appointment.appointment_time >= start,
+            Appointment.appointment_time < end,
+            Appointment.is_deleted == False,  # noqa: E712
+        )
+        .count()
+    )
+
+    total_revenue = (
+        db.query(func.sum(Billing.amount))
+        .filter(
+            Billing.tenant_id == tenant_id,
+            Billing.status == "paid",
+            Billing.is_deleted == False,  # noqa: E712
+        )
+        .scalar()
+        or 0
+    )
+
+    return {
+        "total_patients": total_patients,
+        "total_doctors": total_doctors,
+        "today_appointments": today_appointments,
+        "total_revenue": float(total_revenue),
+    }
+
+
 def authorize_admin_dashboard_access(current_user: User) -> None:
-    if current_user.role not in (UserRole.admin, UserRole.super_admin):
+    if current_user.role not in (
+        UserRole.admin,
+        UserRole.super_admin,
+        UserRole.staff,
+    ):
         raise ForbiddenError("Admin access required")
 
 
@@ -70,9 +124,15 @@ def resolve_admin_metrics_tenant_id(
     - admin: header must match the user's primary tenant.
     - super_admin: uses the header as the selected tenant (no UserTenant row).
     """
-    eff = get_current_tenant_id(current_user, db)
     if current_user.role == UserRole.super_admin:
+        row = db.get(Tenant, x_tenant_id)
+        if row is None:
+            raise ValidationError("Tenant not found")
+        if not row.is_active:
+            raise ValidationError("Tenant is not active")
         return x_tenant_id
+
+    eff = get_current_tenant_id(current_user, db)
     if eff is None:
         raise ValidationError("Tenant context is not configured for this user")
     if x_tenant_id != eff:
