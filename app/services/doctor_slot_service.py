@@ -403,6 +403,10 @@ def invalidate_slots_cache_for_doctor_date(doctor_id: UUID, target_date: date) -
 
 
 def invalidate_all_slots_cache_for_doctor(doctor_id: UUID) -> None:
+    """
+    Drop every cached (doctor, calendar-date) entry for this doctor (all future/past date keys).
+    For a string-keyed cache this would be: delete_pattern(f"slots:{doctor_id}:*").
+    """
     cache = _resolve_slot_cache_backend()
     if cache is None:
         return

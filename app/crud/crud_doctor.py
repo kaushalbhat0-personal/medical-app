@@ -113,6 +113,11 @@ def update_doctor(
     for field, value in update_data.items():
         setattr(doctor, field, value)
 
+    if "timezone" in update_data:
+        from app.core.slot_cache_invalidation import schedule_invalidate_doctor_slot_cache_on_commit
+
+        schedule_invalidate_doctor_slot_cache_on_commit(db, doctor.id)
+
     db.add(doctor)
     db.commit()
     db.refresh(doctor)

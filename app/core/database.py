@@ -28,3 +28,6 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+import app.core.slot_cache_invalidation  # noqa: E402, F401 — register after_commit/rollback slot cache hooks

@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.slot_cache_invalidation import schedule_invalidate_doctor_slot_cache_on_commit
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 
 
@@ -50,8 +51,10 @@ def get_availability_window(db: Session, window_id: UUID) -> DoctorAvailability 
 
 
 def delete_availability_window(db: Session, window: DoctorAvailability) -> None:
+    doctor_id = window.doctor_id
     db.delete(window)
     db.flush()
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
 
 
 def list_time_off_for_doctor_on_date(db: Session, doctor_id: UUID, target_date: date) -> list[DoctorTimeOff]:
@@ -102,6 +105,7 @@ def create_time_off(
     db.add(row)
     db.flush()
     db.refresh(row)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
     return row
 
 
@@ -119,12 +123,15 @@ def update_time_off_row(
     db.add(row)
     db.flush()
     db.refresh(row)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, row.doctor_id)
     return row
 
 
 def delete_time_off(db: Session, row: DoctorTimeOff) -> None:
+    doctor_id = row.doctor_id
     db.delete(row)
     db.flush()
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
 
 
 def _time_ranges_overlap(a_start: time, a_end: time, b_start: time, b_end: time) -> bool:
@@ -179,6 +186,7 @@ def create_availability_window(
     db.add(row)
     db.flush()
     db.refresh(row)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
     return row
 
 
@@ -216,4 +224,5 @@ def update_availability_window(
     db.add(window)
     db.flush()
     db.refresh(window)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, window.doctor_id)
     return window

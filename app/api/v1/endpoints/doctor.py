@@ -209,7 +209,6 @@ def create_doctor_availability_window(
         )
         db.commit()
         db.refresh(row)
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return row
     except Exception:
         db.rollback()
@@ -234,7 +233,6 @@ def update_doctor_availability_window(
         )
         db.commit()
         db.refresh(row)
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return row
     except Exception:
         db.rollback()
@@ -257,7 +255,6 @@ def delete_doctor_availability_window(
             db, doctor_id, window_id, current_user, tenant_id
         )
         db.commit()
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception:
         db.rollback()
@@ -305,7 +302,6 @@ def create_doctor_time_off(
         )
         db.commit()
         db.refresh(row)
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return row
     except Exception:
         db.rollback()
@@ -330,7 +326,6 @@ def update_doctor_time_off(
         )
         db.commit()
         db.refresh(row)
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return row
     except Exception:
         db.rollback()
@@ -353,7 +348,6 @@ def delete_doctor_time_off(
             db, doctor_id, time_off_id, current_user, tenant_id
         )
         db.commit()
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception:
         db.rollback()
@@ -381,10 +375,7 @@ def update_doctor(
     current_user: User = Depends(get_current_user),
 ) -> DoctorRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    updated = doctor_service.update_doctor(db, doctor_id, payload, current_user, tenant_id)
-    if payload.model_dump(exclude_unset=True).get("timezone") is not None:
-        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
-    return updated
+    return doctor_service.update_doctor(db, doctor_id, payload, current_user, tenant_id)
 
 
 @router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
