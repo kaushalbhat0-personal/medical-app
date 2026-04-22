@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,7 @@ class TenantType(str, enum.Enum):
 
 class Tenant(Base):
     __tablename__ = "tenants"
+    __table_args__ = (Index("ix_tenants_type", "type"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

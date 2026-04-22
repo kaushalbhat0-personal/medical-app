@@ -91,7 +91,6 @@ class Billing(Base):
     idempotency_key: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
-        unique=True,
     )
     is_deleted: Mapped[bool] = mapped_column(
         Boolean,
