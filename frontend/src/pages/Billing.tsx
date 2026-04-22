@@ -8,6 +8,7 @@ import { createBillHandler, payBillHandler, fetchPatientAppointmentsHandler } fr
 import { billingApi } from '../services';
 import { CURRENCIES, EMPTY_BILL } from '../constants';
 import { formatPatientName, formatDateSafe, formatCurrency } from '../utils';
+import { formatAppointmentDateTimeWithZoneLabel } from '../utils/doctorSchedule';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, Button, Card as CommonCard } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -273,16 +274,9 @@ export function Billing() {
                     : 'Select appointment (optional)'
                 }
                 options={patientAppointments.map((a) => {
-                  // Format date nicely
                   const dateStr = a.scheduled_at || a.appointment_time || '';
-                  const formattedDate = dateStr 
-                    ? new Date(dateStr).toLocaleDateString('en-IN', { 
-                        day: '2-digit', 
-                        month: 'short', 
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
+                  const formattedDate = dateStr
+                    ? formatAppointmentDateTimeWithZoneLabel(dateStr, a.doctor?.timezone || 'UTC')
                     : 'No date';
                   return {
                     value: a.id,

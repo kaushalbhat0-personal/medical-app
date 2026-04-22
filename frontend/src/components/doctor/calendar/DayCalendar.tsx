@@ -38,6 +38,7 @@ import {
   ymdInTimeZone,
 } from '../../../utils/doctorSchedule';
 import { BookingModal } from './BookingModal';
+import { SwipeableSlotActions } from './SwipeableSlotActions';
 
 const CALENDAR_VIEW_STORAGE_KEY = 'calendar_view';
 type CalendarViewMode = 'grid' | 'list';
@@ -654,21 +655,23 @@ export function DayCalendar({
     const showCompleteCancel =
       isInteractive && !past && appt && (appt.status === 'scheduled' || appt.status === 'pending');
 
+    const listCardBaseClass = cn(
+      'w-full rounded-xl border p-4 text-left transition-colors min-h-[64px] flex flex-col gap-3',
+      past && 'border-border bg-muted/30 text-muted-foreground',
+      !past && s.available && 'border-emerald-600/40 bg-green-50 dark:bg-emerald-950/25',
+      !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border-border bg-gray-50 dark:bg-muted/40',
+      !past && !s.available && appt?.status === 'completed' && 'border-border bg-gray-50 opacity-60 dark:bg-muted/40',
+      !past && !s.available && appt?.status === 'cancelled' && 'border-red-200 bg-red-50 dark:bg-red-950/20',
+      !past && !s.available && !appt && 'border-border bg-gray-50 dark:bg-muted/40',
+      selected && 'ring-2 ring-primary border-primary shadow-sm'
+    );
+
     const cardShell = (opts: {
       interactive: boolean;
       children: ReactNode;
       className?: string;
     }) => {
-      const base = cn(
-        'w-full rounded-xl border p-4 text-left transition-colors min-h-[64px] flex flex-col gap-3',
-        past && 'border-border bg-muted/30 text-muted-foreground',
-        !past && s.available && 'border-emerald-600/40 bg-green-50 dark:bg-emerald-950/25',
-        !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border-border bg-gray-50 dark:bg-muted/40',
-        !past && !s.available && appt?.status === 'completed' && 'border-border bg-gray-50 opacity-60 dark:bg-muted/40',
-        !past && !s.available && appt?.status === 'cancelled' && 'border-red-200 bg-red-50 dark:bg-red-950/20',
-        !past && !s.available && !appt && 'border-border bg-gray-50 dark:bg-muted/40',
-        selected && 'ring-2 ring-primary border-primary shadow-sm'
-      );
+      const base = listCardBaseClass;
 
       if (opts.interactive) {
         return (
@@ -762,6 +765,31 @@ export function DayCalendar({
 
     if (!past && s.available && isInteractive) {
       return cardShell({ interactive: true, children: body });
+    }
+
+    if (showCompleteCancel && appt) {
+      return (
+        <SwipeableSlotActions
+          key={k}
+          ref={(el) => {
+            if (el) slotBtnRefs.current.set(k, el);
+            else slotBtnRefs.current.delete(k);
+          }}
+          dataTestId="doctor-schedule-slot"
+          swipeEnabled={!isDesktop}
+          disabled={apptActionBusy != null}
+          className={listCardBaseClass}
+          onKeyDown={slotNavKeyHandler(k)}
+          onComplete={() => {
+            void onCompleteAppt(String(appt.id));
+          }}
+          onCancel={() => {
+            void onCancelAppt(String(appt.id));
+          }}
+        >
+          {body}
+        </SwipeableSlotActions>
+      );
     }
 
     return cardShell({ interactive: false, children: body });

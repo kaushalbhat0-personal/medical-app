@@ -9,6 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '../../components/common';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import {
+  appointmentCalendarDayYmd,
+  formatSlotTimeWithZoneLabel,
+  relativeCalendarDayTitleInZone,
+} from '../../utils/doctorSchedule';
 import { appointmentsApi, billingApi, patientsApi } from '../../services';
 import { Textarea } from '@/components/ui/textarea';
 import type { Appointment, Bill, Patient } from '../../types';
@@ -38,58 +43,8 @@ function appointmentTime(a: Appointment): number {
   return t ? new Date(t).getTime() : 0;
 }
 
-/** Local calendar date for timeline grouping. */
-function groupKeyLocal(iso: string | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function isSameLocalCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function relDayHeading(iso: string | undefined): string {
-  if (!iso) return 'Unknown date';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Unknown date';
-  const today = new Date();
-  const yest = new Date(today);
-  yest.setDate(yest.getDate() - 1);
-  if (isSameLocalCalendarDay(d, today)) return 'Today';
-  if (isSameLocalCalendarDay(d, yest)) return 'Yesterday';
-  return d.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-function relDayTitle(iso: string | undefined): string {
-  const h = relDayHeading(iso);
-  if (h === 'Today') return 'TODAY';
-  if (h === 'Yesterday') return 'YESTERDAY';
-  return h;
-}
-
 function kindPriority(k: TimelineItem['kind']): number {
   return k === 'appointment' ? 0 : 1;
-}
-
-function formatTimeOnly(iso: string | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString(undefined, { timeStyle: 'short' });
 }
 
 function formatRelativePast(iso: string | undefined): string {
@@ -148,7 +103,8 @@ function PageSkeleton() {
 export function DoctorPatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isIndependent, isReadOnly } = useDoctorWorkspace();
+  const { isIndependent, isReadOnly, selfDoctor } = useDoctorWorkspace();
+  const scheduleTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -224,7 +180,7 @@ export function DoctorPatientDetailPage() {
       const raw = a.appointment_time || a.scheduled_at;
       const t = appointmentTime(a);
       if (!raw || !t) continue;
-      const dayKey = groupKeyLocal(raw);
+      const dayKey = appointmentCalendarDayYmd(raw, scheduleTz);
       if (!dayKey) continue;
       items.push({
         id: `a-${a.id}`,
@@ -242,7 +198,7 @@ export function DoctorPatientDetailPage() {
         : b.created_at || b.updated_at;
       const t = raw ? new Date(raw).getTime() : 0;
       if (!raw || !t) continue;
-      const dayKey = groupKeyLocal(raw);
+      const dayKey = appointmentCalendarDayYmd(raw, scheduleTz);
       if (!dayKey) continue;
       items.push({
         id: `b-${b.id}`,
@@ -266,7 +222,7 @@ export function DoctorPatientDetailPage() {
     }
     const order = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a));
     return { timelineByDay: byDay, dayOrder: order };
-  }, [appointments, bills]);
+  }, [appointments, bills, scheduleTz]);
 
   if (!id) {
     return <ErrorState title="Invalid link" description="This patient page address is not valid." />;
@@ -541,7 +497,7 @@ export function DoctorPatientDetailPage() {
                     )}
                   >
                     <h2 className="text-lg font-semibold tracking-tight text-foreground border-b border-border/60 pb-2 mb-4">
-                      {relDayTitle(sampleIso)}
+                      {sampleIso ? relativeCalendarDayTitleInZone(sampleIso, scheduleTz) : ''}
                     </h2>
                     <ul className="space-y-3">
                       {list.map((it) => {
@@ -563,7 +519,10 @@ export function DoctorPatientDetailPage() {
                                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                                   <p className="text-muted-foreground tabular-nums">
                                     <span className="font-medium text-foreground">
-                                      {formatTimeOnly(a.appointment_time || a.scheduled_at)}
+                                      {formatSlotTimeWithZoneLabel(
+                                        a.appointment_time || a.scheduled_at || '',
+                                        scheduleTz
+                                      )}
                                     </span>
                                     <span className="mx-1.5 text-border">·</span>
                                     <span className="text-foreground">Appointment</span>{' '}
@@ -627,7 +586,7 @@ export function DoctorPatientDetailPage() {
                               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                                 <p className="text-muted-foreground tabular-nums">
                                   <span className="font-medium text-foreground">
-                                    {formatTimeOnly(it.iso)}
+                                    {formatSlotTimeWithZoneLabel(it.iso, scheduleTz)}
                                   </span>
                                   <span className="mx-1.5 text-border">·</span>
                                   <span className="text-foreground font-medium">
@@ -697,7 +656,10 @@ export function DoctorPatientDetailPage() {
                 ? appointments.find((x) => String(x.id) === String(b.appointment_id))
                 : undefined;
               const apptTime = appt
-                ? formatTimeOnly(appt.appointment_time || appt.scheduled_at)
+                ? formatSlotTimeWithZoneLabel(
+                    appt.appointment_time || appt.scheduled_at || '',
+                    scheduleTz
+                  )
                 : null;
               return (
                 <Card key={String(b.id)}>

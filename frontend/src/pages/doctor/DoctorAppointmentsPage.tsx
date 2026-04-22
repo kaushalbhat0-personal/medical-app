@@ -8,6 +8,7 @@ import { useAppointments } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState, EmptyState } from '../../components/common';
 import { DayCalendar } from '../../components/doctor/calendar/DayCalendar';
+import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import type { Appointment } from '../../types';
 
 type Tab = 'upcoming' | 'past';
@@ -55,6 +56,8 @@ export function DoctorAppointmentsPage() {
   }, [appointments, now]);
 
   const list = tab === 'upcoming' ? upcoming : past;
+
+  const displayTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
 
   const clearApptPageNavState = useCallback(() => {
     if (
@@ -220,7 +223,10 @@ export function DoctorAppointmentsPage() {
                     <span className="font-medium truncate block">{pName}</span>
                   )}
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
+                    {formatAppointmentDateTimeWithZoneLabel(
+                      a.appointment_time || a.scheduled_at || '',
+                      displayTz
+                    )}
                   </span>
                 </div>
                 <Badge variant={apptStatusBadgeVariant(a.status)} className="capitalize shrink-0">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { Calendar, Loader2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -7,14 +8,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { appointmentsApi } from '../../services';
 import type { Appointment } from '../../types';
-import { formatAppointmentDoctorName, formatDateTimeSafe } from '../../utils';
+import { formatAppointmentDoctorName } from '../../utils';
+import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import { ErrorState } from '../../components/common';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY } from '../../constants/patient';
+
+dayjs.extend(utc);
 
 type TabKey = 'upcoming' | 'past';
 
 function appointmentTime(a: Appointment): string | undefined {
   return a.appointment_time || a.scheduled_at;
+}
+
+function doctorTimeZone(a: Appointment): string {
+  return a.doctor?.timezone?.trim() || 'UTC';
 }
 
 function doctorLabel(a: Appointment): string {
@@ -118,12 +126,12 @@ export function PatientAppointments() {
   }, [location.pathname, location.key, loadFromServer]);
 
   const { upcoming, past } = useMemo(() => {
-    const now = dayjs();
+    const now = dayjs.utc();
     const upcomingList: Appointment[] = [];
     const pastList: Appointment[] = [];
     for (const a of rows) {
       const t = appointmentTime(a);
-      const dt = t ? dayjs(t) : null;
+      const dt = t ? dayjs.utc(t) : null;
       const isPast =
         a.status === 'pending'
           ? false
@@ -131,8 +139,12 @@ export function PatientAppointments() {
       if (isPast) pastList.push(a);
       else upcomingList.push(a);
     }
-    upcomingList.sort((a, b) => dayjs(appointmentTime(a)).valueOf() - dayjs(appointmentTime(b)).valueOf());
-    pastList.sort((a, b) => dayjs(appointmentTime(b)).valueOf() - dayjs(appointmentTime(a)).valueOf());
+    upcomingList.sort(
+      (a, b) => dayjs.utc(appointmentTime(a)!).valueOf() - dayjs.utc(appointmentTime(b)!).valueOf()
+    );
+    pastList.sort(
+      (a, b) => dayjs.utc(appointmentTime(b)!).valueOf() - dayjs.utc(appointmentTime(a)!).valueOf()
+    );
     return { upcoming: upcomingList, past: pastList };
   }, [rows]);
 
@@ -219,7 +231,9 @@ export function PatientAppointments() {
                 >
                   <div>
                     <p className="font-medium">{doctorLabel(a)}</p>
-                    <p className="text-sm text-muted-foreground">{t ? formatDateTimeSafe(t) : 'Time TBD'}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t ? formatAppointmentDateTimeWithZoneLabel(t, doctorTimeZone(a)) : 'Time TBD'}
+                    </p>
                     {a.notes && <p className="text-xs text-muted-foreground mt-1 max-w-md">{a.notes}</p>}
                   </div>
                   <Badge

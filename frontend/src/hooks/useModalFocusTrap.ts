@@ -3,14 +3,38 @@ import { useEffect, type RefObject } from 'react';
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+let bodyScrollLockCount = 0;
+let bodyScrollPreviousOverflow = '';
+
 function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
+/**
+ * Prevents page scroll behind a modal. Nested modals are supported via a ref count.
+ */
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) return;
+    if (bodyScrollLockCount === 0) {
+      bodyScrollPreviousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    bodyScrollLockCount += 1;
+    return () => {
+      bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+      if (bodyScrollLockCount === 0) {
+        document.body.style.overflow = bodyScrollPreviousOverflow;
+      }
+    };
+  }, [locked]);
 }
 
 /**
  * Keeps keyboard focus inside `containerRef` while `active` is true (modal pattern).
  */
 export function useModalFocusTrap(containerRef: RefObject<HTMLElement | null>, active: boolean) {
+  useBodyScrollLock(active);
   useEffect(() => {
     if (!active) return;
     const container = containerRef.current;

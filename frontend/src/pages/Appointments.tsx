@@ -8,11 +8,8 @@ import { useAppointments, type AppointmentFilters } from '../hooks';
 import { createAppointmentHandler } from '../handlers';
 import { appointmentsApi } from '../services';
 import { EMPTY_APPOINTMENT } from '../constants';
-import {
-  formatPatientName,
-  formatDoctorName,
-  formatDateTimeSafe,
-} from '../utils';
+import { formatPatientName, formatDoctorName } from '../utils';
+import { formatAppointmentDateTimeWithZoneLabel } from '../utils/doctorSchedule';
 import { ErrorState, EmptyState, GlobalLoader, FormWrapper, FormSelect, FormInput, FormTextarea, Button, Card as CommonCard } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -332,7 +329,12 @@ export function Appointments() {
                   <TableRow key={apt.id}>
                     <TableCell className="font-medium">{formatPatientName(apt.patient)}</TableCell>
                     <TableCell className="text-muted-foreground">{formatDoctorName(apt.doctor)}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatDateTimeSafe(appointmentTime)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatAppointmentDateTimeWithZoneLabel(
+                        appointmentTime || '',
+                        apt.doctor?.timezone || 'UTC'
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(apt.status)}>{apt.status}</Badge>
                     </TableCell>

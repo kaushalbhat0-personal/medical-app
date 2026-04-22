@@ -8,7 +8,7 @@ import { appointmentsApi } from '../../../services';
 import type { Patient } from '../../../types';
 import { cn } from '@/lib/utils';
 import { PatientSearchSelect } from '../PatientSearchSelect';
-import { formatSlotDateTimeLine } from '../../../utils/doctorSchedule';
+import { formatAppointmentDateTimeWithZoneLabel } from '../../../utils/doctorSchedule';
 
 export interface BookingModalProps {
   open: boolean;
@@ -144,7 +144,7 @@ export function BookingModal({
             Book appointment
           </h2>
           <p id="day-cal-book-desc" className="text-sm text-muted-foreground mt-0.5">
-            {formatSlotDateTimeLine(slotStart, timeZone)}. Choose a patient, then confirm.
+            {formatAppointmentDateTimeWithZoneLabel(slotStart, timeZone)}. Choose a patient, then confirm.
           </p>
         </div>
         <div className="space-y-4 px-4 py-4">

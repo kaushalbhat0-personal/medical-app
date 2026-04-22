@@ -8,21 +8,13 @@ import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState } from '../../components/common';
 import type { Appointment } from '../../types';
 import { UserPlus, CalendarPlus, Receipt } from 'lucide-react';
+import { appointmentCalendarDayYmd, formatSlotTimeWithZoneLabel, ymdInTimeZone } from '../../utils/doctorSchedule';
 
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function isAppointmentToday(a: Appointment, ref: Date): boolean {
+function isAppointmentToday(a: Appointment, ref: Date, doctorTz: string): boolean {
   const t = a.appointment_time || a.scheduled_at;
   if (!t) return false;
-  const dt = new Date(t);
-  const day = startOfLocalDay(ref);
-  const next = new Date(day);
-  next.setDate(next.getDate() + 1);
-  return dt >= day && dt < next;
+  const refYmd = ymdInTimeZone(doctorTz, ref);
+  return appointmentCalendarDayYmd(t, doctorTz) === refYmd;
 }
 
 export function DoctorHome() {
@@ -35,10 +27,11 @@ export function DoctorHome() {
   const error = aptError || patError;
 
   const now = useMemo(() => new Date(), []);
+  const doctorTz = (selfDoctor?.timezone || 'UTC').trim() || 'UTC';
 
   const todaysAppointments = useMemo(
-    () => appointments.filter((a) => isAppointmentToday(a, now)),
-    [appointments, now]
+    () => appointments.filter((a) => isAppointmentToday(a, now, doctorTz)),
+    [appointments, now, doctorTz]
   );
 
   const upcoming = useMemo(() => {
@@ -198,7 +191,10 @@ export function DoctorHome() {
                       <span className="font-medium truncate block">{pName}</span>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)}
+                      {formatSlotTimeWithZoneLabel(
+                        a.appointment_time || a.scheduled_at || '',
+                        doctorTz
+                      )}
                     </span>
                   </div>
                   <span className="text-muted-foreground capitalize shrink-0">{a.status}</span>

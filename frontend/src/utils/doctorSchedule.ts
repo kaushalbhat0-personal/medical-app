@@ -66,7 +66,7 @@ export function slotBlockInView(
   viewEnd: Dayjs,
   totalMinutes: number
 ): SlotBlockInViewResult {
-  const slotStart = dayjs(iso);
+  const slotStart = dayjs.utc(iso);
   const slotEnd = slotStart.add(durationMinutes, 'minute');
   const clipStart = later(slotStart, viewStart);
   const clipEnd = earlier(slotEnd, viewEnd);
@@ -130,7 +130,7 @@ export function listHourGridTicks(
 export function wallMinutesInZone(iso: string, iana: string): number {
   const tz = iana || 'UTC';
   try {
-    const x = dayjs(iso).tz(tz);
+    const x = dayjs.utc(iso).tz(tz);
     return x.hour() * 60 + x.minute() + x.second() / 60;
   } catch {
     const d = new Date(iso);
@@ -139,29 +139,90 @@ export function wallMinutesInZone(iso: string, iana: string): number {
   }
 }
 
-/** Format a slot start for display in the doctor's local zone. */
-export function formatSlotTime(iso: string, iana: string): string {
-  const tz = iana || 'UTC';
+/** Short timezone label for a wall time (e.g. IST, EST). Uses the instant for DST correctness. */
+export function timeZoneAbbreviation(iana: string, refMs?: number): string {
+  const z = (iana || 'UTC').trim() || 'UTC';
+  const ref = refMs != null && !Number.isNaN(refMs) ? refMs : Date.now();
   try {
-    return dayjs(iso).tz(tz).format('h:mm A');
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' }).formatToParts(
+      new Date(ref)
+    );
+    return parts.find((p) => p.type === 'timeZoneName')?.value ?? z.replace(/_/g, ' ');
   } catch {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return z.replace(/_/g, ' ');
   }
 }
 
-export function formatSlotDateTimeLine(iso: string, iana: string): string {
+/** Calendar YYYY-MM-DD in the doctor zone for a UTC instant from the API. */
+export function appointmentCalendarDayYmd(iso: string, iana: string): string {
   const tz = iana || 'UTC';
   try {
-    return dayjs(iso).tz(tz).format('ddd, MMM D — h:mm A');
+    return dayjs.utc(iso).tz(tz).format('YYYY-MM-DD');
   } catch {
-    return new Date(iso).toLocaleString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return ymdInTimeZone(tz, new Date(iso));
   }
+}
+
+/** Format a slot start for display in the doctor's local zone (API times are UTC). */
+export function formatSlotTime(iso: string, iana: string): string {
+  if (!iso?.trim()) return '—';
+  const tz = iana || 'UTC';
+  try {
+    return dayjs.utc(iso).tz(tz).format('h:mm A');
+  } catch {
+    return '—';
+  }
+}
+
+export function formatSlotTimeWithZoneLabel(iso: string, iana: string): string {
+  if (!iso?.trim()) return '—';
+  const time = formatSlotTime(iso, iana);
+  const abbr = timeZoneAbbreviation(iana, new Date(iso).getTime());
+  return `${time} (${abbr})`;
+}
+
+export function formatSlotDateTimeLine(iso: string, iana: string): string {
+  if (!iso?.trim()) return '—';
+  const tz = iana || 'UTC';
+  try {
+    return dayjs.utc(iso).tz(tz).format('ddd, MMM D — h:mm A');
+  } catch {
+    return '—';
+  }
+}
+
+/** Longer line for lists: date, time, and short zone (e.g. Wed, Apr 23 — 10:00 AM (IST)). */
+export function formatAppointmentDateTimeWithZoneLabel(iso: string, iana: string): string {
+  if (!iso?.trim()) return '—';
+  const line = formatSlotDateTimeLine(iso, iana);
+  const abbr = timeZoneAbbreviation(iana, new Date(iso).getTime());
+  return `${line} (${abbr})`;
+}
+
+/**
+ * "Today" / "Yesterday" / long date for grouping headings, using the doctor's calendar
+ * (not the browser's local date).
+ */
+export function relativeCalendarDayHeadingInZone(iso: string, iana: string): string {
+  const tz = iana || 'UTC';
+  try {
+    const d = dayjs.utc(iso).tz(tz);
+    const todayYmd = ymdInTimeZone(tz, new Date());
+    const ymd = d.format('YYYY-MM-DD');
+    const yestYmd = addDaysYmd(todayYmd, iana, -1);
+    if (ymd === todayYmd) return 'Today';
+    if (ymd === yestYmd) return 'Yesterday';
+    return d.format('dddd, MMMM D, YYYY');
+  } catch {
+    return 'Unknown date';
+  }
+}
+
+export function relativeCalendarDayTitleInZone(iso: string, iana: string): string {
+  const h = relativeCalendarDayHeadingInZone(iso, iana);
+  if (h === 'Today') return 'TODAY';
+  if (h === 'Yesterday') return 'YESTERDAY';
+  return h;
 }
 
 /** e.g. "All times in IST (Asia/Kolkata)" for the schedule footnote. */
@@ -185,7 +246,7 @@ export function formatNextAvailablePhrase(iso: string, slotDayYmd: string, docto
   if (slotDayYmd === doctorTodayYmd) return `Today at ${time}`;
   if (addDaysYmd(doctorTodayYmd, iana, 1) === slotDayYmd) return `Tomorrow at ${time}`;
   try {
-    const day = dayjs(iso).tz(iana).format('ddd, MMM D');
+    const day = dayjs.utc(iso).tz(iana).format('ddd, MMM D');
     return `${day} at ${time}`;
   } catch {
     return time;
@@ -241,7 +302,7 @@ export function parseAndClampDateParam(raw: string | null, minYmd: string): stri
  * (second and sub-second parts zeroed). Use for slot identity in UI state merges.
  */
 export function slotKey(iso: string): string {
-  return dayjs(iso).utc().second(0).millisecond(0).toISOString();
+  return dayjs.utc(iso).second(0).millisecond(0).toISOString();
 }
 
 export function dedupeDoctorSlots<T extends { start: string }>(slots: T[]): T[] {

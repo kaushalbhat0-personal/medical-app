@@ -14,7 +14,7 @@ import {
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
 } from '../../services';
-import { dedupeDoctorSlots, slotKey } from '../../utils/doctorSchedule';
+import { dedupeDoctorSlots, formatSlotTimeWithZoneLabel, slotKey } from '../../utils/doctorSchedule';
 import { useLinkedPatient, useModalFocusTrap } from '../../hooks';
 import type { Doctor } from '../../types';
 import { formatDoctorName } from '../../utils';
@@ -26,12 +26,6 @@ function localDateInputValue(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-function formatSlotLabel(isoStart: string): string {
-  const d = new Date(isoStart);
-  if (Number.isNaN(d.getTime())) return isoStart;
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 function selectedSlotIsFuture(isoStart: string): boolean {
@@ -484,7 +478,7 @@ export function PatientDoctors() {
                         : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
-                    {formatSlotLabel(slot.start)}
+                    {formatSlotTimeWithZoneLabel(slot.start, bookingDoctor?.timezone || 'UTC')}
                   </button>
                 );
               })}
@@ -534,7 +528,10 @@ export function PatientDoctors() {
                 <span className="font-medium">{formatDoctorName(bookingDoctor)}</span>
                 <br />
                 <span className="text-muted-foreground">
-                  {bookDate} · {selectedSlotStart ? formatSlotLabel(selectedSlotStart) : '—'}
+                  {bookDate} ·{' '}
+                  {selectedSlotStart
+                    ? formatSlotTimeWithZoneLabel(selectedSlotStart, bookingDoctor?.timezone || 'UTC')
+                    : '—'}
                 </span>
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
