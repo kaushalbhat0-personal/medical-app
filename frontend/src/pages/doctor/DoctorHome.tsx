@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useAppointments, usePatients } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState } from '../../components/common';
@@ -26,7 +27,7 @@ function isAppointmentToday(a: Appointment, ref: Date): boolean {
 
 export function DoctorHome() {
   const navigate = useNavigate();
-  const { isIndependent } = useDoctorWorkspace();
+  const { isIndependent, selfDoctor } = useDoctorWorkspace();
   const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments();
   const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients();
 
@@ -106,6 +107,29 @@ export function DoctorHome() {
             Create bill
           </Button>
         </div>
+      )}
+
+      {selfDoctor && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Schedule</CardTitle>
+            <CardDescription>
+              {isIndependent
+                ? 'Book visits from the full day calendar on Appointments. This page stays a quick overview.'
+                : 'Your visit list and organization schedule live on Appointments.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              to="/doctor/appointments"
+              state={{ openSchedule: true }}
+              className={cn(buttonVariants({ variant: 'secondary' }), 'inline-flex gap-2')}
+            >
+              <CalendarPlus className="h-4 w-4" aria-hidden />
+              Open schedule
+            </Link>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">

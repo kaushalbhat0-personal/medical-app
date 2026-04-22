@@ -6,8 +6,9 @@ import logging
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import hash_password
 from app.crud import crud_doctor, crud_doctor_availability, crud_tenant, crud_user
@@ -589,6 +590,19 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
 
         raise NotFoundError("Doctor not found")
 
+    return doctor
+
+
+def get_doctor_or_404_with_tenant(db: Session, doctor_id: UUID) -> Doctor:
+    """Doctor row with `tenant` loaded; used for tenant-type checks (e.g. self-managed only)."""
+    stmt = (
+        select(Doctor)
+        .where(Doctor.id == doctor_id, Doctor.is_deleted == False)
+        .options(joinedload(Doctor.tenant))
+    )
+    doctor = db.scalars(stmt).first()
+    if doctor is None:
+        raise NotFoundError("Doctor not found")
     return doctor
 
 

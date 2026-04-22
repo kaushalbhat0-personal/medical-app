@@ -4,6 +4,18 @@ export { authApi, formatLoginError } from './auth';
 export { patientsApi, type CreatePatientData } from './patients';
 export { appointmentsApi, type CreateAppointmentData } from './appointments';
 export { billingApi, BillingApiError, type CreateBillData } from './billing';
-export { doctorsApi, type CreateDoctorData, type DoctorSlot } from './doctors';
+export {
+  doctorsApi,
+  initDoctorSlotsCacheCrossTabSync,
+  invalidateDoctorSlotsClientCache,
+  SLOTS_CROSS_TAB_BROADCAST,
+  SLOTS_INVALIDATE_STORAGE_KEY,
+  shouldSyncSlotsCrossTab,
+  type CreateDoctorData,
+  type DoctorDayMeta,
+  type DoctorScheduleDay,
+  type DoctorSlot,
+} from './doctors';
+export type { DoctorAvailabilityWindow } from '../types';
 export { dashboardApi } from './dashboard';
 export { tenantsApi } from './tenants';

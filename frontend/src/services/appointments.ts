@@ -41,14 +41,17 @@ export const appointmentsApi = {
   create: async (
     appointment: CreateAppointmentData,
     options?: { idempotencyKey?: string; signal?: AbortSignal }
-  ): Promise<Appointment> => {
+  ): Promise<{ appointment: Appointment; idempotentReplay: boolean }> => {
     try {
       const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
       const response = await api.post('/appointments', appointment, {
         headers: { 'Idempotency-Key': idempotencyKey },
         signal: options?.signal,
       });
-      return response.data;
+      const idempotentReplay = String(
+        (response.headers as { 'x-idempotent-replay'?: string })['x-idempotent-replay'] ?? ''
+      ) === '1';
+      return { appointment: response.data, idempotentReplay };
     } catch (error) {
       console.error('[appointmentsApi.create] Error:', error);
       throw error;

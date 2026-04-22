@@ -48,14 +48,15 @@ test.describe('Patient portal', () => {
     await page.locator('#book-date').fill(bookingDate);
     await slotsResponse;
 
-    const slotLocator = page.locator('[data-testid="slot-button"]');
+    const slotLocator = page.getByTestId('slot-button');
     const noSlots = page.getByText(/No slots available/i);
     if ((await slotLocator.count()) === 0) {
       await expect(noSlots).toBeVisible({ timeout: 20_000 });
       return;
     }
-    await expect(slotLocator.first()).toBeVisible({ timeout: 20_000 });
-    await page.locator('[data-testid="slot-button"]:enabled').first().click();
+    const firstOpen = page.getByTestId('slot-button').first();
+    await expect(firstOpen).toBeEnabled({ timeout: 20_000 });
+    await firstOpen.click();
 
     await page.getByRole('button', { name: 'Confirm' }).click();
 

@@ -57,9 +57,9 @@ async function openBookingForDoctor(
   await page.locator('#book-date').fill(bookingDate);
   await slotsResponse;
 
-  const slotLocator = page.locator('[data-testid="slot-button"]:enabled');
-  await expect(slotLocator.first()).toBeVisible({ timeout: 20_000 });
-  await slotLocator.first().click();
+  const firstSlot = page.getByTestId('slot-button').first();
+  await expect(firstSlot).toBeEnabled({ timeout: 20_000 });
+  await firstSlot.click();
 }
 
 async function appointmentListLength(

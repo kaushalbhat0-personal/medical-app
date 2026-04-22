@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- minimal typings for untyped CJS module */
 declare module 'lodash.debounce' {
   interface DebouncedFunc<T extends (...args: any[]) => any> {
     (...args: Parameters<T>): ReturnType<T> | undefined;

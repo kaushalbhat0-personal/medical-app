@@ -51,7 +51,7 @@ export function Login({ onLogin }: LoginPageProps) {
         setApiError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });
       }
-    } catch (err: any) {
+    } catch {
       const errorMessage = 'An unexpected error occurred. Please try again.';
       setApiError(errorMessage);
       toast.error(errorMessage, { duration: 5000 });

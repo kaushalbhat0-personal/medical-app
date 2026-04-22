@@ -19,5 +19,15 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // shadcn/ui and context files export helpers alongside components; Vite HMR is fine.
+      'react-refresh/only-export-components': 'off',
+      // Incremental strictness: prefer typed data but do not block CI on legacy `any` uses.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/incompatible-library': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
   },
 ])

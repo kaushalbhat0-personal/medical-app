@@ -1,4 +1,8 @@
-"""Test data builders for API tests and Playwright e2e seeding."""
+"""Test data builders for API tests and Playwright e2e seeding.
+
+When seeding with literal UUID strings and a SQLAlchemy session, prefer
+``app.utils.db_uuids.as_db_uuid`` so SQLite and PostgreSQL both bind correctly.
+"""
 
 from __future__ import annotations
 
@@ -19,8 +23,8 @@ from app.models.user import User, UserRole
 from app.utils.appointment_datetime import normalize_appointment_time_utc
 
 
-def create_tenant(db: Session, *, name: str | None = None) -> Tenant:
-    t = Tenant(name=name or f"Test Tenant {uuid.uuid4().hex[:8]}", type=TenantType.clinic.value)
+def create_tenant(db: Session, *, name: str | None = None, tenant_type: TenantType = TenantType.clinic) -> Tenant:
+    t = Tenant(name=name or f"Test Tenant {uuid.uuid4().hex[:8]}", type=tenant_type.value)
     db.add(t)
     db.flush()
     return t
@@ -149,7 +153,7 @@ def seed_bookable_doctor_and_patient(
     patient_password: str,
     doctor_force_password_reset: bool = False,
 ) -> tuple[Doctor, Patient, datetime]:
-    tenant = create_tenant(db)
+    tenant = create_tenant(db, tenant_type=TenantType.independent_doctor)
     doc_user = create_user(
         db,
         email=doctor_email,
@@ -305,6 +309,35 @@ def extend_playwright_e2e_seed(
     return {
         "doctor_b_display_name": doctor_b.name,
         "patient_only_doctor_b_name": patient_only_b.name,
+    }
+
+
+def seed_e2e_hospital_doctor(db: Session) -> dict[str, str]:
+    """Organization-managed (hospital) doctor for read-only schedule UI E2E."""
+    tenant = create_tenant(db, name="E2E Hospital Tenant", tenant_type=TenantType.hospital)
+    doc_user = create_user(
+        db,
+        email="e2e-hospital-doctor@local.test",
+        password="TempPass9!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+        force_password_reset=False,
+    )
+    doctor = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="UTC")
+    add_weekly_availability(
+        db,
+        doctor_id=doctor.id,
+        tenant_id=tenant.id,
+        day_of_week=_BOOKING_ANCHOR_DATE.weekday(),
+        start=time(10, 0),
+        end=time(12, 0),
+        slot_duration=30,
+    )
+    db.commit()
+    return {
+        "hospital_doctor_email": doc_user.email,
+        "hospital_doctor_password": "TempPass9!",
+        "hospital_doctor_display_name": doctor.name,
     }
 
 

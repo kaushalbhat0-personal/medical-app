@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.core.database import engine
 from app.models.tenant import TenantType
+from app.utils.db_uuids import as_db_uuid
 
 DEFAULT_TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEFAULT_TENANT_NAME = "Default"
@@ -29,7 +30,7 @@ def ensure_default_tenant_exists() -> None:
                 "ON CONFLICT (id) DO NOTHING"
             ),
             {
-                "id": DEFAULT_TENANT_ID,
+                "id": as_db_uuid(str(DEFAULT_TENANT_ID), conn),
                 "name": DEFAULT_TENANT_NAME,
                 "type": TenantType.hospital.value,
             },

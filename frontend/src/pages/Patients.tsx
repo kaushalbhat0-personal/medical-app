@@ -243,8 +243,8 @@ export function Patients() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {safePatients.map((patient) => (
-                    <TableRow key={patient?.id || Math.random()}>
+                  {safePatients.map((patient, index) => (
+                    <TableRow key={patient?.id != null ? String(patient.id) : `patient-row-${index}`}>
                       <TableCell className="font-medium">{formatPatientName(patient)}</TableCell>
                       <TableCell className="text-muted-foreground">{patient?.email || '-'}</TableCell>
                       <TableCell className="text-muted-foreground">{patient?.phone || '-'}</TableCell>

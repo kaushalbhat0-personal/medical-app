@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuth, AuthProvider } from './hooks/useAuth';
+import { initDoctorSlotsCacheCrossTabSync } from './services';
 import { setNavigator } from './utils/navigation';
 import { postLoginHomePath } from './utils/roles';
 import { roleFromToken } from './utils/jwtPayload';
@@ -341,6 +342,9 @@ function AnimatedRoutes() {
 function App() {
   useEffect(() => {
     warmUpBackend();
+  }, []);
+  useEffect(() => {
+    return initDoctorSlotsCacheCrossTabSync();
   }, []);
 
   return (

@@ -45,6 +45,32 @@ export interface Patient {
   updated_at?: string;
 }
 
+/** Weekly availability pattern from GET /doctors/{id}/availability-windows */
+export interface DoctorAvailabilityWindow {
+  id: string;
+  doctor_id: string;
+  /** Monday = 0 … Sunday = 6 (server convention) */
+  day_of_week: number;
+  /** "HH:MM:SS" */
+  start_time: string;
+  end_time: string;
+  slot_duration: number;
+  tenant_id: string;
+  created_at: string;
+}
+
+/** Calendar time off (full day or partial) from GET /doctors/{id}/time-off */
+export interface DoctorTimeOff {
+  id: string;
+  doctor_id: string;
+  /** YYYY-MM-DD */
+  off_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  tenant_id: string;
+  created_at: string;
+}
+
 export interface Doctor {
   id: number | string;
   // Backend returns flat structure, not nested user

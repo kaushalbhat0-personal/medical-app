@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 
 @router.post("", response_model=AppointmentRead, status_code=201)
 def create_appointment(
+    response: Response,
     payload: AppointmentCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -28,7 +29,7 @@ def create_appointment(
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> AppointmentRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    return appointment_service.create_appointment(
+    appt, idempotent_replay = appointment_service.create_appointment(
         db,
         payload,
         current_user,
@@ -36,6 +37,9 @@ def create_appointment(
         idempotency_key=idempotency_key,
         acting_doctor=acting_doctor,
     )
+    if idempotent_replay:
+        response.headers["X-Idempotent-Replay"] = "1"
+    return appt
 
 
 @router.get("", response_model=list[AppointmentRead])

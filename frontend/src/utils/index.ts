@@ -29,3 +29,5 @@ export {
 
 // Layout utilities for consistent spacing
 export { layout, spacing } from './layout';
+
+export { slotKey, dedupeDoctorSlots, assignOverlapLanesPure } from './doctorSchedule';

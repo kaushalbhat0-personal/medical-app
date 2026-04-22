@@ -17,8 +17,13 @@ from app.schemas.doctor import (
     DoctorAvailabilityRead,
     DoctorAvailabilityUpdate,
     DoctorCreate,
+    DoctorDayMeta,
     DoctorRead,
+    DoctorScheduleDayRead,
     DoctorSlotRead,
+    DoctorTimeOffCreate,
+    DoctorTimeOffRead,
+    DoctorTimeOffUpdate,
     DoctorUpdate,
 )
 from app.services import doctor_availability_service, doctor_service, doctor_slot_service
@@ -95,6 +100,97 @@ def read_doctor_slots(
     return doctor_slot_service.get_doctor_slots_for_date(db, doctor_id, on_date, current_user, tenant_id)
 
 
+@router.get("/{doctor_id}/schedule/day", response_model=DoctorScheduleDayRead)
+def read_doctor_schedule_day(
+    doctor_id: UUID,
+    on_date: date = Query(
+        ...,
+        alias="date",
+        description="Calendar day (YYYY-MM-DD) in the doctor's configured timezone (IANA)",
+    ),
+    next_from: date | None = Query(
+        default=None,
+        alias="from",
+        description="Start scan for next-available from this calendar day; omit to use today in the doctor's timezone",
+    ),
+    horizon_days: int = Query(
+        default=14,
+        ge=1,
+        le=60,
+        description="Maximum number of calendar days to scan for next available",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorScheduleDayRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    slots, full_off, next_s = doctor_slot_service.get_doctor_schedule_day(
+        db,
+        doctor_id,
+        on_date,
+        current_user,
+        tenant_id,
+        next_from=next_from,
+        horizon_days=horizon_days,
+    )
+    return DoctorScheduleDayRead(
+        slots=slots, full_day_time_off=full_off, next_available=next_s
+    )
+
+
+@router.get(
+    "/{doctor_id}/availability-windows",
+    response_model=list[DoctorAvailabilityRead],
+)
+def list_doctor_availability_windows(
+    doctor_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DoctorAvailabilityRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    return doctor_availability_service.list_availability_windows(
+        db, doctor_id, current_user, tenant_id
+    )
+
+
+@router.get("/{doctor_id}/day-meta", response_model=DoctorDayMeta)
+def read_doctor_day_meta(
+    doctor_id: UUID,
+    on_date: date = Query(
+        ...,
+        alias="date",
+        description="Calendar day (YYYY-MM-DD) in the doctor's configured timezone (IANA)",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorDayMeta:
+    tenant_id = get_current_tenant_id(current_user, db)
+    full_day = doctor_slot_service.get_doctor_day_meta(db, doctor_id, on_date, current_user, tenant_id)
+    return DoctorDayMeta(full_day_time_off=full_day)
+
+
+@router.get("/{doctor_id}/next-available", response_model=DoctorSlotRead | None)
+def read_doctor_next_available_slot(
+    doctor_id: UUID,
+    from_date: date = Query(
+        ...,
+        alias="from",
+        description="Start scanning from this calendar day (YYYY-MM-DD) in the doctor's timezone",
+    ),
+    horizon_days: int = Query(
+        default=14,
+        ge=1,
+        le=60,
+        description="Maximum number of calendar days to scan from the effective start date",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorSlotRead | None:
+    tenant_id = get_current_tenant_id(current_user, db)
+    return doctor_slot_service.get_next_available_slot_for_doctor(
+        db, doctor_id, from_date, current_user, tenant_id, horizon_days=horizon_days
+    )
+
+
 @router.post(
     "/{doctor_id}/availability-windows",
     response_model=DoctorAvailabilityRead,
@@ -140,6 +236,125 @@ def update_doctor_availability_window(
         db.refresh(row)
         doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
         return row
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.delete(
+    "/{doctor_id}/availability-windows/{window_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_doctor_availability_window(
+    doctor_id: UUID,
+    window_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        doctor_availability_service.delete_availability_window(
+            db, doctor_id, window_id, current_user, tenant_id
+        )
+        db.commit()
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.get(
+    "/{doctor_id}/time-off",
+    response_model=list[DoctorTimeOffRead],
+)
+def list_doctor_time_off(
+    doctor_id: UUID,
+    from_date: date | None = Query(
+        default=None,
+        description="Filter entries on or after this date (inclusive)",
+    ),
+    to_date: date | None = Query(
+        default=None,
+        description="Filter entries on or before this date (inclusive)",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DoctorTimeOffRead]:
+    tenant_id = get_current_tenant_id(current_user, db)
+    return doctor_availability_service.list_time_off(
+        db, doctor_id, current_user, tenant_id, from_date=from_date, to_date=to_date
+    )
+
+
+@router.post(
+    "/{doctor_id}/time-off",
+    response_model=DoctorTimeOffRead,
+    status_code=201,
+)
+def create_doctor_time_off(
+    doctor_id: UUID,
+    payload: DoctorTimeOffCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorTimeOffRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        row = doctor_availability_service.create_time_off(
+            db, doctor_id, payload, current_user, tenant_id
+        )
+        db.commit()
+        db.refresh(row)
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return row
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.put(
+    "/{doctor_id}/time-off/{time_off_id}",
+    response_model=DoctorTimeOffRead,
+)
+def update_doctor_time_off(
+    doctor_id: UUID,
+    time_off_id: UUID,
+    payload: DoctorTimeOffUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DoctorTimeOffRead:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        row = doctor_availability_service.update_time_off(
+            db, doctor_id, time_off_id, payload, current_user, tenant_id
+        )
+        db.commit()
+        db.refresh(row)
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return row
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.delete(
+    "/{doctor_id}/time-off/{time_off_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_doctor_time_off(
+    doctor_id: UUID,
+    time_off_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    tenant_id = get_current_tenant_id(current_user, db)
+    try:
+        doctor_availability_service.delete_time_off(
+            db, doctor_id, time_off_id, current_user, tenant_id
+        )
+        db.commit()
+        doctor_slot_service.invalidate_all_slots_cache_for_doctor(doctor_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception:
         db.rollback()
         raise

@@ -90,7 +90,7 @@ export function PatientHome() {
           setDoctors(docList);
           setTenants(tenantList);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) setError('Could not load marketplace data. Try again shortly.');
       } finally {
         if (!cancelled) setLoading(false);

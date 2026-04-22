@@ -17,7 +17,7 @@ import { isManagedOrgTenant } from '../../utils/tenantType';
 
 function DoctorLayoutInner() {
   const { user, logout } = useAuth();
-  const { isIndependent, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
+  const { isIndependent, isReadOnly, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
   const managedOrg = isManagedOrgTenant(selfDoctor?.tenant_type);
 
   const tabs = [
@@ -26,7 +26,7 @@ function DoctorLayoutInner() {
     { to: '/doctor/patients', label: 'Patients', icon: Users },
     { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
     { to: '/doctor/bills', label: 'Bills', icon: Receipt },
-    ...(isIndependent ? [{ to: '/doctor/availability', label: 'Availability', icon: Clock }] : []),
+    { to: '/doctor/availability', label: 'Availability', icon: Clock },
   ];
 
   return (

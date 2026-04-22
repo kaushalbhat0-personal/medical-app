@@ -11,10 +11,9 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: 'list',
-  globalSetup: path.join(__dirname, 'e2e', 'global-setup.ts'),
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
@@ -23,7 +22,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: `${process.env.PYTHON ?? 'python'} -m uvicorn app.main:app --host 127.0.0.1 --port 9777`,
+      // Seed SQLite and credentials first so the file is not locked by a previous uvicorn (Windows).
+      command: `${process.env.PYTHON ?? 'python'} -m tests.e2e_prepare && ${process.env.PYTHON ?? 'python'} -m uvicorn app.main:app --host 127.0.0.1 --port 9777`,
       cwd: backendRoot,
       url: 'http://127.0.0.1:9777/api/v1/health',
       reuseExistingServer: !process.env.CI,

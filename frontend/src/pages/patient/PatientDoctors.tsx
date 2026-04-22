@@ -7,7 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { appointmentsApi, doctorsApi, type DoctorSlot } from '../../services';
+import {
+  appointmentsApi,
+  doctorsApi,
+  invalidateDoctorSlotsClientCache,
+  shouldSyncSlotsCrossTab,
+  SLOTS_CROSS_TAB_BROADCAST,
+  type DoctorSlot,
+} from '../../services';
+import { dedupeDoctorSlots, slotKey } from '../../utils/doctorSchedule';
 import { useLinkedPatient, useModalFocusTrap } from '../../hooks';
 import type { Doctor } from '../../types';
 import { formatDoctorName } from '../../utils';
@@ -89,6 +97,8 @@ export function PatientDoctors() {
   const [bookingIdempotencyKey, setBookingIdempotencyKey] = useState('');
   const dialogRef = useRef<HTMLDivElement>(null);
   const abortCreateRef = useRef<AbortController | null>(null);
+  const slotsRequestIdRef = useRef(0);
+  const slotsFetchAbortRef = useRef<AbortController | null>(null);
 
   const minBookDate = useMemo(() => localDateInputValue(new Date()), []);
   const todayCalendarStr = localDateInputValue(new Date());
@@ -102,6 +112,8 @@ export function PatientDoctors() {
   const closeModal = useCallback(() => {
     abortCreateRef.current?.abort();
     abortCreateRef.current = null;
+    slotsFetchAbortRef.current?.abort();
+    slotsFetchAbortRef.current = null;
     setModalOpen(false);
     setBookingDoctor(null);
     setBookDate('');
@@ -160,27 +172,39 @@ export function PatientDoctors() {
   }, []);
 
   const fetchSlots = useCallback(
-    async (signal: AbortSignal | undefined, mode: 'initial' | 'poll') => {
+    async (mode: 'initial' | 'poll') => {
       if (!bookingDoctor || !bookDate || !patientId) return;
+      const reqId = ++slotsRequestIdRef.current;
+      let signal: AbortSignal | undefined;
       if (mode === 'initial') {
+        slotsFetchAbortRef.current?.abort();
+        const ac = new AbortController();
+        slotsFetchAbortRef.current = ac;
+        signal = ac.signal;
         setSlotsLoading(true);
         setSlotsError(null);
         setSelectedSlotStart(null);
       }
       try {
-        const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, { signal });
-        if (signal?.aborted) return;
-        setSlots(list);
+        const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, {
+          signal,
+          skipCache: mode === 'poll',
+        });
+        if (reqId !== slotsRequestIdRef.current) return;
+        setSlots(dedupeDoctorSlots(list));
         if (mode === 'poll') setSlotsError(null);
       } catch (e) {
         if (axios.isCancel(e)) return;
         if (signal?.aborted) return;
+        if (reqId !== slotsRequestIdRef.current) return;
         if (mode === 'initial') {
           setSlotsError('Unable to load available slots.');
           setSlots([]);
         }
       } finally {
-        if (mode === 'initial' && !signal?.aborted) setSlotsLoading(false);
+        if (mode === 'initial' && (!signal || !signal.aborted) && reqId === slotsRequestIdRef.current) {
+          setSlotsLoading(false);
+        }
       }
     },
     [bookingDoctor?.id, bookDate, patientId]
@@ -194,9 +218,8 @@ export function PatientDoctors() {
       setSelectedSlotStart(null);
       return;
     }
-    const ac = new AbortController();
-    void fetchSlots(ac.signal, 'initial');
-    return () => ac.abort();
+    void fetchSlots('initial');
+    return () => slotsFetchAbortRef.current?.abort();
   }, [modalOpen, bookingDoctor?.id, bookDate, patientId, fetchSlots]);
 
   useEffect(() => {
@@ -217,7 +240,7 @@ export function PatientDoctors() {
         return;
       }
       intervalId = window.setInterval(() => {
-        void fetchSlots(undefined, 'poll');
+        void fetchSlots('poll');
       }, 30_000);
     };
 
@@ -226,7 +249,7 @@ export function PatientDoctors() {
     const onVisibility = () => {
       if (typeof document === 'undefined') return;
       if (document.visibilityState === 'visible') {
-        void fetchSlots(undefined, 'poll');
+        void fetchSlots('poll');
         startPollIfVisible();
       } else {
         clearPoll();
@@ -240,7 +263,18 @@ export function PatientDoctors() {
     };
   }, [modalOpen, bookingDoctor?.id, bookDate, patientId, fetchSlots]);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onOtherTab = () => {
+      if (!shouldSyncSlotsCrossTab()) return;
+      void fetchSlots('poll');
+    };
+    window.addEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
+    return () => window.removeEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
+  }, [modalOpen, fetchSlots]);
+
   const openBookModal = (d: Doctor) => {
+    if (modalOpen) return;
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookingDoctor(d);
     setBookDate('');
@@ -275,7 +309,7 @@ export function PatientDoctors() {
 
     setSubmitting(true);
     try {
-      const created = await appointmentsApi.create(
+      const { appointment: created, idempotentReplay } = await appointmentsApi.create(
         {
           doctor_id: String(bookingDoctor.id),
           patient_id: patientId,
@@ -289,7 +323,9 @@ export function PatientDoctors() {
         /* storage full / disabled */
       }
       closeModal();
-      toast.success('Appointment booked.');
+      toast.success(
+        idempotentReplay ? 'Appointment already booked successfully.' : 'Appointment booked.'
+      );
       navigate('/patient/appointments', { state: { seedAppointment: created } });
     } catch (err) {
       if (axios.isCancel(err)) return;
@@ -301,10 +337,11 @@ export function PatientDoctors() {
         toast.error('That slot was just taken. Choose another time.');
         setSelectedSlotStart(null);
         if (bookDate && bookingDoctor) {
+          invalidateDoctorSlotsClientCache(String(bookingDoctor.id), bookDate);
           setSlotsLoading(true);
           try {
-            const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate);
-            setSlots(list);
+            const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, { skipCache: true });
+            setSlots(dedupeDoctorSlots(list));
           } catch {
             setSlotsError('Unable to load available slots.');
           } finally {
@@ -405,6 +442,7 @@ export function PatientDoctors() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="book-appt-title"
+            aria-describedby="book-appt-desc"
             aria-busy={submitting}
             className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg outline-none"
             onClick={(e) => e.stopPropagation()}
@@ -413,7 +451,9 @@ export function PatientDoctors() {
               <h2 id="book-appt-title" className="text-lg font-semibold">
                 Book appointment
               </h2>
-              <p className="text-sm text-muted-foreground mt-0.5">{formatDoctorName(bookingDoctor)}</p>
+              <p id="book-appt-desc" className="text-sm text-muted-foreground mt-0.5">
+                {formatDoctorName(bookingDoctor)}. Select a date and time, then confirm.
+              </p>
             </div>
             <div className="space-y-4 px-4 py-4">
               {!patientId && (
@@ -479,18 +519,19 @@ export function PatientDoctors() {
                     {slots.map((slot) => {
                       const pastOnToday =
                         bookDate === todayCalendarStr && isSlotInThePast(slot.start);
+                      const sk = slotKey(slot.start);
                       return (
                         <Button
-                          key={slot.start}
+                          key={sk}
                           type="button"
                           data-testid="slot-button"
                           size="sm"
-                          variant={selectedSlotStart === slot.start ? 'default' : 'outline'}
+                          variant={selectedSlotStart != null && slotKey(selectedSlotStart) === sk ? 'default' : 'outline'}
                           disabled={!slot.available || submitting || pastOnToday}
-                          aria-pressed={selectedSlotStart === slot.start}
+                          aria-pressed={selectedSlotStart != null && slotKey(selectedSlotStart) === sk}
                           aria-disabled={!slot.available || pastOnToday}
                           className="min-w-[4.5rem]"
-                          onClick={() => setSelectedSlotStart(slot.start)}
+                          onClick={() => setSelectedSlotStart(sk)}
                         >
                           {formatSlotLabel(slot.start)}
                         </Button>

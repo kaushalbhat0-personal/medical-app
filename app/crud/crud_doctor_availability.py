@@ -35,9 +35,23 @@ def list_availability_for_doctor_day(db: Session, doctor_id: UUID, day_of_week: 
     return list(db.scalars(stmt).all())
 
 
+def list_all_availability_for_doctor(db: Session, doctor_id: UUID) -> list[DoctorAvailability]:
+    stmt = (
+        select(DoctorAvailability)
+        .where(DoctorAvailability.doctor_id == doctor_id)
+        .order_by(DoctorAvailability.day_of_week, DoctorAvailability.start_time)
+    )
+    return list(db.scalars(stmt).all())
+
+
 def get_availability_window(db: Session, window_id: UUID) -> DoctorAvailability | None:
     stmt = select(DoctorAvailability).where(DoctorAvailability.id == window_id)
     return db.scalars(stmt).first()
+
+
+def delete_availability_window(db: Session, window: DoctorAvailability) -> None:
+    db.delete(window)
+    db.flush()
 
 
 def list_time_off_for_doctor_on_date(db: Session, doctor_id: UUID, target_date: date) -> list[DoctorTimeOff]:
@@ -46,6 +60,71 @@ def list_time_off_for_doctor_on_date(db: Session, doctor_id: UUID, target_date: 
         DoctorTimeOff.off_date == target_date,
     )
     return list(db.scalars(stmt).all())
+
+
+def list_time_off_for_doctor(
+    db: Session,
+    doctor_id: UUID,
+    *,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> list[DoctorTimeOff]:
+    stmt = select(DoctorTimeOff).where(DoctorTimeOff.doctor_id == doctor_id)
+    if from_date is not None:
+        stmt = stmt.where(DoctorTimeOff.off_date >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(DoctorTimeOff.off_date <= to_date)
+    stmt = stmt.order_by(DoctorTimeOff.off_date, DoctorTimeOff.id)
+    return list(db.scalars(stmt).all())
+
+
+def get_time_off(db: Session, time_off_id: UUID) -> DoctorTimeOff | None:
+    stmt = select(DoctorTimeOff).where(DoctorTimeOff.id == time_off_id)
+    return db.scalars(stmt).first()
+
+
+def create_time_off(
+    db: Session,
+    *,
+    doctor_id: UUID,
+    off_date: date,
+    start_time: time | None,
+    end_time: time | None,
+    tenant_id: UUID,
+) -> DoctorTimeOff:
+    row = DoctorTimeOff(
+        doctor_id=doctor_id,
+        off_date=off_date,
+        start_time=start_time,
+        end_time=end_time,
+        tenant_id=tenant_id,
+    )
+    db.add(row)
+    db.flush()
+    db.refresh(row)
+    return row
+
+
+def update_time_off_row(
+    db: Session,
+    row: DoctorTimeOff,
+    *,
+    off_date: date,
+    start_time: time | None,
+    end_time: time | None,
+) -> DoctorTimeOff:
+    row.off_date = off_date
+    row.start_time = start_time
+    row.end_time = end_time
+    db.add(row)
+    db.flush()
+    db.refresh(row)
+    return row
+
+
+def delete_time_off(db: Session, row: DoctorTimeOff) -> None:
+    db.delete(row)
+    db.flush()
 
 
 def _time_ranges_overlap(a_start: time, a_end: time, b_start: time, b_end: time) -> bool:

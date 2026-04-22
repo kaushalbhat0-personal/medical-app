@@ -82,8 +82,9 @@ def _validate_doctor_availability(
 
 
 def _validate_appointment_time_in_future(appointment_time: datetime) -> None:
-    if appointment_time < datetime.now(timezone.utc):
-        raise ValidationError("Cannot book appointment in the past")
+    at = normalize_appointment_time_utc(appointment_time)
+    if at <= datetime.now(timezone.utc):
+        raise ValidationError("Cannot book past slots")
 
 
 def _validate_slot_not_double_booked(
@@ -165,7 +166,8 @@ def create_appointment(
     idempotency_key: str | None = None,
     *,
     acting_doctor: Doctor | None = None,
-) -> Appointment:
+) -> tuple[Appointment, bool]:
+    """Returns (appointment, idempotent_replay) where idempotent_replay is True if this response replays a prior create."""
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
     authorize_appointment_create(
         db,
@@ -188,7 +190,7 @@ def create_appointment(
                 raise ConflictError(
                     "Idempotency key reused with different request payload"
                 )
-            return get_appointment_or_404(db, existing.appointment_id)
+            return (get_appointment_or_404(db, existing.appointment_id), True)
 
     _validate_patient_and_doctor_exist(
         db,
@@ -233,7 +235,7 @@ def create_appointment(
                 db, current_user.id, idempotency_key
             )
             if existing is not None and existing.request_hash == body_hash:
-                return get_appointment_or_404(db, existing.appointment_id)
+                return (get_appointment_or_404(db, existing.appointment_id), True)
         msg = str(getattr(e, "orig", e))
         if "uq_appointments_doctor_time_active" in msg or "uq_doctor_time" in msg:
             raise ValidationError("Slot already booked") from e
@@ -246,7 +248,7 @@ def create_appointment(
         appointment.id,
         appointment.tenant_id,
     )
-    return appointment
+    return (appointment, False)
 
 
 def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:

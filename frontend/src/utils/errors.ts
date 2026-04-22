@@ -52,7 +52,6 @@ export function handleApiError(error: AxiosError<ApiErrorResponse>): string {
 
 export function logError(context: string, error: unknown): void {
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.error(`[${context}]`, error);
   }
   // In production, send to error tracking service (Sentry, etc.)

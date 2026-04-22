@@ -264,24 +264,25 @@ def _compute_slots(
         for start_dt in _iter_slot_starts_utc(target_date, w.start_time, w.end_time, dur, doctor_tz):
             if _slot_overlaps_partial_time_off(start_dt, dur, target_date, doctor_tz, partial_ranges):
                 continue
-            slots.append(DoctorSlotRead(start=start_dt, available=start_dt not in busy))
+            slots.append(
+                DoctorSlotRead(
+                    start=start_dt,
+                    available=start_dt not in busy,
+                    duration_minutes=dur,
+                )
+            )
 
     slots.sort(key=lambda s: s.start)
     return slots
 
 
-def get_doctor_slots_for_date(
+def _get_cached_slots_for_doctor_date(
     db: Session,
-    doctor_id: UUID,
+    doctor: Doctor,
     target_date: date,
-    current_user: User,
-    tenant_id: UUID | None,
 ) -> list[DoctorSlotRead]:
-    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
-    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
-
     cache = _resolve_slot_cache_backend()
-    cache_key_doc = str(doctor_id)
+    cache_key_doc = str(doctor.id)
     cache_key_date = target_date.isoformat()
     if cache is not None:
         cached = cache.get(cache_key_doc, cache_key_date)
@@ -294,6 +295,104 @@ def get_doctor_slots_for_date(
         cache.set(cache_key_doc, cache_key_date, list(slots), _SLOTS_CACHE_TTL_SEC)
 
     return slots
+
+
+def get_doctor_slots_for_date(
+    db: Session,
+    doctor_id: UUID,
+    target_date: date,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> list[DoctorSlotRead]:
+    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    return _get_cached_slots_for_doctor_date(db, doctor, target_date)
+
+
+def get_doctor_day_meta(
+    db: Session,
+    doctor_id: UUID,
+    target_date: date,
+    current_user: User,
+    tenant_id: UUID | None,
+) -> bool:
+    """True if the doctor has whole-day time off on target_date (no slots for that reason)."""
+    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    time_off_rows = crud_doctor_availability.list_time_off_for_doctor_on_date(db, doctor.id, target_date)
+    return _time_off_blocks_full_day(time_off_rows)
+
+
+def _next_available_from_doctor(
+    db: Session,
+    doctor: Doctor,
+    from_date: date,
+    *,
+    horizon_days: int = 14,
+) -> DoctorSlotRead | None:
+    """Next bookable future slot; caller must have loaded *doctor* and checked authorization."""
+    doctor_tz = _doctor_zoneinfo(doctor)
+    today_local = datetime.now(doctor_tz).date()
+    start_d = from_date if from_date >= today_local else today_local
+    now_utc = datetime.now(timezone.utc)
+    for offset in range(horizon_days):
+        d = start_d + timedelta(days=offset)
+        slots = _get_cached_slots_for_doctor_date(db, doctor, d)
+        for s in slots:
+            if not s.available:
+                continue
+            st = _utc_naive(s.start)
+            if st <= now_utc:
+                continue
+            return s
+    return None
+
+
+def get_next_available_slot_for_doctor(
+    db: Session,
+    doctor_id: UUID,
+    from_date: date,
+    current_user: User,
+    tenant_id: UUID | None,
+    *,
+    horizon_days: int = 14,
+) -> DoctorSlotRead | None:
+    """First available future slot from from_date (inclusive), within horizon_days, in doctor local calendar."""
+    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    return _next_available_from_doctor(
+        db, doctor, from_date, horizon_days=horizon_days
+    )
+
+
+def get_doctor_schedule_day(
+    db: Session,
+    doctor_id: UUID,
+    target_date: date,
+    current_user: User,
+    tenant_id: UUID | None,
+    *,
+    next_from: date | None = None,
+    horizon_days: int = 14,
+) -> tuple[list[DoctorSlotRead], bool, DoctorSlotRead | None]:
+    """
+    One round-trip: slots for *target_date*, full-day time-off flag, and next available from *next_from*
+    (or today in the doctor's timezone when *next_from* is None).
+    """
+    doctor = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    slots = _get_cached_slots_for_doctor_date(db, doctor, target_date)
+    time_off_rows = crud_doctor_availability.list_time_off_for_doctor_on_date(
+        db, doctor.id, target_date
+    )
+    full_day = _time_off_blocks_full_day(time_off_rows)
+    scan_from = next_from
+    if scan_from is None:
+        scan_from = datetime.now(_doctor_zoneinfo(doctor)).date()
+    next_s = _next_available_from_doctor(
+        db, doctor, scan_from, horizon_days=horizon_days
+    )
+    return slots, full_day, next_s
 
 
 def invalidate_slots_cache_for_doctor_date(doctor_id: UUID, target_date: date) -> None:

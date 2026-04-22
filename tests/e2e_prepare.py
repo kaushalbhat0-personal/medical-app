@@ -39,6 +39,7 @@ def main() -> None:
         seed_bookable_doctor_and_patient,
         seed_doctor_password_reset_only,
         seed_e2e_doctor_other_tenant,
+        seed_e2e_hospital_doctor,
     )
 
     engine = create_engine(db_url)
@@ -56,6 +57,7 @@ def main() -> None:
         )
         extras = extend_playwright_e2e_seed(db, doctor_a=doctor, patient_a=patient)
         other_tenant = seed_e2e_doctor_other_tenant(db)
+        hospital_doc = seed_e2e_hospital_doctor(db)
         seed_doctor_password_reset_only(
             db,
             email="e2e-doctor-reset@local.test",
@@ -81,6 +83,9 @@ def main() -> None:
             "doctorOtherTenantEmail": other_tenant["doctor_other_tenant_email"],
             "doctorOtherTenantPassword": other_tenant["doctor_other_tenant_password"],
             "doctorOtherTenantDisplayName": other_tenant["doctor_other_tenant_display_name"],
+            "hospitalDoctorEmail": hospital_doc["hospital_doctor_email"],
+            "hospitalDoctorPassword": hospital_doc["hospital_doctor_password"],
+            "hospitalDoctorDisplayName": hospital_doc["hospital_doctor_display_name"],
         }
     finally:
         db.close()

@@ -3,13 +3,10 @@
  *
  * Validates: Requirements 3.3, 3.4
  *
- * These tests MUST PASS on UNFIXED code.
- * They establish baseline behavior for schemas that are NOT being changed:
- * - appointmentSchema: z.coerce.number() for patient_id and doctor_id
+ * Baseline behavior for stable schemas:
+ * - appointmentSchema: patient_id and doctor_id as non-empty strings (UUIDs from API)
  * - billingSchema: z.coerce.number() for amount
  * - loginSchema: email/password pass-through
- *
- * EXPECTED OUTCOME (on unfixed code): All tests PASS
  */
 
 import { describe, it, expect } from 'vitest';
@@ -20,33 +17,28 @@ import { appointmentSchema, billingSchema, loginSchema } from '../schemas';
 const FUTURE_DATETIME = '2099-01-01T10:00:00';
 const FUTURE_DATE = '2099-12-31';
 
-describe('Preservation: appointmentSchema coerces patient_id and doctor_id to numbers', () => {
+describe('Preservation: appointmentSchema keeps patient_id and doctor_id as strings', () => {
   it(
-    'should coerce string patient_id and doctor_id to numbers',
+    'should preserve UUID strings for patient_id and doctor_id',
     () => {
       /**
-       * Property: For all integers ≥ 1 as strings for patient_id and doctor_id,
-       * appointmentSchema coerces them to numbers.
+       * Property: For all RFC 4122 v4 UUIDs, appointmentSchema preserves string ids.
        *
        * Validates: Requirements 3.3
        */
       fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 100000 }),
-          fc.integer({ min: 1, max: 100000 }),
-          (patientId, doctorId) => {
-            const result = appointmentSchema.parse({
-              patient_id: String(patientId),
-              doctor_id: String(doctorId),
-              scheduled_at: FUTURE_DATETIME,
-              notes: '',
-            });
-            expect(typeof result.patient_id).toBe('number');
-            expect(typeof result.doctor_id).toBe('number');
-            expect(result.patient_id).toBe(patientId);
-            expect(result.doctor_id).toBe(doctorId);
-          }
-        )
+        fc.property(fc.uuid(), fc.uuid(), (patientId, doctorId) => {
+          const result = appointmentSchema.parse({
+            patient_id: patientId,
+            doctor_id: doctorId,
+            scheduled_at: FUTURE_DATETIME,
+            notes: '',
+          });
+          expect(typeof result.patient_id).toBe('string');
+          expect(typeof result.doctor_id).toBe('string');
+          expect(result.patient_id).toBe(patientId);
+          expect(result.doctor_id).toBe(doctorId);
+        })
       );
     }
   );

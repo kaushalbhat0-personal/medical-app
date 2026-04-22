@@ -1,7 +1,7 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class DoctorCreate(BaseModel):
@@ -61,6 +61,26 @@ class DoctorSlotRead(BaseModel):
 
     start: datetime = Field(description="Slot start in UTC")
     available: bool = Field(description="False if an active appointment already occupies this start time")
+    duration_minutes: int = Field(
+        gt=0,
+        description="Length of the slot in minutes (from the doctor's availability window slot_duration).",
+    )
+
+
+class DoctorDayMeta(BaseModel):
+    """Per-day hints for the schedule UI (independent of generated slot rows)."""
+
+    full_day_time_off: bool = Field(
+        description="True when time off blocks the entire calendar day (no slots will be offered).",
+    )
+
+
+class DoctorScheduleDayRead(BaseModel):
+    """Slots, day-level time-off hint, and next bookable slot in one response."""
+
+    slots: list[DoctorSlotRead]
+    full_day_time_off: bool
+    next_available: DoctorSlotRead | None = None
 
 
 class DoctorAvailabilityCreate(BaseModel):
@@ -88,3 +108,38 @@ class DoctorAvailabilityRead(BaseModel):
     slot_duration: int
     tenant_id: UUID
     created_at: datetime
+
+
+class DoctorTimeOffRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    doctor_id: UUID
+    off_date: date
+    start_time: time | None
+    end_time: time | None
+    tenant_id: UUID
+    created_at: datetime
+
+
+class DoctorTimeOffCreate(BaseModel):
+    off_date: date
+    start_time: time | None = None
+    end_time: time | None = None
+
+    @model_validator(mode="after")
+    def _validate_range(self) -> "DoctorTimeOffCreate":
+        st, et = self.start_time, self.end_time
+        if (st is None) ^ (et is None):
+            raise ValueError("For partial time off, set both start and end; for a full day off, leave both empty.")
+        if st is not None and et is not None and st >= et:
+            raise ValueError("End time must be after start time for partial time off.")
+        return self
+
+
+class DoctorTimeOffUpdate(BaseModel):
+    """Unsent fields are left unchanged. Service merges and validates the resulting range."""
+
+    off_date: date | None = None
+    start_time: time | None = None
+    end_time: time | None = None
