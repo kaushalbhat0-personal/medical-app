@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from migration_helpers import pg_column_exists
 
 # revision identifiers, used by Alembic.
 revision: str = 'k8m6n0f2o5p4'
@@ -20,9 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add description column to billings table
-    op.add_column('billings', sa.Column('description', sa.String(500), nullable=True))
+    if not pg_column_exists('billings', 'description'):
+        op.add_column('billings', sa.Column('description', sa.String(500), nullable=True))
 
 
 def downgrade() -> None:
     # Remove description column from billings table
-    op.drop_column('billings', 'description')
+    if pg_column_exists('billings', 'description'):
+        op.drop_column('billings', 'description')

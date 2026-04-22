@@ -13,6 +13,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
+from migration_helpers import pg_column_exists, pg_index_exists
+
 # revision identifiers, used by Alembic.
 revision: str = "a1b2c3d4e5f6"
 down_revision: Union[str, None] = "u8v9w0x1y2z3"
@@ -21,21 +23,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "doctors",
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-    )
-    op.add_column(
-        "doctors",
-        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-    )
-    op.create_index("ix_doctors_is_active", "doctors", ["is_active"], unique=False)
-    op.create_index("ix_doctors_is_deleted", "doctors", ["is_deleted"], unique=False)
+    if not pg_column_exists("doctors", "is_active"):
+        op.add_column(
+            "doctors",
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        )
+    if not pg_column_exists("doctors", "is_deleted"):
+        op.add_column(
+            "doctors",
+            sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        )
+    if not pg_index_exists("ix_doctors_is_active"):
+        op.create_index("ix_doctors_is_active", "doctors", ["is_active"], unique=False)
+    if not pg_index_exists("ix_doctors_is_deleted"):
+        op.create_index("ix_doctors_is_deleted", "doctors", ["is_deleted"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_doctors_is_deleted", table_name="doctors")
-    op.drop_index("ix_doctors_is_active", table_name="doctors")
-    op.drop_column("doctors", "is_deleted")
-    op.drop_column("doctors", "is_active")
+    if pg_index_exists("ix_doctors_is_deleted"):
+        op.drop_index("ix_doctors_is_deleted", table_name="doctors")
+    if pg_index_exists("ix_doctors_is_active"):
+        op.drop_index("ix_doctors_is_active", table_name="doctors")
+    if pg_column_exists("doctors", "is_deleted"):
+        op.drop_column("doctors", "is_deleted")
+    if pg_column_exists("doctors", "is_active"):
+        op.drop_column("doctors", "is_active")
 

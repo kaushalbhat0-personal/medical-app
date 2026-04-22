@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from migration_helpers import pg_column_exists
+
 revision: str = "g4h2i6b8j0k1"
 down_revision: Union[str, None] = "f3b1d5a7e9c2"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -28,14 +30,15 @@ def upgrade() -> None:
     appointmentstatus.create(op.get_bind(), checkfirst=True)
 
     # Add created_by column
-    op.add_column(
-        "appointments",
-        sa.Column(
-            "created_by",
-            postgresql.UUID(as_uuid=True),
-            nullable=True,
-        ),
-    )
+    if not pg_column_exists("appointments", "created_by"):
+        op.add_column(
+            "appointments",
+            sa.Column(
+                "created_by",
+                postgresql.UUID(as_uuid=True),
+                nullable=True,
+            ),
+        )
 
     # Update existing rows to have a placeholder created_by value
     # (users should update this manually or through app logic)
@@ -65,15 +68,16 @@ def upgrade() -> None:
     )
 
     # Add is_deleted column for soft delete
-    op.add_column(
-        "appointments",
-        sa.Column(
-            "is_deleted",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.false(),
-        ),
-    )
+    if not pg_column_exists("appointments", "is_deleted"):
+        op.add_column(
+            "appointments",
+            sa.Column(
+                "is_deleted",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.false(),
+            ),
+        )
 
     # Create index for is_deleted to speed up filtered queries
     op.create_index(
@@ -88,7 +92,8 @@ def downgrade() -> None:
     op.drop_index("idx_active_appointments", table_name="appointments")
 
     # Drop is_deleted column
-    op.drop_column("appointments", "is_deleted")
+    if pg_column_exists("appointments", "is_deleted"):
+        op.drop_column("appointments", "is_deleted")
 
     # Drop composite index
     op.drop_index("idx_user_doctor_time", table_name="appointments")
@@ -113,7 +118,8 @@ def downgrade() -> None:
     )
 
     # Drop created_by column
-    op.drop_column("appointments", "created_by")
+    if pg_column_exists("appointments", "created_by"):
+        op.drop_column("appointments", "created_by")
 
     # Drop the enum type
     appointmentstatus = postgresql.ENUM(

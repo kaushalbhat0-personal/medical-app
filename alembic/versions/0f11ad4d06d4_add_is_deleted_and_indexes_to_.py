@@ -9,7 +9,8 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
+from migration_helpers import pg_column_exists, pg_index_exists
 
 # revision identifiers, used by Alembic.
 revision: str = '0f11ad4d06d4'
@@ -19,29 +20,35 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade():
-    op.add_column(
-        "appointments",
-        sa.Column(
-            "is_deleted",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.false(),
-        ),
-    )
+    if not pg_column_exists("appointments", "is_deleted"):
+        op.add_column(
+            "appointments",
+            sa.Column(
+                "is_deleted",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.false(),
+            ),
+        )
 
-    op.create_index(
-        "idx_active_appointments",
-        "appointments",
-        ["is_deleted"],
-    )
+    if not pg_index_exists("idx_active_appointments"):
+        op.create_index(
+            "idx_active_appointments",
+            "appointments",
+            ["is_deleted"],
+        )
 
-    op.create_index(
-        "idx_user_doctor_time",
-        "appointments",
-        ["created_by", "doctor_id", "appointment_time"],
-    )
+    if not pg_index_exists("idx_user_doctor_time"):
+        op.create_index(
+            "idx_user_doctor_time",
+            "appointments",
+            ["created_by", "doctor_id", "appointment_time"],
+        )
 
 def downgrade():
-    op.drop_index("idx_user_doctor_time", table_name="appointments")
-    op.drop_index("idx_active_appointments", table_name="appointments")
-    op.drop_column("appointments", "is_deleted")
+    if pg_index_exists("idx_user_doctor_time"):
+        op.drop_index("idx_user_doctor_time", table_name="appointments")
+    if pg_index_exists("idx_active_appointments"):
+        op.drop_index("idx_active_appointments", table_name="appointments")
+    if pg_column_exists("appointments", "is_deleted"):
+        op.drop_column("appointments", "is_deleted")

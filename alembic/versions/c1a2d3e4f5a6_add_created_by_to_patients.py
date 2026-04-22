@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from migration_helpers import pg_column_exists
+
 revision: str = "c1a2d3e4f5a6"
 down_revision: Union[str, None] = "d9e8f7a6b5c4"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -19,10 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "patients",
-        sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
-    )
+    if not pg_column_exists("patients", "created_by"):
+        op.add_column(
+            "patients",
+            sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
+        )
 
     bind = op.get_bind()
     first_user_id = bind.execute(
@@ -51,4 +54,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("patients", "created_by")
+    if pg_column_exists("patients", "created_by"):
+        op.drop_column("patients", "created_by")

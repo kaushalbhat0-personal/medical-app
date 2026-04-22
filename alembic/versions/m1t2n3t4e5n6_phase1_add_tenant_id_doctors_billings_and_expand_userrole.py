@@ -12,6 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from migration_helpers import pg_column_exists, pg_constraint_exists
+
 # revision identifiers, used by Alembic.
 revision: str = "m1t2n3t4e5n6"
 down_revision: Union[str, None] = "l9n7o1g3p6q5"
@@ -43,32 +45,36 @@ END$$;
 
 def upgrade() -> None:
     # Add optional tenant_id to doctors
-    op.add_column(
-        "doctors",
-        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_doctors_tenant_id_tenants",
-        source_table="doctors",
-        referent_table="tenants",
-        local_cols=["tenant_id"],
-        remote_cols=["id"],
-        ondelete="SET NULL",
-    )
+    if not pg_column_exists("doctors", "tenant_id"):
+        op.add_column(
+            "doctors",
+            sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
+        )
+    if not pg_constraint_exists("fk_doctors_tenant_id_tenants", table_name="doctors"):
+        op.create_foreign_key(
+            "fk_doctors_tenant_id_tenants",
+            source_table="doctors",
+            referent_table="tenants",
+            local_cols=["tenant_id"],
+            remote_cols=["id"],
+            ondelete="SET NULL",
+        )
 
     # Add optional tenant_id to billings
-    op.add_column(
-        "billings",
-        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_billings_tenant_id_tenants",
-        source_table="billings",
-        referent_table="tenants",
-        local_cols=["tenant_id"],
-        remote_cols=["id"],
-        ondelete="SET NULL",
-    )
+    if not pg_column_exists("billings", "tenant_id"):
+        op.add_column(
+            "billings",
+            sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
+        )
+    if not pg_constraint_exists("fk_billings_tenant_id_tenants", table_name="billings"):
+        op.create_foreign_key(
+            "fk_billings_tenant_id_tenants",
+            source_table="billings",
+            referent_table="tenants",
+            local_cols=["tenant_id"],
+            remote_cols=["id"],
+            ondelete="SET NULL",
+        )
 
     # Expand userrole enum (additive; do not remove existing values)
     _add_enum_value_if_missing("userrole", "super_admin")
@@ -79,9 +85,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     # NOTE: Postgres enums cannot safely remove values in-place.
     # We only drop the newly added columns/constraints.
-    op.drop_constraint("fk_billings_tenant_id_tenants", "billings", type_="foreignkey")
-    op.drop_column("billings", "tenant_id")
+    if pg_constraint_exists("fk_billings_tenant_id_tenants", table_name="billings"):
+        op.drop_constraint("fk_billings_tenant_id_tenants", "billings", type_="foreignkey")
+    if pg_column_exists("billings", "tenant_id"):
+        op.drop_column("billings", "tenant_id")
 
-    op.drop_constraint("fk_doctors_tenant_id_tenants", "doctors", type_="foreignkey")
-    op.drop_column("doctors", "tenant_id")
+    if pg_constraint_exists("fk_doctors_tenant_id_tenants", table_name="doctors"):
+        op.drop_constraint("fk_doctors_tenant_id_tenants", "doctors", type_="foreignkey")
+    if pg_column_exists("doctors", "tenant_id"):
+        op.drop_column("doctors", "tenant_id")
 

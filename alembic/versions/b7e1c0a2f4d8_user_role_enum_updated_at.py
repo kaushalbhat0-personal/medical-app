@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from migration_helpers import pg_column_exists
+
 revision: str = "b7e1c0a2f4d8"
 down_revision: Union[str, None] = "a4f8c2e91b3d"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -23,15 +25,16 @@ def upgrade() -> None:
     userrole = postgresql.ENUM("admin", "staff", name="userrole", create_type=True)
     userrole.create(bind, checkfirst=True)
 
-    op.add_column(
-        "users",
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-    )
+    if not pg_column_exists("users", "updated_at"):
+        op.add_column(
+            "users",
+            sa.Column(
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.text("now()"),
+                nullable=False,
+            ),
+        )
 
     op.execute(
         sa.text(
@@ -49,7 +52,8 @@ def downgrade() -> None:
             "USING role::text"
         )
     )
-    op.drop_column("users", "updated_at")
+    if pg_column_exists("users", "updated_at"):
+        op.drop_column("users", "updated_at")
     postgresql.ENUM("admin", "staff", name="userrole", create_type=False).drop(
         bind, checkfirst=True
     )
