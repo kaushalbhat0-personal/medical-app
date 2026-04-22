@@ -29,7 +29,6 @@ class Settings(BaseSettings):
 
     # Slot read cache: disable for debugging; backend "memory" is default (Redis reserved for future).
     DOCTOR_SLOT_CACHE_ENABLED: bool = True
-    DOCTOR_SLOT_CACHE_BACKEND: str = "memory"
 
     # CORS settings - EXPLICIT ORIGINS ONLY (FastAPI CORSMiddleware doesn't support wildcards)
     # For Vercel preview URLs, add them explicitly or set ALLOWED_ORIGINS=* in .env for development only

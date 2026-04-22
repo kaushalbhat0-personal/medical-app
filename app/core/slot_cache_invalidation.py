@@ -1,4 +1,4 @@
-"""Purge in-memory slot read cache after commit when availability, time off, or doctor timezone changes."""
+"""Purge Upstash (shared) slot read cache after commit when availability, time off, or doctor timezone changes."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ _PENDING = "pending_doctor_slot_cache_invalidations"
 def schedule_invalidate_doctor_slot_cache_on_commit(db: Session, doctor_id: UUID) -> None:
     """
     After this session successfully commits, drop all cached slot lists for the doctor
-    (every date). In-memory this matches delete_pattern("slots:{doctor_id}:*").
+    (every date) via ``redis_delete_pattern("slots:{doctor_id}:*")``.
 
     Do not call after commit — register before commit/flush; SQLAlchemy runs the flush on commit.
     """

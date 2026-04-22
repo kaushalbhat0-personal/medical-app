@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.redis import redis_delete, redis_delete_pattern, redis_get, redis_set
 from app.crud import crud_appointment, crud_doctor_availability
 from app.models.doctor import Doctor
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
@@ -16,36 +17,11 @@ from app.models.user import User
 from app.schemas.doctor import DoctorSlotRead
 from app.services import doctor_service
 from app.services.exceptions import ValidationError
-from app.services.slot_read_cache import SlotReadCacheBackend, get_default_in_memory_slot_cache
 from app.utils.appointment_datetime import normalize_appointment_time_utc
 
 logger = logging.getLogger(__name__)
 
-_SLOTS_CACHE_TTL_SEC = 30.0
-
-_slot_cache_backend: SlotReadCacheBackend | None = None
-
-
-def _resolve_slot_cache_backend() -> SlotReadCacheBackend | None:
-    """Return cache backend or None when caching disabled."""
-    if not settings.DOCTOR_SLOT_CACHE_ENABLED:
-        return None
-    backend = (settings.DOCTOR_SLOT_CACHE_BACKEND or "memory").strip().lower()
-    if backend != "memory":
-        logger.warning(
-            "DOCTOR_SLOT_CACHE_BACKEND=%r not implemented; using in-memory slot cache",
-            settings.DOCTOR_SLOT_CACHE_BACKEND,
-        )
-    global _slot_cache_backend
-    if _slot_cache_backend is None:
-        _slot_cache_backend = get_default_in_memory_slot_cache()
-    return _slot_cache_backend
-
-
-def set_slot_read_cache_backend(backend: SlotReadCacheBackend | None) -> None:
-    """Test hook or process startup: plug a Redis-backed implementation without changing call sites."""
-    global _slot_cache_backend
-    _slot_cache_backend = backend
+_SLOTS_CACHE_TTL_SEC = 60
 
 
 def _zoneinfo_or_utc(name: str, *, context: str) -> ZoneInfo:
@@ -281,19 +257,16 @@ def _get_cached_slots_for_doctor_date(
     doctor: Doctor,
     target_date: date,
 ) -> list[DoctorSlotRead]:
-    cache = _resolve_slot_cache_backend()
-    cache_key_doc = str(doctor.id)
-    cache_key_date = target_date.isoformat()
-    if cache is not None:
-        cached = cache.get(cache_key_doc, cache_key_date)
-        if cached is not None:
-            return list(cached)
+    if not settings.DOCTOR_SLOT_CACHE_ENABLED:
+        return _compute_slots(db, doctor, target_date)
+
+    key = f"slots:{doctor.id}:{target_date.isoformat()}"
+    cached = redis_get(key)
+    if cached is not None:
+        return [DoctorSlotRead.model_validate(x) for x in cached]
 
     slots = _compute_slots(db, doctor, target_date)
-
-    if cache is not None:
-        cache.set(cache_key_doc, cache_key_date, list(slots), _SLOTS_CACHE_TTL_SEC)
-
+    redis_set(key, [s.model_dump(mode="json") for s in slots], ttl=_SLOTS_CACHE_TTL_SEC)
     return slots
 
 
@@ -396,21 +369,18 @@ def get_doctor_schedule_day(
 
 
 def invalidate_slots_cache_for_doctor_date(doctor_id: UUID, target_date: date) -> None:
-    cache = _resolve_slot_cache_backend()
-    if cache is None:
+    if not settings.DOCTOR_SLOT_CACHE_ENABLED:
         return
-    cache.invalidate_date(str(doctor_id), target_date.isoformat())
+    key = f"slots:{doctor_id}:{target_date.isoformat()}"
+    redis_delete(key)
 
 
 def invalidate_all_slots_cache_for_doctor(doctor_id: UUID) -> None:
-    """
-    Drop every cached (doctor, calendar-date) entry for this doctor (all future/past date keys).
-    For a string-keyed cache this would be: delete_pattern(f"slots:{doctor_id}:*").
-    """
-    cache = _resolve_slot_cache_backend()
-    if cache is None:
+    """Remove all slot list keys for this doctor: ``slots:{doctor_id}:*``."""
+    if not settings.DOCTOR_SLOT_CACHE_ENABLED:
         return
-    cache.invalidate_doctor(str(doctor_id))
+    pattern = f"slots:{doctor_id}:*"
+    redis_delete_pattern(pattern)
 
 
 def invalidate_slots_cache_for_appointment(db: Session, doctor: Doctor, appointment_time_utc: datetime) -> None:
