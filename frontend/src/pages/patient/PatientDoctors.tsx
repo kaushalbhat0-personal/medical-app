@@ -162,7 +162,8 @@ export function PatientDoctors() {
       try {
         const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, {
           signal,
-          skipCache: mode === 'poll',
+          // Always bypass short-lived client cache so doctor/date changes and reloads show server truth.
+          skipCache: true,
         });
         if (reqId !== slotsRequestIdRef.current) return;
         setSlots(dedupeDoctorSlots(list));
@@ -184,8 +185,12 @@ export function PatientDoctors() {
     [bookingDoctor?.id, bookDate, patientId]
   );
 
+  const refetchSlots = useCallback(() => {
+    void fetchSlots('poll');
+  }, [fetchSlots]);
+
   useEffect(() => {
-    if (!bookingDoctor || !bookDate || !patientId) {
+    if (!bookingDoctor?.id || !bookDate || !patientId) {
       setSlots([]);
       setSlotsLoading(false);
       setSlotsError(null);
@@ -195,6 +200,12 @@ export function PatientDoctors() {
     void fetchSlots('initial');
     return () => slotsFetchAbortRef.current?.abort();
   }, [bookingDoctor?.id, bookDate, patientId, fetchSlots]);
+
+  /** Latest slots when confirm step opens (booking flow advances) without clearing the chosen time. */
+  useEffect(() => {
+    if (!confirmOpen || !bookingDoctor?.id || !bookDate || !patientId) return;
+    refetchSlots();
+  }, [confirmOpen, bookingDoctor?.id, bookDate, patientId, refetchSlots]);
 
   useEffect(() => {
     if (!bookingDoctor || !bookDate || !patientId) return;
@@ -214,7 +225,7 @@ export function PatientDoctors() {
         return;
       }
       intervalId = window.setInterval(() => {
-        void fetchSlots('poll');
+        refetchSlots();
       }, 30_000);
     };
 
@@ -223,7 +234,7 @@ export function PatientDoctors() {
     const onVisibility = () => {
       if (typeof document === 'undefined') return;
       if (document.visibilityState === 'visible') {
-        void fetchSlots('poll');
+        refetchSlots();
         startPollIfVisible();
       } else {
         clearPoll();
@@ -235,17 +246,17 @@ export function PatientDoctors() {
       document.removeEventListener('visibilitychange', onVisibility);
       clearPoll();
     };
-  }, [bookingDoctor?.id, bookDate, patientId, fetchSlots]);
+  }, [bookingDoctor?.id, bookDate, patientId, refetchSlots]);
 
   useEffect(() => {
     if (!bookingDoctor) return;
     const onOtherTab = () => {
       if (!shouldSyncSlotsCrossTab()) return;
-      void fetchSlots('poll');
+      refetchSlots();
     };
     window.addEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
     return () => window.removeEventListener(SLOTS_CROSS_TAB_BROADCAST, onOtherTab);
-  }, [bookingDoctor, fetchSlots]);
+  }, [bookingDoctor, refetchSlots]);
 
   const selectDoctor = (d: Doctor) => {
     setBookingIdempotencyKey(crypto.randomUUID());
@@ -295,6 +306,7 @@ export function PatientDoctors() {
       } catch {
         /* storage full / disabled */
       }
+      invalidateDoctorSlotsClientCache(String(bookingDoctor.id), bookDate);
       exitBookingFlow();
       toast.success(
         idempotentReplay ? 'Appointment already booked successfully.' : 'Appointment booked.'
