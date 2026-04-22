@@ -509,7 +509,7 @@ export function PatientDoctors() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="book-appt-title"
-            className="w-full max-w-md rounded-t-xl border border-border bg-card shadow-lg outline-none sm:rounded-xl"
+            className="w-full max-w-md rounded-t-xl border border-border bg-card text-foreground shadow-lg outline-none sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-border px-4 py-3">

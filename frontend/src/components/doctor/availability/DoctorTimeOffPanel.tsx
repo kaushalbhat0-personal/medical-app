@@ -231,7 +231,7 @@ export function DoctorTimeOffPanel({
             role="dialog"
             aria-modal="true"
             data-testid="time-off-modal"
-            className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg outline-none p-0"
+            className="w-full max-w-md rounded-xl border border-border bg-card text-foreground shadow-lg outline-none p-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-border px-4 py-3">

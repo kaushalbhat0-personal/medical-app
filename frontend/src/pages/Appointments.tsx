@@ -213,7 +213,7 @@ export function Appointments() {
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(Number(e.target.value) || '')}
                 disabled={loading || refetching}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="">All Doctors</option>
                 {doctors.map((d) => (
@@ -229,7 +229,7 @@ export function Appointments() {
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as AppointmentFilters['status'])}
                 disabled={loading || refetching}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="">All Status</option>
                 <option value="scheduled">Scheduled</option>

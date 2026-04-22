@@ -136,7 +136,7 @@ export function BookingModal({
         aria-describedby="day-cal-book-desc"
         aria-busy={submitting}
         className={cn(
-          'w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg outline-none'
+          'w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card text-foreground shadow-lg outline-none'
         )}
         onClick={(e) => e.stopPropagation()}
       >

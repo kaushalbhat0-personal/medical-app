@@ -151,7 +151,7 @@ export function AvailabilityWindowModal({
         aria-modal="true"
         aria-labelledby="avail-modal-title"
         data-testid="availability-modal"
-        className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg outline-none p-0"
+        className="w-full max-w-md rounded-xl border border-border bg-card text-foreground shadow-lg outline-none p-0"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-border px-4 py-3">
@@ -172,7 +172,7 @@ export function AvailabilityWindowModal({
             </label>
             <select
               id="avail-dow"
-              className="mt-1 flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
               value={dow}
               onChange={(e) => setDow(parseInt(e.target.value, 10))}
               disabled={submitting}

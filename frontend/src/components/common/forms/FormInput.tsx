@@ -22,25 +22,25 @@ export function FormInput<TFieldValues extends Record<string, unknown>>({
     ? register(name, { valueAsNumber: true })
     : register(name);
 
+  const isDate = type === 'date';
+
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium text-foreground">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-destructive ml-1">*</span>}
       </label>
       <input
         type={type}
         {...registerProps}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full min-h-[44px] px-4 py-2.5 rounded-xl border transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 ${
-          error
-            ? 'border-red-500 focus:border-red-500'
-            : 'border-gray-300 focus:border-blue-500'
-        }`}
+        className={`w-full min-h-[44px] rounded-xl border bg-background px-4 py-2.5 text-foreground transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          error ? 'border-destructive focus-visible:ring-destructive/30' : 'border-input'
+        } ${isDate ? '[color-scheme:light] dark:[color-scheme:dark]' : ''}`}
       />
       {error && (
-        <span className="text-sm text-red-500 mt-1 block">{error.message as string}</span>
+        <span className="text-sm text-destructive mt-1 block">{error.message as string}</span>
       )}
     </div>
   );

@@ -240,7 +240,7 @@ export function DoctorBillsPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-bill-title"
-            className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg"
+            className="w-full max-w-md rounded-xl border border-border bg-card text-foreground shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-border px-4 py-3">
@@ -256,7 +256,7 @@ export function DoctorBillsPage() {
                 </label>
                 <select
                   id="bill-appt"
-                  className="mt-1 flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
                   value={appointmentId}
                   onChange={(e) => setAppointmentId(e.target.value)}
                   disabled={submitting}
