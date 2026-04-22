@@ -67,12 +67,40 @@ def record_appointment_idempotency(
     return row
 
 
-def get_appointment(db: Session, appointment_id: UUID) -> Appointment | None:
-    stmt = select(Appointment).where(
-        Appointment.id == appointment_id,
-        Appointment.is_deleted == False,
+def get_appointment(
+    db: Session,
+    appointment_id: UUID,
+    *,
+    include_deleted: bool = False,
+) -> Appointment | None:
+    stmt = (
+        select(Appointment)
+        .where(Appointment.id == appointment_id)
+        .options(
+            joinedload(Appointment.patient),
+            joinedload(Appointment.doctor),
+        )
     )
+    if not include_deleted:
+        stmt = stmt.where(Appointment.is_deleted == False)
     return db.scalars(stmt).first()
+
+
+def get_appointments_by_ids(
+    db: Session, appointment_ids: list[UUID]
+) -> dict[UUID, Appointment]:
+    if not appointment_ids:
+        return {}
+    stmt = (
+        select(Appointment)
+        .where(Appointment.id.in_(appointment_ids))
+        .options(
+            joinedload(Appointment.patient),
+            joinedload(Appointment.doctor),
+        )
+    )
+    rows = db.scalars(stmt).unique().all()
+    return {row.id: row for row in rows}
 
 
 def get_appointments(

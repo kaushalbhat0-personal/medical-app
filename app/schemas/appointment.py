@@ -19,7 +19,7 @@ class DoctorMini(BaseModel):
 
     id: UUID
     name: str
-    timezone: str = "UTC"
+    timezone: str
 
 
 class AppointmentCreate(BaseModel):

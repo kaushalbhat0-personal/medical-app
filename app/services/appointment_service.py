@@ -248,7 +248,10 @@ def create_appointment(
         appointment.id,
         appointment.tenant_id,
     )
-    return (appointment, False)
+    reloaded = crud_appointment.get_appointment(db, appointment.id)
+    if reloaded is None:
+        raise NotFoundError("Appointment not found")
+    return (reloaded, False)
 
 
 def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
@@ -270,7 +273,10 @@ def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
         appointment.status = AppointmentStatus.completed
         db.add(appointment)
         db.commit()
-        db.refresh(appointment)
+        reloaded = crud_appointment.get_appointment(db, appointment_id)
+        if reloaded is None:
+            raise NotFoundError("Appointment not found")
+        return reloaded
 
     return appointment
 
@@ -299,8 +305,10 @@ def _update_status_for_past_appointments(
 
     if updated:
         db.commit()
-        for apt in updated:
-            db.refresh(apt)
+        by_id = crud_appointment.get_appointments_by_ids(
+            db, [a.id for a in appointments]
+        )
+        return [by_id[a.id] for a in appointments]
 
     return appointments
 
@@ -478,7 +486,10 @@ def update_appointment(
         updated.id,
         updated.tenant_id,
     )
-    return updated
+    reloaded = crud_appointment.get_appointment(db, updated.id)
+    if reloaded is None:
+        raise NotFoundError("Appointment not found")
+    return reloaded
 
 
 def delete_appointment(
@@ -513,4 +524,7 @@ def delete_appointment(
         deleted.id,
         deleted.tenant_id,
     )
-    return deleted
+    reloaded = crud_appointment.get_appointment(db, deleted.id, include_deleted=True)
+    if reloaded is None:
+        raise NotFoundError("Appointment not found")
+    return reloaded

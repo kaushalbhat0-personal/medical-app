@@ -126,3 +126,50 @@ async def test_slot_conflict_second_patient_same_slot_rejected(
     assert second.status_code == 400
     detail = (second.json().get("detail") or "").lower()
     assert "slot already booked" in detail or "30 minutes" in detail or "appointment within" in detail
+
+
+@pytest.mark.asyncio
+async def test_get_appointments_includes_doctor_timezone(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": pat_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "patient_id": str(patient.id),
+        "doctor_id": str(doctor.id),
+        "appointment_time": slot.isoformat(),
+    }
+    created = await client.post("/api/v1/appointments", json=payload, headers=headers)
+    assert created.status_code == 201, created.text
+    appt_id = created.json()["id"]
+
+    listed = await client.get("/api/v1/appointments", headers=headers)
+    assert listed.status_code == 200
+    rows = listed.json()
+    match = next((r for r in rows if r["id"] == appt_id), None)
+    assert match is not None
+    doc_out = match["doctor"]
+    assert doc_out["id"] == str(doctor.id)
+    assert doc_out["name"] == doctor.name
+    assert doc_out["timezone"] == doctor.timezone
+
+    assert created.json()["doctor"]["timezone"] == doctor.timezone
