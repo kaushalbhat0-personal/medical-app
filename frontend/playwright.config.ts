@@ -33,6 +33,7 @@ export default defineConfig({
         DATABASE_URL: dbUrl,
         SECRET_KEY: 'playwright-e2e-secret-key-0000000001',
         ALLOWED_ORIGINS: 'http://127.0.0.1:5173',
+        ENVIRONMENT: 'development',
       },
     },
     {
