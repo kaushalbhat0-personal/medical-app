@@ -47,7 +47,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
 
   const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;
   return (
-    <div className="h-screen overflow-hidden bg-surface border-r border-border flex flex-col w-full">
+    <div className="min-h-screen h-full bg-surface border-r border-border flex flex-col w-full">
       {/* Header */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-border flex-shrink-0">
         {/* Logo */}

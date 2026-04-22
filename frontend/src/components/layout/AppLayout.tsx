@@ -19,10 +19,10 @@ export default function AppLayout({ children, user, onLogout }: AppLayoutProps) 
   const handleToggleCollapse = () => setIsCollapsed(!isCollapsed);
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex min-h-screen w-full overflow-y-auto bg-background text-foreground">
       {/* Desktop Sidebar - fixed width */}
-      <div className="hidden lg:block flex-shrink-0">
-        <div className={`h-full transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+      <div className="hidden lg:block flex-shrink-0 self-stretch">
+        <div className={`min-h-screen h-full transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
           <Sidebar
             user={user}
             isCollapsed={isCollapsed}
@@ -52,13 +52,13 @@ export default function AppLayout({ children, user, onLogout }: AppLayoutProps) 
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <Topbar
           user={user}
           onLogout={onLogout}
           onMenuToggle={handleMenuToggle}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 p-4 md:p-6">
           {children}
         </main>
       </div>

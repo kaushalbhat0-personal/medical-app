@@ -15,7 +15,7 @@ export function PatientLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen w-full overflow-y-auto bg-background text-foreground flex flex-col">
       <header className="border-b border-border bg-card sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">

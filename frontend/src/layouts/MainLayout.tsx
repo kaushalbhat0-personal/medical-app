@@ -81,7 +81,7 @@ export function MainLayout({ user, onLogout, children }: MainLayoutProps) {
   }, []);
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-background">
+    <div className="flex min-h-screen w-full overflow-y-auto bg-background">
       {/* Mobile Overlay */}
       <div
         className={`fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-300 ${
