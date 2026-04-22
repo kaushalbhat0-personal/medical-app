@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAppointments, usePatients } from '../../hooks';
+import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState } from '../../components/common';
 import type { Appointment } from '../../types';
+import { UserPlus, CalendarPlus, Receipt } from 'lucide-react';
 
 function startOfLocalDay(d: Date): Date {
   const x = new Date(d);
@@ -22,6 +25,8 @@ function isAppointmentToday(a: Appointment, ref: Date): boolean {
 }
 
 export function DoctorHome() {
+  const navigate = useNavigate();
+  const { isIndependent } = useDoctorWorkspace();
   const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments();
   const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients();
 
@@ -61,8 +66,47 @@ export function DoctorHome() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">A snapshot of your practice today.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isIndependent
+            ? 'A snapshot of your practice today — add care and billing as you go.'
+            : 'A snapshot of patients and visits associated with you in this organization.'}
+        </p>
       </div>
+
+      {isIndependent && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/doctor/patients', { state: { openAddPatient: true } })}
+            className="gap-2"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden />
+            Add patient
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/doctor/appointments', { state: { openSchedule: true } })}
+            className="gap-2"
+          >
+            <CalendarPlus className="h-4 w-4" aria-hidden />
+            Schedule visit
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/doctor/bills', { state: { openCreateBill: true } })}
+            className="gap-2"
+          >
+            <Receipt className="h-4 w-4" aria-hidden />
+            Create bill
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>

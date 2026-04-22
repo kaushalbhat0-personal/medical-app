@@ -592,7 +592,36 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
     return doctor
 
 
+def require_doctor_profile(db: Session, current_user: User) -> Doctor:
+    """Doctor row for this user with tenant loaded; RBAC-style denials."""
+    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+    if doctor is None:
+        raise ForbiddenError("Doctor profile not found for this user")
+    if doctor.tenant is None:
+        raise ForbiddenError("Doctor tenant is not set")
+    return doctor
 
+
+def get_acting_doctor_or_none(db: Session, current_user: User) -> Doctor | None:
+    """Single doctor-profile lookup per request for doctor-role users; avoids repeated joins elsewhere."""
+    if current_user.role != UserRole.doctor:
+        return None
+    return require_doctor_profile(db, current_user)
+
+
+def ensure_self_managed_doctor(doctor: Doctor) -> None:
+    """``independent_doctor`` tenants only (self-managed practice). ``doctor.tenant`` must be loaded."""
+    if doctor.tenant is None:
+        raise ForbiddenError("Doctor tenant is not set")
+    if doctor.tenant.type != TenantType.independent_doctor.value:
+        raise ForbiddenError("Only independent doctors can perform this action")
+
+
+def require_self_managed_doctor(db: Session, current_user: User) -> Doctor:
+    """Only ``independent_doctor`` tenants may perform patient/bill creation and similar actions."""
+    doctor = require_doctor_profile(db, current_user)
+    ensure_self_managed_doctor(doctor)
+    return doctor
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
@@ -601,9 +630,21 @@ def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
 
     if doctor is None:
 
-        raise NotFoundError("Doctor profile not found for this user")
+        raise ForbiddenError("Doctor profile not found for this user")
 
     return doctor
+
+
+def doctor_is_independent(doctor: Doctor) -> bool:
+    """True if the doctor's tenant is ``independent_doctor``. ``doctor.tenant`` must be loaded."""
+    if doctor.tenant is None:
+        raise ForbiddenError("Doctor tenant is not set")
+    return doctor.tenant.type == TenantType.independent_doctor.value
+
+
+def is_independent_doctor(db: Session, current_user: User) -> bool:
+    """Resolves the doctor by user and checks tenant type."""
+    return doctor_is_independent(require_doctor_profile(db, current_user))
 
 
 
@@ -640,9 +681,8 @@ def get_doctors(
 
 
     if current_user is not None and current_user.role == UserRole.doctor:
-        try:
-            self_doctor = get_doctor_by_user_id(db, current_user.id)
-        except NotFoundError:
+        self_doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+        if self_doctor is None:
             logger.warning(
                 "[RBAC] doctor user has no doctor profile user_id=%s; returning empty doctor list",
                 current_user.id,

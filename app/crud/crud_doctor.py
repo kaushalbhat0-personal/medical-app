@@ -65,11 +65,15 @@ def get_doctor(db: Session, doctor_id: UUID) -> Doctor | None:
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor | None:
-    stmt = select(Doctor).where(
-        Doctor.user_id == user_id,
-        Doctor.is_deleted == False,
+    stmt = (
+        select(Doctor)
+        .options(joinedload(Doctor.tenant))
+        .where(
+            Doctor.user_id == user_id,
+            Doctor.is_deleted == False,
+        )
     )
-    return db.scalars(stmt).first()
+    return db.scalars(stmt).unique().first()
 
 
 def get_doctors(

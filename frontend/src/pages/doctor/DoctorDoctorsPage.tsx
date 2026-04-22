@@ -1,6 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { useDoctors } from '../../hooks';
 import { ErrorState, EmptyState } from '../../components/common';
+import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import type { Doctor } from '../../types';
 import { formatDoctorInitials, formatDoctorName } from '../../utils';
 
@@ -9,6 +10,7 @@ function doctorLoginEmailLabel(d: Doctor): string {
 }
 
 export function DoctorDoctorsPage() {
+  const { isReadOnly } = useDoctorWorkspace();
   const { doctors, loading, error, refetch } = useDoctors();
 
   if (error) {
@@ -26,7 +28,11 @@ export function DoctorDoctorsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Doctors</h1>
-        <p className="text-sm text-muted-foreground mt-1">Providers in your tenant.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isReadOnly
+            ? 'Providers in your organization (directory — read only).'
+            : 'Providers in your tenant.'}
+        </p>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}

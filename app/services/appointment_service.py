@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.doctor import Doctor
 from app.models.user import User, UserRole
 from app.services import doctor_service, doctor_slot_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
@@ -103,6 +104,8 @@ def authorize_appointment_create(
     appointment_in: AppointmentCreate,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> None:
     if current_user.role == UserRole.super_admin:
         return
@@ -121,12 +124,21 @@ def authorize_appointment_create(
 
     if current_user.role == UserRole.doctor:
         try:
-            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        except NotFoundError:
-            log_rbac_mutation_violation(current_user, "appointment")
-            raise ForbiddenError("Doctor profile not found for this user")
-        if acting_doctor.id != appointment_in.doctor_id:
-            log_rbac_mutation_violation(current_user, "appointment")
+            doc = acting_doctor or doctor_service.require_doctor_profile(
+                db, current_user
+            )
+        except ForbiddenError:
+            log_rbac_mutation_violation(
+                current_user, "appointment", action="create_appointment"
+            )
+            raise
+        if doc.id != appointment_in.doctor_id:
+            log_rbac_mutation_violation(
+                current_user,
+                "appointment",
+                action="create_appointment",
+                tenant_type=doc.tenant.type if doc.tenant else None,
+            )
             raise ForbiddenError("Cannot create appointment for another doctor")
         return
 
@@ -151,9 +163,17 @@ def create_appointment(
     current_user: User,
     tenant_id: UUID | None,
     idempotency_key: str | None = None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> Appointment:
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
-    authorize_appointment_create(db, appointment_in, current_user, tenant_id)
+    authorize_appointment_create(
+        db,
+        appointment_in,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+    )
 
     if idempotency_key is not None:
         idempotency_key = idempotency_key.strip() or None
@@ -291,6 +311,8 @@ def get_appointments(
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
     tenant_id: UUID | None = None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> list[Appointment]:
     _ensure_can_list_appointments(current_user)
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
@@ -299,8 +321,10 @@ def get_appointments(
     eff_tenant_id = tenant_id
 
     if current_user.role == UserRole.doctor:
-        doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        eff_doctor_id = doctor.id
+        doc = acting_doctor or doctor_service.require_doctor_profile(
+            db, current_user
+        )
+        eff_doctor_id = doc.id
         eff_patient_id = None
     elif current_user.role == UserRole.patient:
         patient = patient_service.get_patient_by_user_id(db, current_user.id)
@@ -327,6 +351,9 @@ def authorize_appointment_access(
     appointment: Appointment,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
+    rbac_action: str = "appointment_access",
 ) -> None:
     if current_user.role == UserRole.super_admin:
         return
@@ -343,13 +370,16 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.doctor:
-        try:
-            acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        except NotFoundError:
-            log_rbac_mutation_violation(current_user, "appointment")
-            raise ForbiddenError("Doctor profile not found for this user")
-        if appointment.doctor_id != acting_doctor.id:
-            log_rbac_mutation_violation(current_user, "appointment")
+        doc = acting_doctor or doctor_service.require_doctor_profile(
+            db, current_user
+        )
+        if appointment.doctor_id != doc.id:
+            log_rbac_mutation_violation(
+                current_user,
+                "appointment",
+                action=rbac_action,
+                tenant_type=doc.tenant.type if doc.tenant else None,
+            )
             raise ForbiddenError("Not allowed to access this appointment")
         return
 
@@ -387,9 +417,18 @@ def update_appointment(
     appointment_in: AppointmentUpdate,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
-    authorize_appointment_access(db, appointment, current_user, tenant_id)
+    authorize_appointment_access(
+        db,
+        appointment,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="update_appointment",
+    )
 
     update_data = appointment_in.model_dump(exclude_unset=True)
     if not update_data:
@@ -445,9 +484,18 @@ def delete_appointment(
     appointment_id: UUID,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
-    authorize_appointment_access(db, appointment, current_user, tenant_id)
+    authorize_appointment_access(
+        db,
+        appointment,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="delete_appointment",
+    )
 
     if appointment.status == AppointmentStatus.completed:
         raise ValidationError("Completed appointment cannot be deleted")

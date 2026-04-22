@@ -1,45 +1,187 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+import { Receipt, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useBilling } from '../../hooks';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useAppointments, useBilling, useModalFocusTrap } from '../../hooks';
+import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState, EmptyState } from '../../components/common';
+import { billingApi } from '../../services';
+import type { Appointment, Bill } from '../../types';
+
+function appointmentTimeMs(a: Appointment): number {
+  const t = a.appointment_time || a.scheduled_at;
+  return t ? new Date(t).getTime() : 0;
+}
+
+function patientName(map: Map<string, string>, id: string): string {
+  return map.get(id) || 'Patient';
+}
+
+function billCoversAppointment(bills: Bill[], appt: Appointment): boolean {
+  const aid = String(appt.id);
+  return bills.some((b) => b.appointment_id && String(b.appointment_id) === aid);
+}
 
 export function DoctorBillsPage() {
-  const { bills, patients, loading, error, refetch } = useBilling();
+  const { isIndependent, selfDoctor, isReadOnly } = useDoctorWorkspace();
+  const { bills, patients: billingPatients, loading, error, refetch } = useBilling();
+  const { appointments, patients, loading: aptLoading, refetch: refetchApt } = useAppointments();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const patientNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of patients) {
+    for (const p of billingPatients) {
       m.set(String(p.id), p.name || 'Patient');
     }
+    for (const p of patients) {
+      if (!m.has(String(p.id))) m.set(String(p.id), p.name || 'Patient');
+    }
     return m;
-  }, [patients]);
+  }, [billingPatients, patients]);
+
+  const bookableAppointments = useMemo(() => {
+    const selfId = selfDoctor != null ? String(selfDoctor.id) : '';
+    if (!selfId) return [];
+    const now = Date.now();
+    return appointments.filter((a) => {
+      if (String(a.doctor_id) !== selfId) return false;
+      if (a.status === 'cancelled' || a.status === 'completed') return false;
+      if (a.status !== 'scheduled' && a.status !== 'pending') return false;
+      if (billCoversAppointment(bills, a)) return false;
+      return appointmentTimeMs(a) > now;
+    });
+  }, [appointments, selfDoctor, bills]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [appointmentId, setAppointmentId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const createOpenedRef = useRef(false);
+
+  useModalFocusTrap(dialogRef, createOpen);
+
+  const closeCreate = useCallback(() => {
+    setCreateOpen(false);
+    setAppointmentId('');
+    setAmount('');
+    setDescription('');
+    if (location.state && typeof location.state === 'object' && 'openCreateBill' in location.state) {
+      navigate(
+        { pathname: location.pathname, search: location.search, hash: location.hash },
+        { replace: true, state: {} }
+      );
+    }
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
+    const st = location.state as { openCreateBill?: boolean } | null;
+    if (st?.openCreateBill && isIndependent && !createOpenedRef.current) {
+      createOpenedRef.current = true;
+      setCreateOpen(true);
+    }
+  }, [location.state, isIndependent]);
+
+  const selectedAppt: Appointment | undefined = useMemo(
+    () => bookableAppointments.find((a) => String(a.id) === appointmentId),
+    [bookableAppointments, appointmentId]
+  );
+
+  const createBill = async () => {
+    if (!selectedAppt || !appointmentId) {
+      toast.error('Choose a visit to bill');
+      return;
+    }
+    const n = parseFloat(amount);
+    if (Number.isNaN(n) || n <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    const pid = String(selectedAppt.patient_id);
+    setSubmitting(true);
+    try {
+      await billingApi.create({
+        patient_id: pid,
+        appointment_id: appointmentId,
+        amount: n,
+        currency: 'INR',
+        description: description.trim() || undefined,
+      });
+      toast.success('Bill created');
+      closeCreate();
+      void refetch();
+      void refetchApt();
+    } catch (e) {
+      const msg =
+        axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
+          ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not create bill')
+          : 'Could not create bill';
+      toast.error(msg, { duration: 5000 });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (error) {
-    return (
-      <ErrorState title="Could not load bills" description="" error={error} onRetry={refetch} />
-    );
+    return <ErrorState title="Could not load bills" description="" error={error} onRetry={refetch} />;
   }
+
+  const listLoading = loading || aptLoading;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Bills</h1>
-        <p className="text-sm text-muted-foreground mt-1">Billing for your patients and visits.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Bills</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isReadOnly
+              ? 'Bills for visits you are associated with (read only in this portal).'
+              : 'Billing for your patients and visits.'}
+          </p>
+        </div>
+        {isIndependent && bookableAppointments.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            className="gap-2"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Create bill
+          </Button>
+        )}
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-      {!loading && bills.length === 0 && (
-        <EmptyState title="No bills" description="Bills tied to your appointments appear here." />
+      {isIndependent && selfDoctor && bookableAppointments.length === 0 && !listLoading && (
+        <p className="text-sm text-muted-foreground rounded-lg border border-border px-3 py-2">
+          Create or schedule a future visit with an outstanding bill to add billing here. Existing visits already billed are not
+          listed.
+        </p>
       )}
 
-      {!loading && bills.length > 0 && (
+      {listLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+
+      {!listLoading && bills.length === 0 && (
+        <EmptyState
+          title="No bills"
+          description="Bills tied to your appointments appear here."
+          icon={Receipt}
+        />
+      )}
+
+      {!listLoading && bills.length > 0 && (
         <div className="space-y-3">
           {bills.map((b) => (
             <Card key={b.id}>
               <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div>
-                  <p className="font-medium">{patientNameById.get(String(b.patient_id)) || 'Patient'}</p>
+                  <p className="font-medium">{patientName(patientNameById, String(b.patient_id))}</p>
                   {b.description && <p className="text-xs text-muted-foreground truncate max-w-md">{b.description}</p>}
                 </div>
                 <div className="text-right">
@@ -51,6 +193,87 @@ export function DoctorBillsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {createOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => !submitting && closeCreate()}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-bill-title"
+            className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-border px-4 py-3">
+              <h2 id="create-bill-title" className="text-lg font-semibold">
+                New bill
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Tie the charge to a scheduled visit you own.</p>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              <div>
+                <label htmlFor="bill-appt" className="text-xs font-medium text-muted-foreground">
+                  Visit
+                </label>
+                <select
+                  id="bill-appt"
+                  className="mt-1 flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  value={appointmentId}
+                  onChange={(e) => setAppointmentId(e.target.value)}
+                  disabled={submitting}
+                >
+                  <option value="">Select appointment</option>
+                  {bookableAppointments.map((a) => (
+                    <option key={String(a.id)} value={String(a.id)}>
+                      {(a.appointment_time || a.scheduled_at || '').replace('T', ' ').slice(0, 16)} —{' '}
+                      {patientName(patientNameById, String(a.patient_id))}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="bill-amt" className="text-xs font-medium text-muted-foreground">
+                  Amount
+                </label>
+                <Input
+                  id="bill-amt"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="mt-1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label htmlFor="bill-desc" className="text-xs font-medium text-muted-foreground">
+                  Description (optional)
+                </label>
+                <Input
+                  id="bill-desc"
+                  className="mt-1"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+              <Button type="button" variant="outline" onClick={closeCreate} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void createBill()} disabled={submitting}>
+                {submitting ? 'Creating…' : 'Create bill'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

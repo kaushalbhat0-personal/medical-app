@@ -62,6 +62,10 @@ export interface Doctor {
   has_availability_windows?: boolean;
   /** Login email for the linked user account (admin-created doctors) */
   linked_user_email?: string | null;
+  /** From GET /doctors (DoctorRead); used for org vs independent UI. */
+  tenant_type?: string | null;
+  tenant_name?: string | null;
+  tenant_id?: string | null;
 }
 
 export interface Appointment {

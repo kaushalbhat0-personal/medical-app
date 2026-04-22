@@ -3,9 +3,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, get_current_user
+from app.api.deps import (
+    get_acting_doctor_optional,
+    get_acting_doctor_optional_active,
+    get_current_active_user,
+    get_current_user,
+)
 from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
+from app.models.doctor import Doctor
 from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.services import patient_service
@@ -18,9 +24,12 @@ def create_patient(
     payload: PatientCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
 ) -> PatientRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    return patient_service.create_patient(db, payload, current_user, tenant_id)
+    return patient_service.create_patient(
+        db, payload, current_user, tenant_id, acting_doctor=acting_doctor
+    )
 
 
 @router.get("", response_model=list[PatientRead])
@@ -30,6 +39,7 @@ def read_patients(
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> list[PatientRead]:
     tenant_id = get_current_tenant_id(current_user, db)
     return patient_service.get_patients(
@@ -39,6 +49,7 @@ def read_patients(
         limit=limit,
         search=search,
         tenant_id=tenant_id,
+        acting_doctor=acting_doctor,
     )
 
 
@@ -47,10 +58,18 @@ def read_patient(
     patient_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> PatientRead:
     tenant_id = get_current_tenant_id(current_user, db)
     patient = patient_service.get_patient_or_404(db, patient_id)
-    patient_service.authorize_patient_read(db, patient, current_user, tenant_id)
+    patient_service.authorize_patient_read(
+        db,
+        patient,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="read_patient",
+    )
     return patient
 
 
@@ -60,10 +79,16 @@ def update_patient(
     payload: PatientUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> PatientRead:
     tenant_id = get_current_tenant_id(current_user, db)
     return patient_service.update_patient(
-        db, patient_id, payload, current_user, tenant_id
+        db,
+        patient_id,
+        payload,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
     )
 
 
@@ -72,7 +97,10 @@ def delete_patient(
     patient_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> Response:
     tenant_id = get_current_tenant_id(current_user, db)
-    patient_service.delete_patient(db, patient_id, current_user, tenant_id)
+    patient_service.delete_patient(
+        db, patient_id, current_user, tenant_id, acting_doctor=acting_doctor
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

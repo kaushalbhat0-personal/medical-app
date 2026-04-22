@@ -12,7 +12,9 @@ from app.api.http_exceptions import (
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.crud import crud_user
+from app.models.doctor import Doctor
 from app.models.user import User
+from app.services import doctor_service
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(
@@ -107,3 +109,27 @@ def get_current_auth_context(
     if not user.is_active:
         raise inactive_user_exception()
     return auth_ctx
+
+
+def get_acting_doctor_optional(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Doctor | None:
+    """At most one doctor-profile load per request (doctor-role users only)."""
+    return doctor_service.get_acting_doctor_or_none(db, current_user)
+
+
+def get_acting_doctor_optional_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Doctor | None:
+    """Same as ``get_acting_doctor_optional`` but for routes that require an active user."""
+    return doctor_service.get_acting_doctor_or_none(db, current_user)
+
+
+def get_current_doctor(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Doctor:
+    """Doctor profile for the current user; use on doctor-only routes."""
+    return doctor_service.require_doctor_profile(db, current_user)

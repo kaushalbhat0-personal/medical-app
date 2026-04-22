@@ -8,12 +8,20 @@ from app.services.exceptions import ForbiddenError
 logger = logging.getLogger(__name__)
 
 
-def log_rbac_mutation_violation(current_user: User, resource: str) -> None:
+def log_rbac_mutation_violation(
+    current_user: User,
+    resource: str,
+    *,
+    action: str | None = None,
+    tenant_type: str | None = None,
+) -> None:
     logger.warning(
-        "[SECURITY] UPDATE/DELETE violation user=%s role=%s resource=%s",
+        "[RBAC] denied user=%s role=%s resource=%s action=%s tenant_type=%s",
         current_user.id,
         current_user.role,
         resource,
+        action if action is not None else "-",
+        tenant_type if tenant_type is not None else "-",
     )
 
 

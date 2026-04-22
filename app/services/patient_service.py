@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
+from app.models.doctor import Doctor
 from app.services import doctor_service
 from app.models.patient import Patient
 from app.models.user import User, UserRole
@@ -28,15 +29,40 @@ def authorize_patient_create(
     db: Session,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> None:
     if current_user.role == UserRole.patient:
-        log_rbac_mutation_violation(current_user, "patient")
+        log_rbac_mutation_violation(
+            current_user, "patient", action="create_patient"
+        )
         raise ForbiddenError("Cannot create another patient record")
     if current_user.role == UserRole.super_admin:
         return
-    if current_user.role in (UserRole.admin, UserRole.staff, UserRole.doctor):
+    if current_user.role in (UserRole.admin, UserRole.staff):
         return
-    log_rbac_mutation_violation(current_user, "patient")
+    if current_user.role == UserRole.doctor:
+        try:
+            doc = acting_doctor or doctor_service.require_doctor_profile(
+                db, current_user
+            )
+        except ForbiddenError:
+            log_rbac_mutation_violation(
+                current_user, "patient", action="create_patient"
+            )
+            raise
+        try:
+            doctor_service.ensure_self_managed_doctor(doc)
+        except ForbiddenError:
+            log_rbac_mutation_violation(
+                current_user,
+                "patient",
+                action="create_patient",
+                tenant_type=doc.tenant.type if doc.tenant else None,
+            )
+            raise
+        return
+    log_rbac_mutation_violation(current_user, "patient", action="create_patient")
     raise ForbiddenError("Not allowed to create patients")
 
 
@@ -45,10 +71,14 @@ def create_patient(
     patient_in: PatientCreate,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> Patient:
     _validate_age(patient_in.age)
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
-    authorize_patient_create(db, current_user, tenant_id)
+    authorize_patient_create(
+        db, current_user, tenant_id, acting_doctor=acting_doctor
+    )
     patient_data = patient_in.model_dump()
     patient_data.pop("created_by", None)
     patient_data["created_by"] = current_user.id
@@ -91,6 +121,9 @@ def authorize_patient_access(
     patient: Patient,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
+    rbac_action: str = "patient_access",
 ) -> None:
     if current_user.role == UserRole.super_admin:
         return
@@ -108,30 +141,42 @@ def authorize_patient_access(
             if not crud_patient.patient_has_active_appointment_in_tenant(
                 db, patient.id, tenant_id
             ):
-                log_rbac_mutation_violation(current_user, "patient")
+                log_rbac_mutation_violation(
+                    current_user, "patient", action=rbac_action
+                )
                 raise ForbiddenError("Patient is not in your tenant")
 
     if current_user.role in (UserRole.admin, UserRole.staff):
         return
 
     if current_user.role == UserRole.doctor:
-        acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        if patient.created_by == current_user.id:
-            return
+        doc = acting_doctor or doctor_service.require_doctor_profile(
+            db, current_user
+        )
+        if doctor_service.doctor_is_independent(doc):
+            if patient.created_by == current_user.id:
+                return
         if crud_patient.patient_has_appointment_with_doctor(
-            db, patient.id, acting_doctor.id
+            db, patient.id, doc.id
         ):
             return
-        log_rbac_mutation_violation(current_user, "patient")
+        log_rbac_mutation_violation(
+            current_user,
+            "patient",
+            action=rbac_action,
+            tenant_type=doc.tenant.type if doc.tenant else None,
+        )
         raise ForbiddenError("Not allowed to modify this patient")
 
     if current_user.role == UserRole.patient:
         if patient.user_id != current_user.id:
-            log_rbac_mutation_violation(current_user, "patient")
+            log_rbac_mutation_violation(
+                current_user, "patient", action=rbac_action
+            )
             raise ForbiddenError("Not allowed to modify this patient")
         return
 
-    log_rbac_mutation_violation(current_user, "patient")
+    log_rbac_mutation_violation(current_user, "patient", action=rbac_action)
     raise ForbiddenError("Not allowed to modify this patient")
 
 
@@ -147,6 +192,8 @@ def get_patients(
     limit: int = 10,
     search: str | None = None,
     tenant_id: UUID | None = None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> list[Patient]:
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
     created_by: UUID | None = None
@@ -154,9 +201,14 @@ def get_patients(
     effective_tenant_id = tenant_id
 
     linked_doctor_id: UUID | None = None
+    doctor_created_by_user_id: UUID | None = None
     if current_user.role == UserRole.doctor:
-        acting_doctor = doctor_service.get_doctor_by_user_id(db, current_user.id)
-        linked_doctor_id = acting_doctor.id
+        doc = acting_doctor or doctor_service.require_doctor_profile(
+            db, current_user
+        )
+        linked_doctor_id = doc.id
+        if doctor_service.doctor_is_independent(doc):
+            doctor_created_by_user_id = current_user.id
     elif current_user.role == UserRole.patient:
         user_id = current_user.id
         # Own profile is keyed by user_id; patient rows may not carry tenant_id
@@ -175,7 +227,7 @@ def get_patients(
         created_by=created_by,
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
-        doctor_created_by_user_id=current_user.id if linked_doctor_id is not None else None,
+        doctor_created_by_user_id=doctor_created_by_user_id,
     )
 
 
@@ -185,10 +237,19 @@ def update_patient(
     patient_in: PatientUpdate,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> Patient:
     _validate_age(patient_in.age)
     patient = get_patient_or_404(db, patient_id)
-    authorize_patient_update(db, patient, current_user, tenant_id)
+    authorize_patient_update(
+        db,
+        patient,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="update_patient",
+    )
     update_data = patient_in.model_dump(exclude_unset=True)
     if not update_data:
         return patient
@@ -208,9 +269,18 @@ def delete_patient(
     patient_id: UUID,
     current_user: User,
     tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
 ) -> None:
     patient = get_patient_or_404(db, patient_id)
-    authorize_patient_delete(db, patient, current_user, tenant_id)
+    authorize_patient_delete(
+        db,
+        patient,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="delete_patient",
+    )
     log_audit_mutation(
         "delete",
         current_user,

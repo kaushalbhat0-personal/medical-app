@@ -9,20 +9,25 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { DoctorWorkspaceProvider, useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { isManagedOrgTenant } from '../../utils/tenantType';
 
-const tabs = [
-  { to: '/doctor/home', label: 'Overview', icon: Home },
-  { to: '/doctor/doctors', label: 'Doctors', icon: Stethoscope },
-  { to: '/doctor/patients', label: 'Patients', icon: Users },
-  { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
-  { to: '/doctor/bills', label: 'Bills', icon: Receipt },
-  { to: '/doctor/availability', label: 'Availability', icon: Clock },
-];
-
-export function DoctorLayout() {
+function DoctorLayoutInner() {
   const { user, logout } = useAuth();
+  const { isIndependent, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
+  const managedOrg = isManagedOrgTenant(selfDoctor?.tenant_type);
+
+  const tabs = [
+    { to: '/doctor/home', label: 'Overview', icon: Home },
+    { to: '/doctor/doctors', label: 'Doctors', icon: Stethoscope },
+    { to: '/doctor/patients', label: 'Patients', icon: Users },
+    { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
+    { to: '/doctor/bills', label: 'Bills', icon: Receipt },
+    ...(isIndependent ? [{ to: '/doctor/availability', label: 'Availability', icon: Clock }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -34,7 +39,13 @@ export function DoctorLayout() {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">Clinician Portal</p>
-              <p className="text-xs text-muted-foreground truncate">Your schedule, patients & billing</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {isIndependent
+                  ? 'Your practice — patients, schedule & billing'
+                  : managedOrg
+                    ? 'Organization — view care assigned to you'
+                    : 'Your schedule, patients & billing'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -43,10 +54,25 @@ export function DoctorLayout() {
                 <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-medium text-primary">
                   <UserRound className="h-4 w-4" />
                 </div>
-                <div className="max-w-[160px]">
+                <div className="max-w-[200px]">
                   <p className="text-sm font-medium truncate">{user.full_name || 'Doctor'}</p>
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 </div>
+                {selfDoctor?.tenant_name && (
+                  <Badge variant="secondary" className="max-w-[140px] truncate hidden md:inline-flex" title={selfDoctor.tenant_name}>
+                    {selfDoctor.tenant_name}
+                  </Badge>
+                )}
+                {isIndependent && (
+                  <Badge variant="outline" className="hidden lg:inline-flex">
+                    Independent
+                  </Badge>
+                )}
+                {managedOrg && !isIndependent && (
+                  <Badge variant="outline" className="hidden lg:inline-flex text-muted-foreground">
+                    View only
+                  </Badge>
+                )}
               </div>
             )}
             <Button
@@ -81,9 +107,45 @@ export function DoctorLayout() {
           </div>
         </nav>
       </header>
+      {loading && (
+        <p className="text-center text-xs text-muted-foreground py-2 border-b border-border/60" aria-live="polite">
+          Loading your workspace…
+        </p>
+      )}
+      {error && !loading && (
+        <p className="text-center text-sm text-destructive py-2 px-4 border-b border-border/60" role="alert">
+          {error}
+        </p>
+      )}
+      {profilePartial && !loading && !error && (
+        <p
+          className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/80 dark:border-amber-800 py-2 px-4"
+          role="status"
+        >
+          Your user account is not clearly linked to a single doctor record in this organization. The portal stays in view-only
+          mode; ask an administrator to confirm your email on your doctor profile.
+        </p>
+      )}
+      {isReadOnly && managedOrg && !profilePartial && !loading && !error && (
+        <p
+          className="text-sm text-muted-foreground bg-muted/40 border-b border-border/60 py-2 px-4"
+          role="status"
+        >
+          Organization account: you can view patients and appointments that involve you. Creating patients, booking on behalf of
+          others, and billing are managed in the main staff app for your facility.
+        </p>
+      )}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
         <Outlet />
       </main>
     </div>
+  );
+}
+
+export function DoctorLayout() {
+  return (
+    <DoctorWorkspaceProvider>
+      <DoctorLayoutInner />
+    </DoctorWorkspaceProvider>
   );
 }

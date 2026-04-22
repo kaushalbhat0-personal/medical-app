@@ -3,10 +3,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, get_current_user
+from app.api.deps import (
+    get_acting_doctor_optional,
+    get_acting_doctor_optional_active,
+    get_current_active_user,
+    get_current_user,
+)
 from app.core.tenant_context import get_current_tenant_id
 from app.core.database import get_db
 from app.models.billing import BillingStatus
+from app.models.doctor import Doctor
 from app.models.user import User
 from app.schemas.billing import BillingCreate, BillingRead, BillingUpdate
 from app.services import billing_service
@@ -19,9 +25,12 @@ def create_bill(
     payload: BillingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
 ) -> BillingRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    return billing_service.create_bill(db, payload, current_user, tenant_id)
+    return billing_service.create_bill(
+        db, payload, current_user, tenant_id, acting_doctor=acting_doctor
+    )
 
 
 @router.get("", response_model=list[BillingRead])
@@ -33,6 +42,7 @@ def read_bills(
     status: BillingStatus | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> list[BillingRead]:
     tenant_id = get_current_tenant_id(current_user, db)
     return billing_service.get_bills(
@@ -44,6 +54,7 @@ def read_bills(
         appointment_id=appointment_id,
         status=status,
         tenant_id=tenant_id,
+        acting_doctor=acting_doctor,
     )
 
 
@@ -52,10 +63,13 @@ def read_bill(
     bill_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> BillingRead:
     tenant_id = get_current_tenant_id(current_user, db)
     bill = billing_service.get_bill_or_404(db, bill_id)
-    billing_service.authorize_bill_read(db, bill, current_user, tenant_id)
+    billing_service.authorize_bill_read(
+        db, bill, current_user, tenant_id, acting_doctor=acting_doctor
+    )
     return bill
 
 
@@ -65,9 +79,12 @@ def update_bill(
     payload: BillingUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> BillingRead:
     tenant_id = get_current_tenant_id(current_user, db)
-    return billing_service.update_bill(db, bill_id, payload, current_user, tenant_id)
+    return billing_service.update_bill(
+        db, bill_id, payload, current_user, tenant_id, acting_doctor=acting_doctor
+    )
 
 
 @router.get("/revenue/total", response_model=dict[str, float])
@@ -101,6 +118,7 @@ def pay_bill(
     bill_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> BillingRead:
     """Mark a bill as paid."""
     from app.schemas.billing import BillingUpdate
@@ -108,7 +126,9 @@ def pay_bill(
 
     tenant_id = get_current_tenant_id(current_user, db)
     update_data = BillingUpdate(status=BillingStatus.paid)
-    return billing_service.update_bill(db, bill_id, update_data, current_user, tenant_id)
+    return billing_service.update_bill(
+        db, bill_id, update_data, current_user, tenant_id, acting_doctor=acting_doctor
+    )
 
 
 @router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,8 +136,11 @@ def delete_bill(
     bill_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> Response:
     """Soft delete a bill."""
     tenant_id = get_current_tenant_id(current_user, db)
-    billing_service.soft_delete_bill(db, bill_id, current_user, tenant_id)
+    billing_service.soft_delete_bill(
+        db, bill_id, current_user, tenant_id, acting_doctor=acting_doctor
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
