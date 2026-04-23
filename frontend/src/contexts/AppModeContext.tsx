@@ -61,7 +61,12 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated || !user) return;
     const t = localStorage.getItem('token');
     const { isDoctor: d, isAdmin: a, isDual: dual } = detect(user, t);
-    if (dual) {
+    const raw = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [];
+    const rawNorm = normalizeRoles(raw);
+    if (rawNorm.length === 1 && rawNorm[0] === 'doctor') {
+      setModeState('practice');
+      writeStoredAppMode('practice');
+    } else if (dual) {
       setModeState(defaultDualMode(readStoredAppMode()));
     } else if (d && !a) {
       setModeState('practice');
@@ -70,6 +75,16 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
       setModeState('admin');
     }
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    console.log('[ROLE_DEBUG]', {
+      roles: user.roles,
+      mode,
+      doctor_id: user.doctor_id,
+      tenant_id: user.tenant_id,
+    });
+  }, [isAuthenticated, user, mode]);
 
   const setMode = useCallback((m: AppMode) => {
     setModeState(m);

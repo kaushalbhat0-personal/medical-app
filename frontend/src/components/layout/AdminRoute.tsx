@@ -10,7 +10,7 @@ interface AdminRouteProps {
 /** Only `admin` and `super_admin` may access wrapped routes. */
 export function AdminRoute({ user, children }: AdminRouteProps) {
   const eff = getEffectiveRoles(user, localStorage.getItem('token'));
-  if (!canAccessAdminUI(eff, user)) {
+  if (!canAccessAdminUI(eff)) {
     return <Navigate to={staffHomePath()} replace />;
   }
   return <>{children}</>;

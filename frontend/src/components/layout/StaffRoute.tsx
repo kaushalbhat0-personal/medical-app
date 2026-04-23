@@ -26,7 +26,7 @@ export function StaffRoute({ user, children }: StaffRouteProps) {
   if (isDualModeUser && resolvedMode === 'practice') {
     return <Navigate to="/doctor/appointments" replace />;
   }
-  if (isDoctorRole(eff) && !canAccessAdminUI(eff, user)) {
+  if (isDoctorRole(eff) && !canAccessAdminUI(eff)) {
     return <Navigate to={doctorHomePath()} replace />;
   }
   return <SuperAdminTenantGate user={user}>{children}</SuperAdminTenantGate>;

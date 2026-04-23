@@ -57,16 +57,19 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
     setError(null);
     setLoading(true);
     try {
-      const list = await doctorsApi.getAll();
-      let me = resolveSelfDoctorFromList(list, user?.email);
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
       const eff = getEffectiveRoles(user, token);
-      if (me == null && isDoctorRole(eff) && user?.doctor_id) {
+      let me: Doctor | null = null;
+      if (isDoctorRole(eff) && user?.doctor_id) {
         try {
           me = await doctorsApi.getOne(String(user.doctor_id));
         } catch {
           me = null;
         }
+      }
+      if (me == null) {
+        const list = await doctorsApi.getAll();
+        me = resolveSelfDoctorFromList(list, user?.email);
       }
       setSelfDoctor(me);
     } catch {

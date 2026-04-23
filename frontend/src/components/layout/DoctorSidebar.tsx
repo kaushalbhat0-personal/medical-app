@@ -1,15 +1,8 @@
-import { X, Stethoscope, UserRound, Home, Calendar, Receipt, Clock, Users } from 'lucide-react';
+import { X, Stethoscope, UserRound } from 'lucide-react';
 import type { User } from '../../types';
-import { getEffectiveRoles, isDoctorRole } from '../../utils/roles';
+import { getEffectiveRoles, normalizeRoles } from '../../utils/roles';
 import { NavItem } from './NavItem';
-
-const overview = { path: '/doctor/home', label: 'Overview', icon: Home };
-const doctorCore = [
-  { path: '/doctor/availability', label: 'Availability', icon: Clock },
-  { path: '/doctor/appointments', label: 'Appointments', icon: Calendar },
-  { path: '/doctor/patients', label: 'Patients', icon: Users },
-] as const;
-const moreLinks = [{ path: '/doctor/bills', label: 'Bills', icon: Receipt }] as const;
+import { DOCTOR_PRACTICE_NAV } from './doctorNav';
 
 interface DoctorSidebarProps {
   user: User | null;
@@ -19,12 +12,11 @@ interface DoctorSidebarProps {
 export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
   const eff = getEffectiveRoles(user, token);
-  const isDoctor = isDoctorRole(eff);
-  const links = [
-    overview,
-    ...(isDoctor ? doctorCore : doctorCore.filter((l) => l.path !== '/doctor/availability')),
-    ...moreLinks,
-  ] as const;
+  const roles = normalizeRoles(eff);
+  const isDoctor = roles.includes('doctor');
+  const links = isDoctor
+    ? DOCTOR_PRACTICE_NAV
+    : DOCTOR_PRACTICE_NAV.filter((l) => l.path !== '/doctor/availability');
 
   return (
     <div className="flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white">

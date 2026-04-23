@@ -69,15 +69,10 @@ export function isAdminRole(roles: string | string[] | null | undefined): boolea
   return normalizeRoles(roles).some((r) => r === 'admin' || r === 'super_admin');
 }
 
-/** Admin dashboard, inventory, billing, settings — admin/super_admin or practice owner (solo doctor). */
-export function canAccessAdminUI(
-  roles: string | string[] | null | undefined,
-  user?: { is_owner?: boolean } | null
-): boolean {
+/** Admin dashboard, inventory, org settings — only org `admin` / `super_admin` in roles (not solo-doctor is_owner). */
+export function canAccessAdminUI(roles: string | string[] | null | undefined): boolean {
   const r = normalizeRoles(roles);
-  if (r.some((x) => x === 'admin' || x === 'super_admin')) return true;
-  if (r.includes('doctor') && user?.is_owner === true) return true;
-  return false;
+  return r.some((x) => x === 'admin' || x === 'super_admin');
 }
 
 export function isSuperAdminRole(roles: string | string[] | null | undefined): boolean {
@@ -97,10 +92,7 @@ export function doctorHomePath(): string {
 }
 
 /** Default landing path after login or post-registration, by role. */
-export function postLoginHomePath(
-  roles: string | string[] | null | undefined,
-  user?: { is_owner?: boolean } | null
-): string {
+export function postLoginHomePath(roles: string | string[] | null | undefined): string {
   const r = normalizeRoles(roles);
   if (r.includes('patient')) return patientHomePath();
   const hasDoc = r.includes('doctor');
@@ -108,9 +100,6 @@ export function postLoginHomePath(
   if (hasDoc && hasAdm) {
     const m: AppMode = readStoredAppMode() ?? 'practice';
     return m === 'admin' ? '/admin/dashboard' : '/doctor/appointments';
-  }
-  if (r.includes('doctor') && user?.is_owner === true) {
-    return '/admin/dashboard';
   }
   if (r.includes('doctor')) return doctorHomePath();
   if (r.includes('super_admin')) {

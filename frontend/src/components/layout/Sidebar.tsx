@@ -15,9 +15,10 @@ import {
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { canAccessAdminUI, getEffectiveRoles, isPatientRole, isSuperAdminRole } from '../../utils/roles';
+import { canAccessAdminUI, getEffectiveRoles, isPatientRole, isSuperAdminRole, normalizeRoles } from '../../utils/roles';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { NavItem } from './NavItem';
+import { DOCTOR_PRACTICE_NAV } from './doctorNav';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -54,11 +55,17 @@ const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { resolvedMode } = useAppMode();
   const effRoles = getEffectiveRoles(user, localStorage.getItem('token'));
+  const roles = normalizeRoles(effRoles);
+  const isDoctorOnly =
+    roles.includes('doctor') && !roles.includes('admin') && !roles.includes('super_admin');
   const useAdminModeLayout =
-    canAccessAdminUI(effRoles, user) && resolvedMode === 'admin' && !isPatientRole(effRoles);
+    canAccessAdminUI(effRoles) &&
+    resolvedMode === 'admin' &&
+    !isPatientRole(effRoles) &&
+    !isDoctorOnly;
 
   const staffNavItems = useMemo(() => {
-    if (!canAccessAdminUI(effRoles, user)) return staffNavBase;
+    if (!canAccessAdminUI(effRoles)) return staffNavBase;
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
@@ -66,7 +73,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
       ? [adminItem, tenantsItem, inventoryItem]
       : [adminItem, inventoryItem];
     return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
-  }, [user, effRoles]);
+  }, [effRoles]);
 
   const adminModeItems = useMemo(() => {
     if (!isSuperAdminRole(effRoles)) {
@@ -78,9 +85,11 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
 
   const navItems = isPatientRole(effRoles)
     ? patientFallbackNavItems
-    : useAdminModeLayout
-      ? adminModeItems
-      : staffNavItems;
+    : isDoctorOnly
+      ? DOCTOR_PRACTICE_NAV
+      : useAdminModeLayout
+        ? adminModeItems
+        : staffNavItems;
   return (
     <div
       className={cn(

@@ -77,7 +77,7 @@ function AnimatedRoutes() {
   const needsPasswordReset = user?.force_password_reset === true;
   const loginRedirect = needsPasswordReset
     ? '/reset-password'
-    : postLoginHomePath(effectiveRoles, user ?? undefined);
+    : postLoginHomePath(effectiveRoles);
 
   if (
     !isLoading &&
@@ -144,7 +144,7 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               {isAuthenticated && !needsPasswordReset ? (
-                <Navigate to={postLoginHomePath(effectiveRoles, user ?? undefined)} replace />
+                <Navigate to={postLoginHomePath(effectiveRoles)} replace />
               ) : (
                 <ResetPassword />
               )}
