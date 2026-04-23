@@ -15,8 +15,7 @@ import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
 import { navigateTo } from '../utils/navigation';
-import { APP_MODE_STORAGE_KEY } from '../constants/appMode';
-import { getTenantIdForRequest } from '../utils/tenantIdForRequest';
+import { getActiveTenantId, getTenantIdForRequest } from '../utils/tenantIdForRequest';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -60,12 +59,13 @@ api.interceptors.request.use(
     if (config.headers) {
       const hasExplicit = config.headers['X-Tenant-ID'] != null;
       if (!hasExplicit) {
-        const tenantId = getTenantIdForRequest();
+        const activeTenantId = getActiveTenantId();
+        const tenantId = activeTenantId ?? getTenantIdForRequest();
         if (tenantId) {
           config.headers['X-Tenant-ID'] = tenantId;
         }
       }
-      const mode = localStorage.getItem(APP_MODE_STORAGE_KEY);
+      const mode = localStorage.getItem('app_mode');
       config.headers['X-Data-Scope'] =
         mode === 'practice' ? 'doctor' : 'tenant';
     }

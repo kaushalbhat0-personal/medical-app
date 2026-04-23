@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
-from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
@@ -50,7 +49,7 @@ def _resolve_patient_tenant_id_for_create(
         return acting_doctor.tenant_id
     if current_user.tenant_id is not None:
         return current_user.tenant_id
-    return DEFAULT_TENANT_ID
+    raise ValidationError("Tenant scope is required to create a patient")
 
 
 def authorize_patient_create(
@@ -145,6 +144,8 @@ def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patie
     existing = crud_patient.get_patient_by_user_id(db, current_user.id)
     if existing is not None:
         return existing
+    if current_user.tenant_id is None:
+        raise ValidationError("Tenant is required for patient profile")
     local = (current_user.email or "patient").split("@", 1)[0].strip() or "Patient"
     name = (local[:255]) if local else "Patient"
     return crud_patient.create_patient_tx(
@@ -156,7 +157,7 @@ def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patie
             "phone": "0000000000",
             "user_id": current_user.id,
             "created_by": current_user.id,
-            "tenant_id": current_user.tenant_id or DEFAULT_TENANT_ID,
+            "tenant_id": current_user.tenant_id,
         },
     )
 
@@ -319,6 +320,11 @@ def get_patients(
         ):
             linked_doctor_id = data_scope.doctor_id
 
+    scope_kind = data_scope.kind.value
+    print("scope:", scope_kind)
+    print("tenant_id:", effective_tenant_id)
+    print("linked_doctor_id:", linked_doctor_id)
+
     return crud_patient.get_patients(
         db,
         skip=skip,
@@ -327,6 +333,7 @@ def get_patients(
         tenant_id=effective_tenant_id,
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
+        data_scope_kind=scope_kind,
     )
 
 

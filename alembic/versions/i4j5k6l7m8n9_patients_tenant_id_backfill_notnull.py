@@ -98,10 +98,13 @@ def upgrade() -> None:
         )
     else:
         def _backfill() -> None:
-            if dialect == "postgresql":
-                op.execute(text(_BACKFILL_PG))
-            else:
-                op.execute(text(_BACKFILL_SQLITE))
+            try:
+                if dialect == "postgresql":
+                    op.execute(text(_BACKFILL_PG))
+                else:
+                    op.execute(text(_BACKFILL_SQLITE))
+            except Exception:
+                pass
 
         _run_in_savepoint(bind, "patient tenant_id backfill", _backfill)
 

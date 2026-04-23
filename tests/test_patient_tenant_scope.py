@@ -31,10 +31,10 @@ def _data_scope_doctor(db: Session, user) -> ResolvedDataScope:
     return resolve_data_scope("doctor", current_user=user, linked_doctor=linked)
 
 
-def test_admin_sees_patient_with_null_tenant_id_via_appointment_fallback(
+def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
     db_session: Session,
 ) -> None:
-    """NULL patient.tenant_id but appointment in tenant: admin and assigned doctor can list them."""
+    """Tenant scope lists by Patient.tenant_id only; backfill sets tenant from doctor via appointments."""
     tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
     admin = create_user(
         db_session,
@@ -82,6 +82,35 @@ def test_admin_sees_patient_with_null_tenant_id_via_appointment_fallback(
             "created_by": doc_user.id,
             "tenant_id": tenant.id,
         },
+    )
+    db_session.commit()
+
+    listed_before = {
+        x.id
+        for x in patient_service.get_patients(
+            db_session,
+            admin,
+            tenant_id=tenant.id,
+            limit=100,
+            data_scope=_data_scope_tenant(db_session, admin),
+        )
+    }
+    assert p.id not in listed_before
+
+    doc_listed_before = {
+        x.id
+        for x in patient_service.get_patients(
+            db_session,
+            doc_user,
+            tenant_id=tenant.id,
+            limit=100,
+            data_scope=_data_scope_doctor(db_session, doc_user),
+        )
+    }
+    assert p.id not in doc_listed_before
+
+    db_session.execute(
+        update(Patient).where(Patient.id == p.id).values(tenant_id=tenant.id)
     )
     db_session.commit()
 
