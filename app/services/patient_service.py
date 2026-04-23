@@ -295,7 +295,6 @@ def get_patients(
     effective_tenant_id = tenant_id
 
     linked_doctor_id: UUID | None = None
-    doctor_created_by_user_id: UUID | None = None
     if current_user.role == UserRole.doctor and current_user.is_owner:
         if data_scope.kind == DataScopeKind.doctor:
             doc = acting_doctor or doctor_service.require_doctor_profile(
@@ -303,14 +302,12 @@ def get_patients(
             )
             effective_tenant_id = doc.tenant_id
             linked_doctor_id = doc.id
-            doctor_created_by_user_id = current_user.id
     elif current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
         effective_tenant_id = doc.tenant_id
         linked_doctor_id = doc.id
-        doctor_created_by_user_id = current_user.id
     elif current_user.role == UserRole.patient:
         user_id = current_user.id
         # Own profile is keyed by user_id; patient rows may not carry tenant_id
@@ -321,7 +318,6 @@ def get_patients(
             and data_scope.doctor_id is not None
         ):
             linked_doctor_id = data_scope.doctor_id
-            doctor_created_by_user_id = None
 
     return crud_patient.get_patients(
         db,
@@ -332,7 +328,6 @@ def get_patients(
         created_by=None,
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
-        doctor_created_by_user_id=doctor_created_by_user_id,
     )
 
 

@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session
 
@@ -70,8 +70,13 @@ def get_patients(
     created_by: UUID | None = None,
     user_id: UUID | None = None,
     linked_doctor_id: UUID | None = None,
-    doctor_created_by_user_id: UUID | None = None,
 ) -> list[Patient]:
+    """
+    List patients. Tenant scope: filter by ``tenant_id`` only. Doctor scope:
+    pass ``linked_doctor_id`` — rows must have a non-deleted appointment with
+    that doctor (optionally also ``Patient.tenant_id``). Do not use
+    ``created_by`` for scoping; it is not reliable for cohort membership.
+    """
     stmt = select(Patient).order_by(Patient.created_at.desc())
     if search:
         stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
@@ -81,12 +86,7 @@ def get_patients(
             Appointment.doctor_id == linked_doctor_id,
             Appointment.is_deleted == False,
         )
-        if doctor_created_by_user_id is not None:
-            stmt = stmt.where(
-                or_(has_appt, Patient.created_by == doctor_created_by_user_id)
-            )
-        else:
-            stmt = stmt.where(has_appt)
+        stmt = stmt.where(has_appt)
         if tenant_id is not None:
             stmt = stmt.where(Patient.tenant_id == tenant_id)
     elif user_id is not None:
