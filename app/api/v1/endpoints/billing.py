@@ -10,7 +10,9 @@ from app.api.deps import (
     get_current_user,
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
+    get_resolved_data_scope,
 )
+from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
 from app.models.billing import BillingStatus
 from app.models.doctor import Doctor
@@ -45,6 +47,7 @@ def read_bills(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> list[BillingRead]:
     return billing_service.get_bills(
         db,
@@ -56,6 +59,7 @@ def read_bills(
         status=status,
         tenant_id=tenant_id,
         acting_doctor=acting_doctor,
+        data_scope=data_scope,
     )
 
 
@@ -66,10 +70,16 @@ def read_bill(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> BillingRead:
     bill = billing_service.get_bill_or_404(db, bill_id)
     billing_service.authorize_bill_read(
-        db, bill, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        bill,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return bill
 
@@ -82,9 +92,16 @@ def update_bill(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> BillingRead:
     return billing_service.update_bill(
-        db, bill_id, payload, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        bill_id,
+        payload,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 
 
@@ -121,6 +138,7 @@ def pay_bill(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> BillingRead:
     """Mark a bill as paid."""
     from app.schemas.billing import BillingUpdate
@@ -128,7 +146,13 @@ def pay_bill(
 
     update_data = BillingUpdate(status=BillingStatus.paid)
     return billing_service.update_bill(
-        db, bill_id, update_data, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        bill_id,
+        update_data,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 
 
@@ -139,9 +163,15 @@ def delete_bill(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> Response:
     """Soft delete a bill."""
     billing_service.soft_delete_bill(
-        db, bill_id, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        bill_id,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

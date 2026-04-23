@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.models.billing import Billing
 from app.models.doctor import Doctor
 from app.models.inventory import (
@@ -27,6 +28,27 @@ from app.services.exceptions import ForbiddenError, NotFoundError, ValidationErr
 from app.services.security_audit import assert_authorized, log_rbac_mutation_violation
 
 logger = logging.getLogger(__name__)
+
+
+def effective_inventory_doctor_id(
+    data_scope: ResolvedDataScope,
+    query_doctor_id: UUID | None,
+    current_user: User,
+) -> UUID | None:
+    """
+    Under practice (doctor) scope, non-doctor roles use the scoped doctor for stock;
+    doctor role remains bound by _resolve_effective_doctor_id_for_stock.
+    """
+    if data_scope.kind != DataScopeKind.doctor or data_scope.doctor_id is None:
+        return query_doctor_id
+    if current_user.role == UserRole.doctor:
+        return query_doctor_id
+    if query_doctor_id is not None and query_doctor_id != data_scope.doctor_id:
+        log_rbac_mutation_violation(
+            current_user, "inventory", action="stock_scope"
+        )
+        raise ForbiddenError("doctor_id does not match practice data scope")
+    return data_scope.doctor_id
 
 
 def _forbid_patients(current_user: User, action: str = "inventory") -> None:
@@ -92,6 +114,7 @@ def get_stock(
     *,
     current_user: User,
     tenant_id: UUID | None,
+    data_scope: ResolvedDataScope | None = None,
 ) -> int:
     """
     Read current quantity for one item and doctor scope (tenant level if doctor_id is None).
@@ -100,7 +123,10 @@ def get_stock(
     _forbid_patients(current_user)
     item = get_item_or_404(db, item_id)
     _authorize_item_tenant(item, current_user, tenant_id)
-    eff_doctor = _resolve_effective_doctor_id_for_stock(db, current_user, doctor_id)
+    q_doc = doctor_id
+    if data_scope is not None:
+        q_doc = effective_inventory_doctor_id(data_scope, doctor_id, current_user)
+    eff_doctor = _resolve_effective_doctor_id_for_stock(db, current_user, q_doc)
     _validate_doctor_for_item_tenant(db, eff_doctor, item.tenant_id)
     row = db.scalars(_stock_query(item_id, eff_doctor)).first()
     return int(row.quantity) if row is not None else 0
@@ -113,13 +139,17 @@ def get_bulk_stock(
     *,
     db: Session,
     current_user: User,
+    data_scope: ResolvedDataScope | None = None,
 ) -> list[tuple[UUID, int]]:
     """
     One-query stock for all items in the tenant (optionally doctor-scoped).
     Items without a stock row get quantity 0.
     """
     _forbid_patients(current_user)
-    eff_doctor_id = _resolve_effective_doctor_id_for_stock(db, current_user, doctor_id)
+    q_doc = doctor_id
+    if data_scope is not None:
+        q_doc = effective_inventory_doctor_id(data_scope, doctor_id, current_user)
+    eff_doctor_id = _resolve_effective_doctor_id_for_stock(db, current_user, q_doc)
     filter_tenant: UUID | None = tenant_id
     if eff_doctor_id is not None:
         doctor = db.get(Doctor, eff_doctor_id)
@@ -332,6 +362,7 @@ def add_stock(
     body: StockAddRequest,
     current_user: User,
     tenant_id: UUID | None,
+    data_scope: ResolvedDataScope | None = None,
 ) -> tuple[UUID, int]:
     _forbid_patients(current_user)
     item = get_item_or_404(db, body.item_id)
@@ -339,8 +370,11 @@ def add_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    q_doc = body.doctor_id
+    if data_scope is not None:
+        q_doc = effective_inventory_doctor_id(data_scope, body.doctor_id, current_user)
     eff_doctor = _resolve_effective_doctor_id_for_stock(
-        db, current_user, body.doctor_id
+        db, current_user, q_doc
     )
     movement, balance = _apply_movement(
         db,
@@ -360,6 +394,7 @@ def reduce_stock(
     body: StockReduceRequest,
     current_user: User,
     tenant_id: UUID | None,
+    data_scope: ResolvedDataScope | None = None,
 ) -> tuple[UUID, int]:
     _forbid_patients(current_user)
     item = get_item_or_404(db, body.item_id)
@@ -367,8 +402,11 @@ def reduce_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    q_doc = body.doctor_id
+    if data_scope is not None:
+        q_doc = effective_inventory_doctor_id(data_scope, body.doctor_id, current_user)
     eff_doctor = _resolve_effective_doctor_id_for_stock(
-        db, current_user, body.doctor_id
+        db, current_user, q_doc
     )
     movement, balance = _apply_movement(
         db,
@@ -388,6 +426,7 @@ def adjust_stock(
     body: StockAdjustRequest,
     current_user: User,
     tenant_id: UUID | None,
+    data_scope: ResolvedDataScope | None = None,
 ) -> tuple[UUID, int]:
     _forbid_patients(current_user)
     item = get_item_or_404(db, body.item_id)
@@ -395,8 +434,11 @@ def adjust_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    q_doc = body.doctor_id
+    if data_scope is not None:
+        q_doc = effective_inventory_doctor_id(data_scope, body.doctor_id, current_user)
     eff_doctor = _resolve_effective_doctor_id_for_stock(
-        db, current_user, body.doctor_id
+        db, current_user, q_doc
     )
     movement, balance = _apply_movement(
         db,

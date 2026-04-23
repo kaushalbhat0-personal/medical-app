@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_patient
 from app.models.appointment import Appointment, AppointmentStatus
@@ -20,6 +21,19 @@ from app.services.security_audit import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def patient_is_in_doctor_cohort(
+    db: Session,
+    patient: Patient,
+    doctor_id: UUID,
+) -> bool:
+    if crud_patient.patient_has_appointment_with_doctor(db, patient.id, doctor_id):
+        return True
+    doctor_row = db.get(Doctor, doctor_id)
+    if doctor_row is None or doctor_row.user_id is None:
+        return False
+    return patient.created_by == doctor_row.user_id
 
 
 def _validate_age(age: int | None) -> None:
@@ -168,8 +182,16 @@ def authorize_patient_access(
     *,
     acting_doctor: Doctor | None = None,
     rbac_action: str = "patient_access",
+    restrict_to_doctor_id: UUID | None = None,
 ) -> None:
     if current_user.role == UserRole.super_admin:
+        if restrict_to_doctor_id is not None and not patient_is_in_doctor_cohort(
+            db, patient, restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "patient", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this patient")
         return
 
     if tenant_id is not None:
@@ -191,10 +213,24 @@ def authorize_patient_access(
                 raise ForbiddenError("Patient is not in your tenant")
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        if restrict_to_doctor_id is not None and not patient_is_in_doctor_cohort(
+            db, patient, restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "patient", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this patient")
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
-        return
+        if restrict_to_doctor_id is None:
+            return
+        if patient_is_in_doctor_cohort(db, patient, restrict_to_doctor_id):
+            return
+        log_rbac_mutation_violation(
+            current_user, "patient", action=rbac_action
+        )
+        raise ForbiddenError("Not allowed to access this patient")
 
     if current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
@@ -252,6 +288,7 @@ def get_patients(
     tenant_id: UUID | None = None,
     *,
     acting_doctor: Doctor | None = None,
+    data_scope: ResolvedDataScope,
 ) -> list[Patient]:
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
     user_id: UUID | None = None
@@ -260,7 +297,13 @@ def get_patients(
     linked_doctor_id: UUID | None = None
     doctor_created_by_user_id: UUID | None = None
     if current_user.role == UserRole.doctor and current_user.is_owner:
-        pass
+        if data_scope.kind == DataScopeKind.doctor:
+            doc = acting_doctor or doctor_service.require_doctor_profile(
+                db, current_user
+            )
+            effective_tenant_id = doc.tenant_id
+            linked_doctor_id = doc.id
+            doctor_created_by_user_id = current_user.id
     elif current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
@@ -273,7 +316,12 @@ def get_patients(
         # Own profile is keyed by user_id; patient rows may not carry tenant_id
         effective_tenant_id = None
     elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
-        pass  # tenant filter only (caller supplies tenant_id)
+        if (
+            data_scope.kind == DataScopeKind.doctor
+            and data_scope.doctor_id is not None
+        ):
+            linked_doctor_id = data_scope.doctor_id
+            doctor_created_by_user_id = None
 
     return crud_patient.get_patients(
         db,
@@ -296,6 +344,7 @@ def update_patient(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> Patient:
     _validate_age(patient_in.age)
     patient = get_patient_or_404(db, patient_id)
@@ -306,6 +355,7 @@ def update_patient(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="update_patient",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
     update_data = patient_in.model_dump(exclude_unset=True)
     if not update_data:
@@ -328,6 +378,7 @@ def delete_patient(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> None:
     patient = get_patient_or_404(db, patient_id)
     authorize_patient_delete(
@@ -337,6 +388,7 @@ def delete_patient(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="delete_patient",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
     log_audit_mutation(
         "delete",

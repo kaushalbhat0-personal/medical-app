@@ -8,7 +8,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
-from app.crud import crud_patient
+from app.core.data_scope import resolve_data_scope
+from app.crud import crud_doctor, crud_patient
 from app.models.tenant import TenantType
 from app.models.user import UserRole
 from app.schemas.appointment import AppointmentCreate
@@ -22,6 +23,11 @@ from tests.factories import (
 )
 
 _BOOKING_DAY_WEEKDAY = date(2035, 6, 15).weekday()
+
+
+def _data_scope(db: Session, user, header: str = "doctor"):
+    linked = crud_doctor.get_doctor_by_user_id(db, user.id)
+    return resolve_data_scope(header, current_user=user, linked_doctor=linked)
 
 
 def test_patient_books_appointment_appears_in_that_doctor_list(
@@ -77,7 +83,11 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
 
     assert pat_user.id != doc_user.id
     out = patient_service.get_patients(
-        db_session, doc_user, tenant_id=tenant.id, limit=50
+        db_session,
+        doc_user,
+        tenant_id=tenant.id,
+        limit=50,
+        data_scope=_data_scope(db_session, doc_user),
     )
     assert {p.id for p in out} == {appt.patient_id}
 
@@ -139,7 +149,25 @@ def test_two_doctors_same_tenant_patient_list_isolated(
         db_session, appt_in, pat_user, None, idempotency_key=None
     )
 
-    a_list = {p.id for p in patient_service.get_patients(db_session, doc_a_user, tenant_id=tenant.id, limit=50)}
-    b_list = {p.id for p in patient_service.get_patients(db_session, doc_b_user, tenant_id=tenant.id, limit=50)}
+    a_list = {
+        p.id
+        for p in patient_service.get_patients(
+            db_session,
+            doc_a_user,
+            tenant_id=tenant.id,
+            limit=50,
+            data_scope=_data_scope(db_session, doc_a_user),
+        )
+    }
+    b_list = {
+        p.id
+        for p in patient_service.get_patients(
+            db_session,
+            doc_b_user,
+            tenant_id=tenant.id,
+            limit=50,
+            data_scope=_data_scope(db_session, doc_b_user),
+        )
+    }
     assert appt.patient_id in a_list
     assert appt.patient_id not in b_list

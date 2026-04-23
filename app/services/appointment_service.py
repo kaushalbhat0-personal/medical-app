@@ -8,6 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScopeKind, ResolvedDataScope
+from app.core.permissions import has_tenant_admin_privileges
 from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
@@ -341,6 +343,7 @@ def get_appointments(
     *,
     acting_doctor: Doctor | None = None,
     list_type: str | None = None,
+    data_scope: ResolvedDataScope,
 ) -> list[Appointment]:
     _ensure_can_list_appointments(current_user)
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
@@ -349,17 +352,28 @@ def get_appointments(
     eff_tenant_id = tenant_id
 
     if current_user.role == UserRole.doctor:
-        doc = acting_doctor or doctor_service.require_doctor_profile(
-            db, current_user
-        )
-        eff_doctor_id = doc.id
-        eff_patient_id = None
+        if (
+            data_scope.kind == DataScopeKind.tenant
+            and has_tenant_admin_privileges(current_user)
+        ):
+            eff_doctor_id = doctor_id
+            eff_patient_id = None
+        else:
+            doc = acting_doctor or doctor_service.require_doctor_profile(
+                db, current_user
+            )
+            eff_doctor_id = doc.id
+            eff_patient_id = None
     elif current_user.role == UserRole.patient:
         patient = patient_service.get_patient_by_user_id(db, current_user.id)
         eff_patient_id = patient.id
         eff_doctor_id = None
     elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
-        pass
+        if (
+            data_scope.kind == DataScopeKind.doctor
+            and data_scope.doctor_id is not None
+        ):
+            eff_doctor_id = data_scope.doctor_id
 
     appointments = crud_appointment.get_appointments(
         db,
@@ -381,8 +395,17 @@ def authorize_appointment_access(
     *,
     acting_doctor: Doctor | None = None,
     rbac_action: str = "appointment_access",
+    restrict_to_doctor_id: UUID | None = None,
 ) -> None:
     if current_user.role == UserRole.super_admin:
+        if (
+            restrict_to_doctor_id is not None
+            and appointment.doctor_id != restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "appointment", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this appointment")
         return
 
     assert_authorized(
@@ -394,10 +417,25 @@ def authorize_appointment_access(
     )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        if (
+            restrict_to_doctor_id is not None
+            and appointment.doctor_id != restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "appointment", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this appointment")
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
-        return
+        if restrict_to_doctor_id is None:
+            return
+        if appointment.doctor_id == restrict_to_doctor_id:
+            return
+        log_rbac_mutation_violation(
+            current_user, "appointment", action=rbac_action
+        )
+        raise ForbiddenError("Not allowed to access this appointment")
 
     if current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
@@ -449,6 +487,7 @@ def update_appointment(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
     authorize_appointment_access(
@@ -458,6 +497,7 @@ def update_appointment(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="update_appointment",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
 
     update_data = appointment_in.model_dump(exclude_unset=True)
@@ -519,6 +559,7 @@ def delete_appointment(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
     authorize_appointment_access(
@@ -528,6 +569,7 @@ def delete_appointment(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="delete_appointment",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
 
     if appointment.status == AppointmentStatus.completed:

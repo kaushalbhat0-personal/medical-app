@@ -8,7 +8,9 @@ from app.api.deps import (
     get_current_user,
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
+    get_resolved_data_scope,
 )
+from app.core.data_scope import ResolvedDataScope
 from app.core.database import get_db
 from app.models.inventory import InventoryItemType
 from app.models.user import User
@@ -42,6 +44,7 @@ def get_bulk_stock(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> list[BulkStockRow] | dict[str, int]:
     rows = inventory_service.get_bulk_stock(
         tenant_id,
@@ -49,6 +52,7 @@ def get_bulk_stock(
         item_ids=item_ids,
         db=db,
         current_user=current_user,
+        data_scope=data_scope,
     )
     if as_map:
         return {str(iid): qty for iid, qty in rows}
@@ -62,6 +66,7 @@ def get_one_stock(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> StockRead:
     quantity = inventory_service.get_stock(
         db,
@@ -69,6 +74,7 @@ def get_one_stock(
         doctor_id=doctor_id,
         current_user=current_user,
         tenant_id=tenant_id,
+        data_scope=data_scope,
     )
     return StockRead(item_id=item_id, doctor_id=doctor_id, quantity=quantity)
 
@@ -124,8 +130,11 @@ def stock_add(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> StockOperationResult:
-    movement_id, qty = inventory_service.add_stock(db, body, current_user, tenant_id)
+    movement_id, qty = inventory_service.add_stock(
+        db, body, current_user, tenant_id, data_scope=data_scope
+    )
     return StockOperationResult(
         item_id=body.item_id,
         doctor_id=body.doctor_id,
@@ -140,8 +149,11 @@ def stock_reduce(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> StockOperationResult:
-    movement_id, qty = inventory_service.reduce_stock(db, body, current_user, tenant_id)
+    movement_id, qty = inventory_service.reduce_stock(
+        db, body, current_user, tenant_id, data_scope=data_scope
+    )
     return StockOperationResult(
         item_id=body.item_id,
         doctor_id=body.doctor_id,
@@ -156,8 +168,11 @@ def stock_adjust(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> StockOperationResult:
-    movement_id, qty = inventory_service.adjust_stock(db, body, current_user, tenant_id)
+    movement_id, qty = inventory_service.adjust_stock(
+        db, body, current_user, tenant_id, data_scope=data_scope
+    )
     return StockOperationResult(
         item_id=body.item_id,
         doctor_id=body.doctor_id,

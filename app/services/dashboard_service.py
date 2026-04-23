@@ -4,7 +4,7 @@ import pytz
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.tenant_context import get_current_tenant_id
@@ -56,8 +56,80 @@ def get_dashboard_stats(db: Session) -> dict:
     }
 
 
-def get_dashboard_stats_for_tenant(db: Session, tenant_id: UUID) -> dict:
+def get_dashboard_stats_for_tenant(
+    db: Session,
+    tenant_id: UUID,
+    doctor_id: UUID | None = None,
+) -> dict:
     """Staff dashboard KPIs scoped to a single tenant (matches GET /dashboard with X-Tenant-ID)."""
+    if doctor_id is not None:
+        doctor_row = db.get(Doctor, doctor_id)
+        if doctor_row is None:
+            raise ValidationError("Doctor not found")
+        if doctor_row.tenant_id != tenant_id:
+            raise ValidationError("Doctor does not belong to this organization")
+
+        has_appt = exists().where(
+            Appointment.patient_id == Patient.id,
+            Appointment.doctor_id == doctor_id,
+            Appointment.is_deleted == False,  # noqa: E712
+        )
+        patient_conds = [has_appt]
+        if doctor_row.user_id is not None:
+            patient_conds.append(Patient.created_by == doctor_row.user_id)
+        total_patients = (
+            db.scalar(
+                select(func.count(Patient.id)).where(
+                    Patient.tenant_id == tenant_id,
+                    or_(*patient_conds),
+                )
+            )
+            or 0
+        )
+        total_doctors = 1
+
+        ist = pytz.timezone("Asia/Kolkata")
+        now = datetime.now(ist)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+
+        today_appointments = (
+            db.scalar(
+                select(func.count())
+                .select_from(Appointment)
+                .where(
+                    Appointment.tenant_id == tenant_id,
+                    Appointment.doctor_id == doctor_id,
+                    Appointment.appointment_time >= start,
+                    Appointment.appointment_time < end,
+                    Appointment.is_deleted == False,  # noqa: E712
+                )
+            )
+            or 0
+        )
+
+        total_revenue = (
+            db.scalar(
+                select(func.coalesce(func.sum(Billing.amount), 0))
+                .select_from(Billing)
+                .join(Appointment, Billing.appointment_id == Appointment.id)
+                .where(
+                    Billing.tenant_id == tenant_id,
+                    Billing.status == BillingStatus.paid,
+                    Billing.is_deleted == False,  # noqa: E712
+                    Appointment.doctor_id == doctor_id,
+                )
+            )
+            or 0
+        )
+
+        return {
+            "total_patients": int(total_patients),
+            "total_doctors": int(total_doctors),
+            "today_appointments": int(today_appointments),
+            "total_revenue": float(total_revenue),
+        }
+
     total_patients = (
         db.query(Patient).filter(Patient.tenant_id == tenant_id).count()
     )
@@ -137,7 +209,11 @@ def resolve_admin_metrics_tenant_id(
     return eff
 
 
-def get_admin_dashboard_metrics(db: Session, tenant_id: UUID) -> dict:
+def get_admin_dashboard_metrics(
+    db: Session,
+    tenant_id: UUID,
+    doctor_id: UUID | None = None,
+) -> dict:
     """
     Aggregated admin metrics for a single tenant.
     * total_revenue: sum of paid bill amounts with created_at in [start_date, +inf)
@@ -147,6 +223,11 @@ def get_admin_dashboard_metrics(db: Session, tenant_id: UUID) -> dict:
     * completed_appointments: completed with appointment_time in [start_date, +inf)
     * pending_bills: sum of amount for non-deleted bills with status pending or failed
     """
+    if doctor_id is not None:
+        drow = db.get(Doctor, doctor_id)
+        if drow is None or drow.tenant_id != tenant_id:
+            raise ValidationError("Invalid doctor for this tenant")
+
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
@@ -156,6 +237,17 @@ def get_admin_dashboard_metrics(db: Session, tenant_id: UUID) -> dict:
         Billing.tenant_id == tenant_id,
         Billing.is_deleted == False,  # noqa: E712
     )
+    if doctor_id is not None:
+        base_bill = and_(
+            base_bill,
+            Billing.appointment_id.in_(
+                select(Appointment.id).where(
+                    Appointment.tenant_id == tenant_id,
+                    Appointment.doctor_id == doctor_id,
+                    Appointment.is_deleted == False,  # noqa: E712
+                )
+            ),
+        )
 
     total_revenue = db.scalar(
         select(func.coalesce(func.sum(Billing.amount), 0))
@@ -186,6 +278,8 @@ def get_admin_dashboard_metrics(db: Session, tenant_id: UUID) -> dict:
         Appointment.tenant_id == tenant_id,
         Appointment.is_deleted == False,  # noqa: E712
     )
+    if doctor_id is not None:
+        base_appt = and_(base_appt, Appointment.doctor_id == doctor_id)
 
     appointments_today = db.scalar(
         select(func.count())
@@ -240,11 +334,20 @@ def _coerce_to_date(d: object) -> date:
     raise TypeError(f"Unexpected calendar day from DB: {type(d)!r}")
 
 
-def get_revenue_trend(db: Session, tenant_id: UUID) -> list[dict]:
+def get_revenue_trend(
+    db: Session,
+    tenant_id: UUID,
+    doctor_id: UUID | None = None,
+) -> list[dict]:
     """
     Daily paid revenue for the last 7 UTC calendar days (inclusive of today), oldest first.
     Days with no paid bills show revenue 0.
     """
+    if doctor_id is not None:
+        drow = db.get(Doctor, doctor_id)
+        if drow is None or drow.tenant_id != tenant_id:
+            raise ValidationError("Invalid doctor for this tenant")
+
     now = datetime.now(timezone.utc)
     today: date = now.date()
     start_date: date = today - timedelta(days=6)
@@ -258,17 +361,34 @@ def get_revenue_trend(db: Session, tenant_id: UUID) -> list[dict]:
         Billing.is_deleted == False,  # noqa: E712
     )
 
-    rows = db.execute(
-        select(day_col, func.coalesce(func.sum(Billing.amount), 0.0))
-        .select_from(Billing)
-        .where(
-            base_bill,
-            Billing.status == BillingStatus.paid,
-            Billing.created_at >= start_dt,
-            Billing.created_at < end_excl,
+    if doctor_id is not None:
+        trend_select = (
+            select(day_col, func.coalesce(func.sum(Billing.amount), 0.0))
+            .select_from(Billing)
+            .join(Appointment, Billing.appointment_id == Appointment.id)
+            .where(
+                base_bill,
+                Billing.status == BillingStatus.paid,
+                Billing.created_at >= start_dt,
+                Billing.created_at < end_excl,
+                Appointment.doctor_id == doctor_id,
+            )
+            .group_by(day_col)
         )
-        .group_by(day_col)
-    ).all()
+    else:
+        trend_select = (
+            select(day_col, func.coalesce(func.sum(Billing.amount), 0.0))
+            .select_from(Billing)
+            .where(
+                base_bill,
+                Billing.status == BillingStatus.paid,
+                Billing.created_at >= start_dt,
+                Billing.created_at < end_excl,
+            )
+            .group_by(day_col)
+        )
+
+    rows = db.execute(trend_select).all()
 
     by_day: dict[date, float] = {}
     for d, amount in rows:
@@ -289,7 +409,11 @@ def get_revenue_trend(db: Session, tenant_id: UUID) -> list[dict]:
     return out
 
 
-def get_doctor_performance(db: Session, tenant_id: UUID) -> list[dict]:
+def get_doctor_performance(
+    db: Session,
+    tenant_id: UUID,
+    doctor_id: UUID | None = None,
+) -> list[dict]:
     """
     Per-doctor stats for the last 7 UTC calendar days (inclusive): ``today - 6`` through end of
     today, aligned with :func:`get_revenue_trend`.
@@ -300,6 +424,11 @@ def get_doctor_performance(db: Session, tenant_id: UUID) -> list[dict]:
       appointment in the tenant; amount attributed to that appointment's ``doctor_id``.
     * All non-deleted doctors in the tenant are included (zeros when no data).
     """
+    if doctor_id is not None:
+        drow = db.get(Doctor, doctor_id)
+        if drow is None or drow.tenant_id != tenant_id:
+            raise ValidationError("Invalid doctor for this tenant")
+
     now = datetime.now(timezone.utc)
     today: date = now.date()
     start_date: date = today - timedelta(days=6)
@@ -312,6 +441,8 @@ def get_doctor_performance(db: Session, tenant_id: UUID) -> list[dict]:
         Appointment.appointment_time >= start_dt,
         Appointment.appointment_time < end_excl,
     )
+    if doctor_id is not None:
+        base_appt = and_(base_appt, Appointment.doctor_id == doctor_id)
 
     appt_subq = (
         select(
@@ -334,20 +465,21 @@ def get_doctor_performance(db: Session, tenant_id: UUID) -> list[dict]:
         Billing.created_at < end_excl,
     )
 
+    rev_join = [
+        Billing.appointment_id == Appointment.id,
+        Appointment.tenant_id == tenant_id,
+        Appointment.is_deleted == False,  # noqa: E712
+    ]
+    if doctor_id is not None:
+        rev_join.append(Appointment.doctor_id == doctor_id)
+
     rev_subq = (
         select(
             Appointment.doctor_id,
             func.coalesce(func.sum(Billing.amount), 0).label("total_revenue"),
         )
         .select_from(Billing)
-        .join(
-            Appointment,
-            and_(
-                Billing.appointment_id == Appointment.id,
-                Appointment.tenant_id == tenant_id,
-                Appointment.is_deleted == False,  # noqa: E712
-            ),
-        )
+        .join(Appointment, and_(*rev_join))
         .where(base_bill_rev)
         .group_by(Appointment.doctor_id)
     ).subquery()
@@ -369,6 +501,8 @@ def get_doctor_performance(db: Session, tenant_id: UUID) -> list[dict]:
         )
         .order_by(Doctor.name)
     )
+    if doctor_id is not None:
+        stmt = stmt.where(Doctor.id == doctor_id)
 
     rows = db.execute(stmt).all()
     out: list[dict] = []

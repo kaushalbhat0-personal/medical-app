@@ -10,7 +10,9 @@ from app.api.deps import (
     get_current_user,
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
+    get_resolved_data_scope,
 )
+from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
 from app.models.doctor import Doctor
 from app.models.user import User
@@ -50,6 +52,7 @@ def read_patients(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> list[PatientRead]:
     return patient_service.get_patients(
         db,
@@ -59,6 +62,7 @@ def read_patients(
         search=search,
         tenant_id=tenant_id,
         acting_doctor=acting_doctor,
+        data_scope=data_scope,
     )
 
 
@@ -69,6 +73,7 @@ def read_patient(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> PatientRead:
     patient = patient_service.get_patient_or_404(db, patient_id)
     patient_service.authorize_patient_read(
@@ -78,6 +83,7 @@ def read_patient(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="read_patient",
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return patient
 
@@ -90,6 +96,7 @@ def update_patient(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> PatientRead:
     return patient_service.update_patient(
         db,
@@ -98,6 +105,7 @@ def update_patient(
         current_user,
         tenant_id,
         acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 
 
@@ -108,8 +116,14 @@ def delete_patient(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> Response:
     patient_service.delete_patient(
-        db, patient_id, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        patient_id,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

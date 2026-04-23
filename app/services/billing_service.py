@@ -4,6 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScopeKind, ResolvedDataScope
+from app.core.permissions import has_tenant_admin_privileges
 from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_billing
 from app.models.appointment import Appointment, AppointmentStatus
@@ -250,6 +252,7 @@ def get_bills(
     tenant_id: UUID | None = None,
     *,
     acting_doctor: Doctor | None = None,
+    data_scope: ResolvedDataScope,
 ) -> list[Billing]:
     if current_user.role not in (
         UserRole.admin,
@@ -267,16 +270,27 @@ def get_bills(
     eff_tenant_id = tenant_id
 
     if current_user.role == UserRole.doctor:
-        doc = acting_doctor or doctor_service.require_doctor_profile(
-            db, current_user
-        )
-        eff_doctor_id = doc.id
-        eff_patient_id = None
+        if (
+            data_scope.kind == DataScopeKind.tenant
+            and has_tenant_admin_privileges(current_user)
+        ):
+            eff_doctor_id = None
+            eff_patient_id = None
+        else:
+            doc = acting_doctor or doctor_service.require_doctor_profile(
+                db, current_user
+            )
+            eff_doctor_id = doc.id
+            eff_patient_id = None
     elif current_user.role == UserRole.patient:
         eff_user_id = current_user.id
         eff_patient_id = None
     elif current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff):
-        pass
+        if (
+            data_scope.kind == DataScopeKind.doctor
+            and data_scope.doctor_id is not None
+        ):
+            eff_doctor_id = data_scope.doctor_id
 
     return crud_billing.get_bills(
         db,
@@ -299,8 +313,23 @@ def authorize_bill_read(
     *,
     acting_doctor: Doctor | None = None,
     rbac_action: str = "read_bill",
+    restrict_to_doctor_id: UUID | None = None,
 ) -> None:
     if current_user.role == UserRole.super_admin:
+        if restrict_to_doctor_id is not None:
+            if bill.appointment_id is None:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
+            appointment = appointment_service.get_appointment_or_404(
+                db, bill.appointment_id
+            )
+            if appointment.doctor_id != restrict_to_doctor_id:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
         return
 
     assert_authorized(
@@ -312,6 +341,20 @@ def authorize_bill_read(
     )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        if restrict_to_doctor_id is not None:
+            if bill.appointment_id is None:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
+            appointment = appointment_service.get_appointment_or_404(
+                db, bill.appointment_id
+            )
+            if appointment.doctor_id != restrict_to_doctor_id:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
         return
 
     if current_user.role == UserRole.patient:
@@ -343,6 +386,14 @@ def authorize_bill_read(
                 tenant_type=doc.tenant.type if doc.tenant else None,
             )
             raise ForbiddenError("Not allowed to access this bill")
+        if (
+            restrict_to_doctor_id is not None
+            and appointment.doctor_id != restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "billing", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this bill")
         return
 
     log_rbac_mutation_violation(current_user, "billing", action=rbac_action)
@@ -357,12 +408,27 @@ def authorize_bill_mutate(
     *,
     acting_doctor: Doctor | None = None,
     rbac_action: str = "mutate_bill",
+    restrict_to_doctor_id: UUID | None = None,
 ) -> None:
     if current_user.role == UserRole.patient:
         log_rbac_mutation_violation(current_user, "billing")
         raise ForbiddenError("Patients cannot modify bills")
 
     if current_user.role == UserRole.super_admin:
+        if restrict_to_doctor_id is not None:
+            if bill.appointment_id is None:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
+            appointment = appointment_service.get_appointment_or_404(
+                db, bill.appointment_id
+            )
+            if appointment.doctor_id != restrict_to_doctor_id:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
         return
 
     assert_authorized(
@@ -381,6 +447,20 @@ def authorize_bill_mutate(
         raise ForbiddenError("Only administrators may modify bills without an appointment")
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        if restrict_to_doctor_id is not None:
+            if bill.appointment_id is None:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
+            appointment = appointment_service.get_appointment_or_404(
+                db, bill.appointment_id
+            )
+            if appointment.doctor_id != restrict_to_doctor_id:
+                log_rbac_mutation_violation(
+                    current_user, "billing", action=rbac_action
+                )
+                raise ForbiddenError("Not allowed to access this bill")
         return
 
     if current_user.role == UserRole.doctor:
@@ -401,6 +481,14 @@ def authorize_bill_mutate(
                 tenant_type=doc.tenant.type if doc.tenant else None,
             )
             raise ForbiddenError("Not allowed to access this bill")
+        if (
+            restrict_to_doctor_id is not None
+            and appointment.doctor_id != restrict_to_doctor_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "billing", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this bill")
         return
 
     log_rbac_mutation_violation(current_user, "billing", action=rbac_action)
@@ -419,6 +507,7 @@ def update_bill(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> Billing:
     bill = get_bill_or_404(db, bill_id)
     authorize_bill_mutate(
@@ -428,6 +517,7 @@ def update_bill(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="update_bill",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
 
     update_data = billing_in.model_dump(exclude_unset=True)
@@ -519,6 +609,7 @@ def soft_delete_bill(
     tenant_id: UUID | None,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> Billing:
     bill = get_bill_or_404(db, bill_id)
     authorize_bill_mutate(
@@ -528,6 +619,7 @@ def soft_delete_bill(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="delete_bill",
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
 
     if bill.is_deleted:
@@ -565,10 +657,16 @@ def get_billing_history(
     limit: int = 100,
     *,
     acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
 ) -> list[BillingEventRead]:
     bill = get_bill_or_404(db, bill_id)
     authorize_bill_read(
-        db, bill, current_user, tenant_id, acting_doctor=acting_doctor
+        db,
+        bill,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_to_doctor_id,
     )
 
     events = crud_billing.get_billing_events(db, bill_id, skip=skip, limit=limit)

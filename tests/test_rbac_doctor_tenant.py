@@ -10,6 +10,8 @@ from typing import Any
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import resolve_data_scope
+from app.crud import crud_doctor
 from app.crud.crud_appointment import add_appointment
 from app.models.appointment import AppointmentStatus
 from app.models.tenant import Tenant, TenantType
@@ -18,6 +20,11 @@ from app.schemas.billing import BillingCreate
 from app.services import billing_service, patient_service
 from app.services.exceptions import ForbiddenError, ValidationError
 from tests.factories import create_doctor_profile, create_patient_profile, create_user
+
+
+def _data_scope(db: Session, user: User, header: str = "doctor"):
+    linked = crud_doctor.get_doctor_by_user_id(db, user.id)
+    return resolve_data_scope(header, current_user=user, linked_doctor=linked)
 
 
 def _tenant(db: Session, tenant_type: TenantType) -> Tenant:
@@ -141,7 +148,11 @@ def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
         )
 
     listed = patient_service.get_patients(
-        db_session, doc_a_user, tenant_id=tenant.id, limit=100
+        db_session,
+        doc_a_user,
+        tenant_id=tenant.id,
+        limit=100,
+        data_scope=_data_scope(db_session, doc_a_user),
     )
     assert patient.id not in {p.id for p in listed}
 
@@ -149,7 +160,11 @@ def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
         db_session, patient, doc_b_user, tenant_id=tenant.id
     )
     listed_b = patient_service.get_patients(
-        db_session, doc_b_user, tenant_id=tenant.id, limit=100
+        db_session,
+        doc_b_user,
+        tenant_id=tenant.id,
+        limit=100,
+        data_scope=_data_scope(db_session, doc_b_user),
     )
     assert patient.id in {p.id for p in listed_b}
 

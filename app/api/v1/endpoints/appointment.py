@@ -11,7 +11,9 @@ from app.api.deps import (
     get_current_user,
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
+    get_resolved_data_scope,
 )
+from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
 from app.models.doctor import Doctor
 from app.models.user import User
@@ -60,6 +62,7 @@ def read_appointments(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> list[AppointmentRead]:
     return appointment_service.get_appointments(
         db,
@@ -71,6 +74,7 @@ def read_appointments(
         tenant_id=tenant_id,
         acting_doctor=acting_doctor,
         list_type=appt_type.value if appt_type is not None else None,
+        data_scope=data_scope,
     )
 
 
@@ -81,6 +85,7 @@ def read_appointment(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> AppointmentRead:
     appointment = appointment_service.get_appointment_or_404(db, appointment_id)
     appointment_service.authorize_appointment_read(
@@ -90,6 +95,7 @@ def read_appointment(
         tenant_id,
         acting_doctor=acting_doctor,
         rbac_action="read_appointment",
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return appointment
 
@@ -102,6 +108,7 @@ def update_appointment(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> AppointmentRead:
     return appointment_service.update_appointment(
         db,
@@ -110,6 +117,7 @@ def update_appointment(
         current_user,
         tenant_id,
         acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 
 
@@ -120,6 +128,7 @@ def delete_appointment(
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> AppointmentRead:
     return appointment_service.delete_appointment(
         db,
@@ -127,4 +136,5 @@ def delete_appointment(
         current_user,
         tenant_id,
         acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )

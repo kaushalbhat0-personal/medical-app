@@ -9,10 +9,11 @@ from app.api.http_exceptions import (
     inactive_user_exception,
     unauthorized_credentials_exception,
 )
+from app.core.data_scope import ResolvedDataScope, resolve_data_scope
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
-from app.crud import crud_user
+from app.crud import crud_doctor, crud_user
 from app.models.doctor import Doctor
 from app.models.user import User
 from app.services import doctor_service
@@ -136,6 +137,24 @@ def get_acting_doctor_optional_active(
 ) -> Doctor | None:
     """Same as ``get_acting_doctor_optional`` but for routes that require an active user."""
     return doctor_service.get_acting_doctor_or_none(db, current_user)
+
+
+def get_linked_doctor_profile_optional(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Doctor | None:
+    """Doctor row linked to this login (any role), for X-Data-Scope resolution."""
+    return crud_doctor.get_doctor_by_user_id(db, current_user.id)
+
+
+def get_resolved_data_scope(
+    x_data_scope: str | None = Header(default=None, alias="X-Data-Scope"),
+    current_user: User = Depends(get_current_user),
+    linked_doctor: Doctor | None = Depends(get_linked_doctor_profile_optional),
+) -> ResolvedDataScope:
+    return resolve_data_scope(
+        x_data_scope, current_user=current_user, linked_doctor=linked_doctor
+    )
 
 
 def get_current_doctor(

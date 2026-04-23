@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
 import { navigateTo } from '../utils/navigation';
+import { APP_MODE_STORAGE_KEY } from '../constants/appMode';
 import { getTenantIdForRequest } from '../utils/tenantIdForRequest';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -64,6 +65,9 @@ api.interceptors.request.use(
           config.headers['X-Tenant-ID'] = tenantId;
         }
       }
+      const mode = localStorage.getItem(APP_MODE_STORAGE_KEY);
+      config.headers['X-Data-Scope'] =
+        mode === 'practice' ? 'doctor' : 'tenant';
     }
 
     // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).
