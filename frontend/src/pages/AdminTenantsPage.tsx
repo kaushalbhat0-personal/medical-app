@@ -116,7 +116,7 @@ export function AdminTenantsPage() {
       setPromoteError(null);
       try {
         const list = await doctorsApi.getAll(
-          { limit: 200 },
+          { skip: 0, limit: 50 },
           { tenantScopeId: tenant.id }
         );
         setPromoteDoctors(list);
