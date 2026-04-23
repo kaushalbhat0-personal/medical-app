@@ -61,6 +61,7 @@ def create_user(
     role: UserRole,
     tenant_id: UUID | None = None,
     force_password_reset: bool = False,
+    is_owner: bool = False,
 ) -> User:
     if role == UserRole.super_admin:
         u = User(
@@ -69,6 +70,7 @@ def create_user(
             role=role,
             is_active=True,
             force_password_reset=force_password_reset,
+            is_owner=is_owner,
             tenant_id=None,
         )
         db.add(u)
@@ -82,6 +84,7 @@ def create_user(
         role=role,
         is_active=True,
         force_password_reset=force_password_reset,
+        is_owner=is_owner,
         tenant_id=tenant_id,
     )
     db.add(u)

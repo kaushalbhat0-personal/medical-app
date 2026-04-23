@@ -34,6 +34,14 @@ export function tenantIdFromToken(token: string | null): string | null | undefin
   return undefined;
 }
 
+export function isOwnerFromToken(token: string | null): boolean | undefined {
+  if (!token) return undefined;
+  const payload = decodeJwtPayload(token);
+  const v = payload?.is_owner;
+  if (typeof v === 'boolean') return v;
+  return undefined;
+}
+
 /** JWT `sub` — same identifier as backend user id (UUID string). */
 export function userIdFromAccessToken(token: string | null): string | undefined {
   if (!token) return undefined;

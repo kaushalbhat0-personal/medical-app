@@ -84,12 +84,19 @@ def authorize_bill_create(
         log_rbac_mutation_violation(current_user, "billing")
         raise ForbiddenError("Patients cannot create bills")
 
-    if current_user.role == UserRole.doctor and billing_in.appointment_id is None:
+    if (
+        current_user.role == UserRole.doctor
+        and not current_user.is_owner
+        and billing_in.appointment_id is None
+    ):
         log_rbac_mutation_violation(current_user, "billing")
         raise ForbiddenError("Doctors must create bills with an appointment")
 
     if billing_in.appointment_id is None:
-        if current_user.role not in (UserRole.admin, UserRole.super_admin):
+        if current_user.role not in (
+            UserRole.admin,
+            UserRole.super_admin,
+        ) and not (current_user.role == UserRole.doctor and current_user.is_owner):
             log_rbac_mutation_violation(current_user, "billing")
             raise ForbiddenError(
                 "Bills without an appointment can only be created by administrators"
@@ -111,6 +118,9 @@ def authorize_bill_create(
         )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.doctor:
@@ -255,7 +265,9 @@ def get_bills(
     eff_user_id: UUID | None = None
     eff_tenant_id = tenant_id
 
-    if current_user.role == UserRole.doctor:
+    if current_user.role == UserRole.doctor and current_user.is_owner:
+        pass
+    elif current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
@@ -301,6 +313,9 @@ def authorize_bill_read(
     )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.patient:
@@ -365,11 +380,14 @@ def authorize_bill_mutate(
     if bill.appointment_id is None and current_user.role not in (
         UserRole.admin,
         UserRole.super_admin,
-    ):
+    ) and not (current_user.role == UserRole.doctor and current_user.is_owner):
         log_rbac_mutation_violation(current_user, "billing")
         raise ForbiddenError("Only administrators may modify bills without an appointment")
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.doctor:
@@ -433,7 +451,10 @@ def update_bill(
     new_patient_id = update_data.get("patient_id", bill.patient_id)
 
     if "appointment_id" in update_data and new_appointment_id is None:
-        if current_user.role not in (UserRole.admin, UserRole.super_admin):
+        if current_user.role not in (
+            UserRole.admin,
+            UserRole.super_admin,
+        ) and not (current_user.role == UserRole.doctor and current_user.is_owner):
             log_rbac_mutation_violation(current_user, "billing")
             raise ForbiddenError("Only administrators may unlink an appointment from a bill")
 

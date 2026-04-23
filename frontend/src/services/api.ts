@@ -56,9 +56,14 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const tenantId = getTenantIdForRequest();
-    if (tenantId && config.headers) {
-      config.headers['X-Tenant-ID'] = tenantId;
+    if (config.headers) {
+      const hasExplicit = config.headers['X-Tenant-ID'] != null;
+      if (!hasExplicit) {
+        const tenantId = getTenantIdForRequest();
+        if (tenantId) {
+          config.headers['X-Tenant-ID'] = tenantId;
+        }
+      }
     }
 
     // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).

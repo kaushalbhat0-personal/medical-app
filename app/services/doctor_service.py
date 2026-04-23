@@ -259,20 +259,13 @@ def create_hospital_doctor_with_login(
 
 def authorize_doctor_create(current_user: User) -> None:
 
-    if current_user.role == UserRole.doctor:
-
-        log_rbac_mutation_violation(current_user, "doctor")
-
-        raise ForbiddenError("Doctors cannot create doctor profiles")
-
-    if current_user.role not in (
+    allowed = current_user.role in (
         UserRole.admin,
         UserRole.super_admin,
         UserRole.staff,
-    ):
-
+    ) or (current_user.role == UserRole.doctor and current_user.is_owner)
+    if not allowed:
         log_rbac_mutation_violation(current_user, "doctor")
-
         raise ForbiddenError("Only administrators can create doctor profiles")
 
 
@@ -353,6 +346,10 @@ def authorize_doctor_update(
 
         return
 
+    if current_user.role == UserRole.doctor and current_user.is_owner:
+
+        return
+
     if current_user.role == UserRole.doctor and doctor.user_id == current_user.id:
 
         return
@@ -395,7 +392,19 @@ def authorize_doctor_delete(
 
     )
 
+    if doctor.user_id is not None:
+        target_user = crud_user.get_user(db, doctor.user_id)
+        if target_user is not None and target_user.is_owner:
+            log_rbac_mutation_violation(current_user, "doctor", action="delete_owner")
+            raise ForbiddenError(
+                "The practice owner cannot be removed from the organization"
+            )
+
     if current_user.role in (UserRole.admin, UserRole.staff):
+
+        return
+
+    if current_user.role == UserRole.doctor and current_user.is_owner:
 
         return
 
@@ -445,6 +454,9 @@ def create_independent_doctor(
         role="doctor",
         is_primary=True,
     )
+    u = crud_user.get_user(db, user_id)
+    if u is not None:
+        u.is_owner = True
     doctor_data["tenant_id"] = tenant.id
     doctor_data["user_id"] = user_id
     doctor = crud_doctor.create_doctor_tx(db, doctor_data)
@@ -514,12 +526,15 @@ def create_doctor(
     doctor_data["tenant_id"] = tenant_id
 
     resolved_user_id = user_id
+    _admin_like = current_user is not None and (
+        current_user.role in (UserRole.admin, UserRole.super_admin, UserRole.staff)
+        or (current_user.role == UserRole.doctor and current_user.is_owner)
+    )
     if (
         resolved_user_id is None
         and tenant_id is not None
         and current_user is not None
-        and current_user.role
-        in (UserRole.admin, UserRole.super_admin, UserRole.staff)
+        and _admin_like
         and account_email
         and str(account_email).strip()
         and account_password
@@ -528,12 +543,7 @@ def create_doctor(
             db, doctor_in, current_user, tenant_id, idempotency_key=idempotency_key
         )
 
-    if (
-        resolved_user_id is None
-        and current_user is not None
-        and current_user.role
-        in (UserRole.admin, UserRole.super_admin, UserRole.staff)
-    ):
+    if resolved_user_id is None and current_user is not None and _admin_like:
         raise ValidationError(
             "account_email and account_password are required to create a doctor with a login"
         )

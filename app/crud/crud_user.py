@@ -28,6 +28,8 @@ def create_user(db: Session, user_data: dict[str, Any]) -> User:
         user.tenant_id = user_data["tenant_id"]
     if user_data.get("force_password_reset") is True:
         user.force_password_reset = True
+    if user_data.get("is_owner") is True:
+        user.is_owner = True
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -48,6 +50,8 @@ def create_user_tx(db: Session, user_data: dict[str, Any]) -> User:
         user.tenant_id = user_data["tenant_id"]
     if user_data.get("force_password_reset") is True:
         user.force_password_reset = True
+    if user_data.get("is_owner") is True:
+        user.is_owner = True
     db.add(user)
     db.flush()
     db.refresh(user)

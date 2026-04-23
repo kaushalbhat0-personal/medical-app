@@ -132,6 +132,23 @@ def list_tenants(
     return list(db.scalars(stmt).all())
 
 
+def get_user_tenant_row(
+    db: Session,
+    *,
+    user_id: UUID,
+    tenant_id: UUID,
+) -> UserTenant | None:
+    stmt = (
+        select(UserTenant)
+        .where(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_id,
+        )
+        .limit(1)
+    )
+    return db.scalars(stmt).first()
+
+
 def create_user_tenant_tx(
     db: Session,
     *,

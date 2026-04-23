@@ -14,12 +14,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
-import { tenantsApi, usersApi } from '../services';
-import type { Tenant } from '../types';
+import { doctorsApi, tenantsApi, usersApi } from '../services';
+import type { Doctor, Tenant } from '../types';
 import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
 
 type OrgType = 'clinic' | 'hospital';
+type AddAdminTab = 'create' | 'promote';
 
 export function AdminTenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -36,6 +37,11 @@ export function AdminTenantsPage() {
   const [addAdminEmail, setAddAdminEmail] = useState('');
   const [addAdminPassword, setAddAdminPassword] = useState('');
   const [addAdminSubmitting, setAddAdminSubmitting] = useState(false);
+  const [addAdminTab, setAddAdminTab] = useState<AddAdminTab>('create');
+  const [promoteDoctors, setPromoteDoctors] = useState<Doctor[]>([]);
+  const [promoteLoading, setPromoteLoading] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const addAdminRef = useRef<HTMLDivElement>(null);
@@ -96,10 +102,38 @@ export function AdminTenantsPage() {
 
   const openAddAdmin = (tenant: Tenant) => {
     setAddAdminTenant(tenant);
+    setAddAdminTab('create');
     setAddAdminName('');
     setAddAdminEmail('');
     setAddAdminPassword('');
+    setPromoteDoctors([]);
+    setPromoteError(null);
   };
+
+  const loadDoctorsForPromote = useCallback(
+    async (tenant: Tenant) => {
+      setPromoteLoading(true);
+      setPromoteError(null);
+      try {
+        const list = await doctorsApi.getAll(
+          { limit: 200 },
+          { tenantScopeId: tenant.id }
+        );
+        setPromoteDoctors(list);
+      } catch {
+        setPromoteError('Could not load doctors for this organization.');
+        setPromoteDoctors([]);
+      } finally {
+        setPromoteLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!addAdminTenant || addAdminTab !== 'promote') return;
+    void loadDoctorsForPromote(addAdminTenant);
+  }, [addAdminTenant, addAdminTab, loadDoctorsForPromote]);
 
   const submitAddAdmin = async () => {
     if (!addAdminTenant) return;
@@ -127,6 +161,26 @@ export function AdminTenantsPage() {
       toast.error('Could not create admin');
     } finally {
       setAddAdminSubmitting(false);
+    }
+  };
+
+  const promoteDoctorToAdmin = async (d: Doctor) => {
+    if (!addAdminTenant) return;
+    const uid = d.user_id != null ? String(d.user_id) : null;
+    if (!uid) {
+      toast.error('This doctor has no login account to promote.');
+      return;
+    }
+    setPromotingUserId(uid);
+    try {
+      await usersApi.patchUserRole(uid, { role: 'admin' }, addAdminTenant.id);
+      toast.success(`${d.name ?? 'Doctor'} is now an admin.`);
+      await load();
+      await loadDoctorsForPromote(addAdminTenant);
+    } catch {
+      toast.error('Could not promote user');
+    } finally {
+      setPromotingUserId(null);
     }
   };
 
@@ -219,7 +273,13 @@ export function AdminTenantsPage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget && !addAdminSubmitting) setAddAdminTenant(null);
+            if (
+              e.target === e.currentTarget &&
+              !addAdminSubmitting &&
+              !promotingUserId
+            ) {
+              setAddAdminTenant(null);
+            }
           }}
         >
           <div
@@ -235,60 +295,146 @@ export function AdminTenantsPage() {
             <h2 id="add-admin-title" className="text-lg font-semibold">
               Add admin — {addAdminTenant.name}
             </h2>
-            <div className="space-y-2">
-              <label htmlFor="add-admin-name" className="text-sm font-medium">
-                Name
-              </label>
-              <Input
-                id="add-admin-name"
-                value={addAdminName}
-                onChange={(e) => setAddAdminName(e.target.value)}
-                placeholder="Full name"
-                autoComplete="name"
-              />
+            <div
+              className="flex gap-1 rounded-lg border border-border p-0.5 bg-muted/50"
+              role="tablist"
+              aria-label="Admin setup method"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={addAdminTab === 'create'}
+                className={cn(
+                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  addAdminTab === 'create'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => setAddAdminTab('create')}
+              >
+                Create new admin
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={addAdminTab === 'promote'}
+                className={cn(
+                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  addAdminTab === 'promote'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => setAddAdminTab('promote')}
+              >
+                Promote doctor
+              </button>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="add-admin-email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="add-admin-email"
-                type="email"
-                value={addAdminEmail}
-                onChange={(e) => setAddAdminEmail(e.target.value)}
-                placeholder="admin@clinic.example"
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="add-admin-password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="add-admin-password"
-                type="password"
-                value={addAdminPassword}
-                onChange={(e) => setAddAdminPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">Role: admin (fixed)</p>
+
+            {addAdminTab === 'create' && (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="add-admin-name" className="text-sm font-medium">
+                    Name
+                  </label>
+                  <Input
+                    id="add-admin-name"
+                    value={addAdminName}
+                    onChange={(e) => setAddAdminName(e.target.value)}
+                    placeholder="Full name"
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="add-admin-email" className="text-sm font-medium">
+                    Email
+                  </label>
+                  <Input
+                    id="add-admin-email"
+                    type="email"
+                    value={addAdminEmail}
+                    onChange={(e) => setAddAdminEmail(e.target.value)}
+                    placeholder="admin@clinic.example"
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="add-admin-password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <Input
+                    id="add-admin-password"
+                    type="password"
+                    value={addAdminPassword}
+                    onChange={(e) => setAddAdminPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Role: admin (fixed)</p>
+              </>
+            )}
+
+            {addAdminTab === 'promote' && (
+              <div className="space-y-2 max-h-[min(50vh,320px)] overflow-y-auto pr-1">
+                <p className="text-sm text-muted-foreground">
+                  Doctors in this organization with a login can be made administrators.
+                </p>
+                {promoteLoading && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Loading doctors…</p>
+                )}
+                {promoteError && (
+                  <p className="text-sm text-destructive py-2">{promoteError}</p>
+                )}
+                {!promoteLoading && !promoteError && promoteDoctors.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No doctors found.</p>
+                )}
+                {!promoteLoading &&
+                  promoteDoctors.map((d) => {
+                    const hasLogin = d.user_id != null && String(d.user_id).length > 0;
+                    const busy = promotingUserId != null;
+                    return (
+                      <div
+                        key={String(d.id)}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{d.name ?? '—'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {d.specialization ?? d.specialty ?? '—'}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={!hasLogin || busy}
+                          onClick={() => void promoteDoctorToAdmin(d)}
+                        >
+                          {promotingUserId === String(d.user_id) ? 'Working…' : 'Make admin'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
                 variant="ghost"
-                disabled={addAdminSubmitting}
+                disabled={addAdminSubmitting || Boolean(promotingUserId)}
                 onClick={() => setAddAdminTenant(null)}
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={() => void submitAddAdmin()}
-                disabled={addAdminSubmitting}
-              >
-                {addAdminSubmitting ? 'Creating…' : 'Create admin'}
-              </Button>
+              {addAdminTab === 'create' && (
+                <Button
+                  type="button"
+                  onClick={() => void submitAddAdmin()}
+                  disabled={addAdminSubmitting}
+                >
+                  {addAdminSubmitting ? 'Creating…' : 'Create admin'}
+                </Button>
+              )}
             </div>
           </div>
         </div>

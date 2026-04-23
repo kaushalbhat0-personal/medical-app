@@ -64,6 +64,21 @@ def get_doctor(db: Session, doctor_id: UUID) -> Doctor | None:
     return db.scalars(stmt).first()
 
 
+def get_active_doctor_for_user_in_tenant(
+    db: Session,
+    *,
+    user_id: UUID,
+    tenant_id: UUID,
+) -> Doctor | None:
+    stmt = select(Doctor).where(
+        Doctor.user_id == user_id,
+        Doctor.tenant_id == tenant_id,
+        Doctor.is_deleted == False,
+        Doctor.is_active == True,
+    )
+    return db.scalars(stmt).first()
+
+
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor | None:
     stmt = (
         select(Doctor)

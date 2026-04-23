@@ -44,9 +44,23 @@ class UserRead(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    is_owner: bool = False
     tenant_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class UserRoleUpdate(BaseModel):
+    """Super-admin: promote a tenant doctor to administrator (same-tenant only)."""
+
+    role: UserRole
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_admin(cls, v: UserRole) -> UserRole:
+        if v != UserRole.admin:
+            raise ValueError("only admin role is supported for this endpoint")
+        return v
 
 
 class UserLogin(BaseModel):
@@ -67,6 +81,7 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    is_owner: bool = False
     tenant_id: UUID | None = None
     full_name: str = ""
 

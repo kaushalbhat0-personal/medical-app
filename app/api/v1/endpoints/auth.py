@@ -31,6 +31,7 @@ def _build_token_payload(user) -> dict:
         "type": "access",
         "role": user.role.value if user.role else "admin",
         "tenant_id": None,
+        "is_owner": user.is_owner,
     }
     if user.role == UserRole.super_admin:
         return payload
@@ -76,6 +77,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "token_type": "bearer",
         "role": token_payload["role"],
         "tenant_id": token_payload["tenant_id"],
+        "is_owner": user.is_owner,
         "force_password_reset": user.force_password_reset,
     }
 

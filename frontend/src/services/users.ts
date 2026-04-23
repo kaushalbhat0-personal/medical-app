@@ -14,4 +14,14 @@ export const usersApi = {
     const { data } = await api.post('/users', payload);
     return data as { id: string; email: string; role: string; tenant_id?: string | null };
   },
+
+  /**
+   * Super-admin: promote a doctor in the org identified by `tenantScopeId` (X-Tenant-ID).
+   */
+  patchUserRole: async (userId: string, body: { role: 'admin' }, tenantScopeId: string) => {
+    const { data } = await api.patch(`/users/${userId}/role`, body, {
+      headers: { 'X-Tenant-ID': tenantScopeId },
+    });
+    return data as { id: string; email: string; role: string; tenant_id?: string | null };
+  },
 };

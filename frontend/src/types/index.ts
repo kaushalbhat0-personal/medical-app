@@ -4,6 +4,8 @@ export interface User {
   full_name: string;
   is_active: boolean;
   role: string;
+  /** Practice owner: solo doctor who created the tenant; admin-equivalent in UI/API */
+  is_owner?: boolean;
   /** Primary tenant from login / JWT when applicable */
   tenant_id?: string | null;
   /** When true, client must complete password reset before using the app */
@@ -103,7 +105,8 @@ export interface Doctor {
   id: number | string;
   // Backend returns flat structure, not nested user
   name?: string;
-  user_id?: number;
+  /** Linked login user (promote to admin) */
+  user_id?: string | number;
   user?: User;
   specialty?: string;
   specialization?: string;
@@ -169,6 +172,7 @@ export interface LoginResponse {
   /** Present on OAuth login response */
   role?: string;
   tenant_id?: string | null;
+  is_owner?: boolean;
   user?: User;
   force_password_reset?: boolean;
 }
@@ -177,6 +181,7 @@ export interface LoginResult {
   success: boolean;
   error?: string;
   role?: string;
+  is_owner?: boolean;
   forcePasswordReset?: boolean;
 }
 
@@ -185,6 +190,7 @@ export interface RegisterResponseUser {
   email: string;
   role: string;
   is_active: boolean;
+  is_owner?: boolean;
   full_name?: string;
 }
 

@@ -17,7 +17,7 @@ import type {
   RegisterResponse,
 } from '../types';
 import { authApi, formatLoginError, patientsApi } from '../services';
-import { roleFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
+import { isOwnerFromToken, roleFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
 import { isPatientRole } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
 import { setActiveTenantId } from '../utils/tenantIdForRequest';
@@ -56,6 +56,11 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
   // We keep the fallback so the UI stays usable even if the backend returns a minimal login response.
   const role = response.role ?? base?.role ?? roleFromToken(response.access_token) ?? 'admin';
   const tenantRaw = response.tenant_id ?? base?.tenant_id ?? tenantIdFromToken(response.access_token);
+  const isOwner =
+    base?.is_owner ??
+    response.is_owner ??
+    isOwnerFromToken(response.access_token) ??
+    false;
 
   return {
     id: base?.id ?? 0,
@@ -63,6 +68,7 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     full_name: base?.full_name ?? credentials.email.split('@')[0] ?? 'User',
     is_active: base?.is_active ?? true,
     role,
+    is_owner: isOwner,
     ...(tenantRaw !== undefined ? { tenant_id: tenantRaw } : {}),
     ...(response.force_password_reset !== undefined
       ? { force_password_reset: response.force_password_reset }
@@ -79,6 +85,7 @@ function buildUserFromRegister(response: RegisterResponse): User {
     full_name: response.user.full_name ?? response.user.email.split('@')[0] ?? 'User',
     is_active: response.user.is_active ?? true,
     role,
+    is_owner: response.user.is_owner ?? isOwnerFromToken(response.access_token) ?? false,
     ...(tenantRaw !== undefined && tenantRaw !== null ? { tenant_id: tenantRaw } : {}),
   };
 }
@@ -87,10 +94,12 @@ function mergeUserWithToken(user: User, token: string | null): User {
   if (!token) return user;
   const role = user.role || roleFromToken(token);
   const tenant_id = user.tenant_id ?? tenantIdFromToken(token) ?? undefined;
+  const ownerHint = isOwnerFromToken(token);
   return {
     ...user,
     ...(role ? { role } : {}),
     ...(tenant_id !== undefined ? { tenant_id } : {}),
+    ...(ownerHint !== undefined && user.is_owner === undefined ? { is_owner: ownerHint } : {}),
   };
 }
 
@@ -130,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: 'User',
             is_active: true,
             role,
+            is_owner: isOwnerFromToken(token) ?? false,
             tenant_id: tenantIdFromToken(token) ?? undefined,
           };
           localStorage.setItem('user', JSON.stringify(minimal));
@@ -223,7 +233,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPatientProfileError(null);
         setPatientProfileLoading(false);
       }
-      return { success: true, role: userData.role, forcePasswordReset: false };
+      return {
+        success: true,
+        role: userData.role,
+        is_owner: userData.is_owner,
+        forcePasswordReset: false,
+      };
     } catch (error) {
       const errorMessage = formatLoginError(error);
       return { success: false, error: errorMessage };
@@ -273,6 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return {
           success: true,
           role: userData.role,
+          is_owner: userData.is_owner,
           forcePasswordReset: response.force_password_reset === true,
         };
       }

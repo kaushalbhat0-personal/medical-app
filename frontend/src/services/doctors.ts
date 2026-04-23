@@ -203,9 +203,19 @@ export const doctorsApi = {
     return response.data as Doctor;
   },
 
-  getAll: async (params?: { search?: string; skip?: number; limit?: number }): Promise<Doctor[]> => {
+  getAll: async (
+    params?: { search?: string; skip?: number; limit?: number },
+    options?: { tenantScopeId?: string }
+  ): Promise<Doctor[]> => {
     try {
-      const response = await api.get('/doctors', { params: { skip: 0, limit: 100, ...params } });
+      const headers =
+        options?.tenantScopeId != null && options.tenantScopeId !== ''
+          ? { 'X-Tenant-ID': options.tenantScopeId }
+          : undefined;
+      const response = await api.get('/doctors', {
+        params: { skip: 0, limit: 100, ...params },
+        headers,
+      });
       // Debug log in development
       if (import.meta.env.DEV) {
         console.log('[doctorsApi.getAll] Response:', response.data);

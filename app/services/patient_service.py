@@ -193,6 +193,9 @@ def authorize_patient_access(
     if current_user.role in (UserRole.admin, UserRole.staff):
         return
 
+    if current_user.role == UserRole.doctor and current_user.is_owner:
+        return
+
     if current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
@@ -256,7 +259,9 @@ def get_patients(
 
     linked_doctor_id: UUID | None = None
     doctor_created_by_user_id: UUID | None = None
-    if current_user.role == UserRole.doctor:
+    if current_user.role == UserRole.doctor and current_user.is_owner:
+        pass
+    elif current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )

@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { roleFromToken } from '../../utils/jwtPayload';
-import { isAdminRole, staffHomePath } from '../../utils/roles';
+import { canAccessAdminUI, staffHomePath } from '../../utils/roles';
 
 interface AdminRouteProps {
   user: User | null;
@@ -11,7 +11,7 @@ interface AdminRouteProps {
 /** Only `admin` and `super_admin` may access wrapped routes. */
 export function AdminRoute({ user, children }: AdminRouteProps) {
   const role = user?.role ?? roleFromToken(localStorage.getItem('token'));
-  if (!isAdminRole(role)) {
+  if (!canAccessAdminUI(role, user)) {
     return <Navigate to={staffHomePath()} replace />;
   }
   return <>{children}</>;

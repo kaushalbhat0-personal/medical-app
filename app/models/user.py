@@ -51,6 +51,12 @@ class User(Base):
         default=UserRole.admin,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_owner: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
     force_password_reset: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

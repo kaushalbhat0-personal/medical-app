@@ -28,6 +28,10 @@ class DoctorRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    user_id: UUID | None = Field(
+        default=None,
+        description="Linked login user id; required to promote doctor to admin",
+    )
     name: str
     specialization: str
     experience_years: int

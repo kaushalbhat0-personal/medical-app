@@ -14,6 +14,7 @@ from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
+from app.core.permissions import has_tenant_admin_privileges
 from app.services.exceptions import ForbiddenError, ValidationError
 
 
@@ -105,11 +106,7 @@ def get_dashboard_stats_for_tenant(db: Session, tenant_id: UUID) -> dict:
 
 
 def authorize_admin_dashboard_access(current_user: User) -> None:
-    if current_user.role not in (
-        UserRole.admin,
-        UserRole.super_admin,
-        UserRole.staff,
-    ):
+    if not has_tenant_admin_privileges(current_user):
         raise ForbiddenError("Admin access required")
 
 

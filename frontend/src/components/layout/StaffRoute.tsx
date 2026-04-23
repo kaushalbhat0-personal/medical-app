@@ -1,7 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { roleFromToken } from '../../utils/jwtPayload';
-import { doctorHomePath, isDoctorRole, isPatientRole, patientHomePath } from '../../utils/roles';
+import {
+  canAccessAdminUI,
+  doctorHomePath,
+  isDoctorRole,
+  isPatientRole,
+  patientHomePath,
+} from '../../utils/roles';
 import { SuperAdminTenantGate } from './SuperAdminTenantGate';
 
 interface StaffRouteProps {
@@ -15,7 +21,7 @@ export function StaffRoute({ user, children }: StaffRouteProps) {
   if (isPatientRole(role)) {
     return <Navigate to={patientHomePath()} replace />;
   }
-  if (isDoctorRole(role)) {
+  if (isDoctorRole(role) && !canAccessAdminUI(role, user)) {
     return <Navigate to={doctorHomePath()} replace />;
   }
   return <SuperAdminTenantGate user={user}>{children}</SuperAdminTenantGate>;

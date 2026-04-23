@@ -15,7 +15,7 @@ import {
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { isAdminRole, isPatientRole, isSuperAdminRole } from '../../utils/roles';
+import { canAccessAdminUI, isPatientRole, isSuperAdminRole } from '../../utils/roles';
 import { NavItem } from './NavItem';
 
 interface SidebarProps {
@@ -42,7 +42,7 @@ const patientFallbackNavItems = [
 
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const staffNavItems = useMemo(() => {
-    if (!isAdminRole(user?.role)) return staffNavBase;
+    if (!canAccessAdminUI(user?.role, user)) return staffNavBase;
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };

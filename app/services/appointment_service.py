@@ -111,7 +111,9 @@ def authorize_appointment_create(
     if current_user.role == UserRole.super_admin:
         return
 
-    if current_user.role in (UserRole.admin, UserRole.staff):
+    if current_user.role in (UserRole.admin, UserRole.staff) or (
+        current_user.role == UserRole.doctor and current_user.is_owner
+    ):
         if tenant_id is not None:
             doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
             assert_authorized(
@@ -345,7 +347,9 @@ def get_appointments(
     eff_patient_id = patient_id
     eff_tenant_id = tenant_id
 
-    if current_user.role == UserRole.doctor:
+    if current_user.role == UserRole.doctor and current_user.is_owner:
+        pass
+    elif current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
@@ -390,6 +394,9 @@ def authorize_appointment_access(
     )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        return
+
+    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.doctor:

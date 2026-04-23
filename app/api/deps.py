@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -16,7 +16,8 @@ from app.crud import crud_user
 from app.models.doctor import Doctor
 from app.models.user import User
 from app.services import doctor_service
-from app.services.exceptions import ValidationError
+from app.services.exceptions import ForbiddenError, ValidationError
+from app.core.permissions import require_admin_or_owner
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(
@@ -201,3 +202,18 @@ def get_current_tenant_context_active(
 ) -> CurrentTenantContext:
     tenant_id = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
     return CurrentTenantContext(user=current_user, tenant_id=tenant_id)
+
+
+def require_current_user_admin_or_owner(
+    db: Session = Depends(get_db),
+    tenant_id: UUID = Depends(get_scoped_tenant_id_active),
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """FastAPI guard: org admin, staff, super_admin, or practice owner in ``tenant_id``."""
+    try:
+        require_admin_or_owner(db, current_user, tenant_id)
+    except ForbiddenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=str(e)
+        ) from e
+    return current_user
