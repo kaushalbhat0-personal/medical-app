@@ -1,13 +1,18 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useAppointments, usePatients } from '../../hooks';
+import { useAppointments, useModalFocusTrap, usePatients } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { useAppMode } from '../../contexts/AppModeContext';
 import { useAuth } from '../../hooks/useAuth';
-import { isDoctorOnlyRole } from '../../utils/roles';
+import { isDoctorOnlyRole, normalizeRoles } from '../../utils/roles';
 import { ErrorState } from '../../components/common';
+import { tenantsApi } from '../../services/tenants';
 import type { Appointment } from '../../types';
 import { UserPlus, CalendarPlus, Receipt, Building2 } from 'lucide-react';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
@@ -17,6 +22,26 @@ import {
   formatSlotTimeWithZoneLabel,
   slotInstantUtcMs,
 } from '../../utils/doctorSchedule';
+
+function apiErrorMessage(e: unknown, fallback: string): string {
+  if (!axios.isAxiosError(e) || !e.response?.data || typeof e.response.data !== 'object') {
+    return fallback;
+  }
+  const d = (e.response.data as { detail?: unknown }).detail;
+  if (d == null) return fallback;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    return d
+      .map((item) => {
+        if (item && typeof item === 'object' && 'msg' in item) {
+          return String((item as { msg: unknown }).msg);
+        }
+        return JSON.stringify(item);
+      })
+      .join(' ');
+  }
+  return String(d);
+}
 
 function isAppointmentToday(a: Appointment): boolean {
   const t = a.appointment_time || a.scheduled_at;
@@ -28,12 +53,64 @@ function isAppointmentToday(a: Appointment): boolean {
 
 export function DoctorHome() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isIndependent, selfDoctor, tenantDoctorCount, loading: workspaceLoading } =
+  const { user, patchUser, refreshUser } = useAuth();
+  const { setMode } = useAppMode();
+  const { isIndependent, selfDoctor, loading: workspaceLoading, refetch: refetchWorkspace } =
     useDoctorWorkspace();
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
-  const showGrowPractice =
-    isDoctorOnlyRole(user, token) && tenantDoctorCount === 1 && !workspaceLoading;
+  const userRoles = user?.roles;
+  const isRolesOnlyDoctor =
+    Array.isArray(userRoles) &&
+    userRoles.length === 1 &&
+    normalizeRoles(userRoles)[0] === 'doctor';
+  const showUpgradeToClinic =
+    isRolesOnlyDoctor &&
+    isDoctorOnlyRole(user, token) &&
+    selfDoctor?.tenant_type === 'individual' &&
+    !workspaceLoading;
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [clinicName, setClinicName] = useState('');
+  const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const upgradeDialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(upgradeDialogRef, upgradeOpen);
+  const openUpgrade = useCallback(() => {
+    setUpgradeError(null);
+    setClinicName('');
+    setUpgradeOpen(true);
+  }, []);
+  const closeUpgrade = useCallback(() => {
+    if (upgradeSubmitting) return;
+    setUpgradeOpen(false);
+    setUpgradeError(null);
+  }, [upgradeSubmitting]);
+  const confirmUpgrade = useCallback(async () => {
+    const name = clinicName.trim();
+    if (!name) {
+      setUpgradeError('Enter a clinic name');
+      return;
+    }
+    setUpgradeSubmitting(true);
+    setUpgradeError(null);
+    try {
+      const data = await tenantsApi.upgradeToOrganization({ clinic_name: name });
+      patchUser({
+        roles: data.roles,
+        is_owner: true,
+      });
+      setMode('admin');
+      await refreshUser();
+      void refetchWorkspace();
+      setUpgradeOpen(false);
+      setClinicName('');
+      toast("You're now running a clinic 🎉", { icon: '✨', duration: 4500 });
+      navigate('/admin/dashboard', { replace: true });
+    } catch (e) {
+      setUpgradeError(apiErrorMessage(e, 'Could not upgrade your practice'));
+    } finally {
+      setUpgradeSubmitting(false);
+    }
+  }, [clinicName, navigate, patchUser, refreshUser, refetchWorkspace, setMode]);
   const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments();
   const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients();
 
@@ -78,7 +155,7 @@ export function DoctorHome() {
         </p>
       </div>
 
-      {showGrowPractice && (
+      {showUpgradeToClinic && (
         <Card className="border-primary/20 bg-gradient-to-r from-sky-50/80 to-emerald-50/50 dark:from-sky-950/30 dark:to-emerald-950/20">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <div className="flex gap-3">
@@ -88,15 +165,74 @@ export function DoctorHome() {
               <div>
                 <CardTitle className="text-base">Grow your practice</CardTitle>
                 <CardDescription className="text-sm leading-relaxed max-w-prose">
-                  Add more doctors, manage staff, and scale your clinic.
+                  Add more doctors, manage staff, and run your clinic.
                 </CardDescription>
               </div>
             </div>
-            <Button type="button" onClick={() => navigate('/onboarding/clinic')}>
-              Create Clinic
+            <Button type="button" onClick={openUpgrade} disabled={workspaceLoading}>
+              Upgrade to Clinic
             </Button>
           </CardHeader>
         </Card>
+      )}
+
+      {upgradeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={closeUpgrade}
+        >
+          <div
+            ref={upgradeDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-clinic-title"
+            className="w-full max-w-md rounded-xl border border-border bg-card text-foreground shadow-lg outline-none p-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-border px-4 py-3">
+              <h2 id="upgrade-clinic-title" className="text-lg font-semibold">
+                Upgrade to Clinic
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                This turns your individual practice into a clinic organization. You can invite staff
+                and add more doctors.
+              </p>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              {upgradeError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {upgradeError}
+                </p>
+              )}
+              <div>
+                <label htmlFor="clinic-name" className="text-xs font-medium text-muted-foreground">
+                  Clinic name
+                </label>
+                <Input
+                  id="clinic-name"
+                  className="mt-1"
+                  value={clinicName}
+                  onChange={(e) => {
+                    setClinicName(e.target.value);
+                    if (upgradeError) setUpgradeError(null);
+                  }}
+                  disabled={upgradeSubmitting}
+                  placeholder="e.g. City Care Clinic"
+                  autoComplete="organization"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+              <Button type="button" variant="outline" onClick={closeUpgrade} disabled={upgradeSubmitting}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void confirmUpgrade()} disabled={upgradeSubmitting}>
+                {upgradeSubmitting ? 'Upgrading…' : 'Confirm Upgrade'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {isIndependent && (

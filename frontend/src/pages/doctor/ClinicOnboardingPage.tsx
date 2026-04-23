@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Building2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
@@ -41,9 +41,12 @@ export function ClinicOnboardingPage() {
               organization. When multi-seat clinic creation is available, you will complete it from
               this page.
             </p>
-            <Button asChild className="w-full sm:w-auto">
-              <Link to="/doctor/doctors">View doctors in your organization</Link>
-            </Button>
+            <Link
+              to="/doctor/doctors"
+              className={cn(buttonVariants({ variant: 'default' }), 'w-full sm:w-auto inline-flex')}
+            >
+              View doctors in your organization
+            </Link>
           </CardContent>
         </Card>
       </div>

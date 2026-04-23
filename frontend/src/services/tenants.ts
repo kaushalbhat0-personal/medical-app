@@ -20,4 +20,19 @@ export const tenantsApi = {
     const response = await api.post('/tenants', payload);
     return response.data as Tenant;
   },
+
+  /**
+   * Solo individual practice → organization; same tenant id; user becomes org admin.
+   * Response includes updated tenant and effective application roles.
+   */
+  upgradeToOrganization: async (payload: { clinic_name: string }): Promise<{
+    tenant: Tenant;
+    roles: string[];
+  }> => {
+    const { data } = await api.post<{
+      tenant: Tenant;
+      roles: string[];
+    }>('/tenants/upgrade-to-organization', { clinic_name: payload.clinic_name });
+    return data;
+  },
 };
