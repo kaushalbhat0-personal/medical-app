@@ -3,6 +3,9 @@ import { roleFromToken, rolesFromToken, tenantIdFromToken } from './jwtPayload';
 /** Canonical localStorage key for the org switcher (super admin) and aligned tenant header for staff. */
 export const ACTIVE_TENANT_ID_STORAGE_KEY = 'activeTenantId';
 
+/** Alias used by some clients; always kept in sync with `activeTenantId` when set. */
+export const ACTIVE_TENANT_ID_ALIAS_KEY = 'active_tenant_id';
+
 /** @deprecated Legacy key; still read for migration */
 const TENANT_ID_LEGACY_STORAGE_KEY = 'tenant_id';
 
@@ -17,15 +20,39 @@ export const TENANT_ID_STORAGE_KEY = ACTIVE_TENANT_ID_STORAGE_KEY;
 
 export function getActiveTenantId(): string | null {
   const primary = localStorage.getItem(ACTIVE_TENANT_ID_STORAGE_KEY)?.trim();
-  if (primary) return primary;
+  if (primary) {
+    if (localStorage.getItem(ACTIVE_TENANT_ID_ALIAS_KEY) !== primary) {
+      try {
+        localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, primary);
+      } catch {
+        // ignore
+      }
+    }
+    return primary;
+  }
+  const alias = localStorage.getItem(ACTIVE_TENANT_ID_ALIAS_KEY)?.trim();
+  if (alias) {
+    localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, alias);
+    return alias;
+  }
   const legacy = localStorage.getItem(TENANT_ID_LEGACY_STORAGE_KEY)?.trim();
   if (legacy) {
     localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, legacy);
+    try {
+      localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, legacy);
+    } catch {
+      // ignore
+    }
     return legacy;
   }
   const adminPick = localStorage.getItem(ADMIN_SELECTED_TENANT_STORAGE_KEY)?.trim();
   if (adminPick) {
     localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, adminPick);
+    try {
+      localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, adminPick);
+    } catch {
+      // ignore
+    }
     return adminPick;
   }
   return null;
@@ -34,6 +61,11 @@ export function getActiveTenantId(): string | null {
 export function setActiveTenantId(tenantId: string): void {
   const id = tenantId.trim();
   localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, id);
+  try {
+    localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, id);
+  } catch {
+    // ignore
+  }
   localStorage.removeItem(TENANT_ID_LEGACY_STORAGE_KEY);
   localStorage.removeItem(ADMIN_SELECTED_TENANT_STORAGE_KEY);
   window.dispatchEvent(new Event(TENANT_ID_STORAGE_EVENT));

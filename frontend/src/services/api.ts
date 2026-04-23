@@ -57,7 +57,7 @@ api.interceptors.request.use(
     }
 
     if (config.headers) {
-      // Multi-tenant scope: org + practice vs admin listing (server enforces RBAC, not the header alone).
+      // Multi-tenant: X-Tenant-ID = active org; X-Data-Scope = doctor (practice) vs tenant (admin).
       const hasExplicit = config.headers['X-Tenant-ID'] != null;
       if (!hasExplicit) {
         const activeTenantId = getActiveTenantId();
@@ -137,6 +137,11 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('activeTenantId');
+        try {
+          localStorage.removeItem('active_tenant_id');
+        } catch {
+          /* ignore */
+        }
         localStorage.removeItem('tenant_id');
         localStorage.removeItem('adminSelectedTenantId');
         toast.error('Session expired. Please log in again.');

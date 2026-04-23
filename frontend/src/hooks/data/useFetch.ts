@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { APP_MODE_CHANGE_EVENT } from '../../constants/appMode';
 import { TENANT_ID_STORAGE_EVENT } from '../../utils/tenantIdForRequest';
 
 /**
@@ -62,6 +63,14 @@ export function useFetch<T>(
     };
     window.addEventListener(TENANT_ID_STORAGE_EVENT, onTenantScopeChange);
     return () => window.removeEventListener(TENANT_ID_STORAGE_EVENT, onTenantScopeChange);
+  }, [fetchData]);
+
+  useEffect(() => {
+    const onAppModeChange = () => {
+      void fetchData(true);
+    };
+    window.addEventListener(APP_MODE_CHANGE_EVENT, onAppModeChange);
+    return () => window.removeEventListener(APP_MODE_CHANGE_EVENT, onAppModeChange);
   }, [fetchData]);
 
   return { data, loading, refetching, error, refetch: () => fetchData(true) };

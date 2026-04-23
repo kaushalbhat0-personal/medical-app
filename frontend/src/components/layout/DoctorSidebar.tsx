@@ -1,4 +1,4 @@
-import { X, Stethoscope, UserRound, Home, Calendar, Receipt, Package, Clock, Users } from 'lucide-react';
+import { X, Stethoscope, UserRound, Home, Calendar, Receipt, Clock, Users } from 'lucide-react';
 import type { User } from '../../types';
 import { NavItem } from './NavItem';
 
@@ -8,11 +8,7 @@ const doctorCore = [
   { path: '/doctor/appointments', label: 'Appointments', icon: Calendar },
   { path: '/doctor/patients', label: 'Patients', icon: Users },
 ] as const;
-const moreLinks = [
-  { path: '/doctor/doctors', label: 'Doctors', icon: Stethoscope },
-  { path: '/doctor/bills', label: 'Bills', icon: Receipt },
-  { path: '/doctor/inventory', label: 'Inventory', icon: Package },
-] as const;
+const moreLinks = [{ path: '/doctor/bills', label: 'Bills', icon: Receipt }] as const;
 
 const links = [overview, ...doctorCore, ...moreLinks] as const;
 

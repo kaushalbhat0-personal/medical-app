@@ -6,14 +6,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePatients, useModalFocusTrap } from '../../hooks';
+import { useAuth } from '../../hooks/useAuth';
+import { useAppMode } from '../../contexts/AppModeContext';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { getActiveTenantId } from '../../utils/tenantIdForRequest';
-import { APP_MODE_STORAGE_KEY } from '../../constants/appMode';
 import { ErrorState, EmptyState } from '../../components/common';
 import { patientsApi } from '../../services';
 import { UserPlus } from 'lucide-react';
 
 export function DoctorPatientsPage() {
+  const { user } = useAuth();
+  const { resolvedMode } = useAppMode();
   const { isIndependent, isReadOnly, selfDoctor } = useDoctorWorkspace();
   const { patients, loading, error, refetch } = usePatients();
   const location = useLocation();
@@ -117,14 +120,8 @@ export function DoctorPatientsPage() {
 
       {!loading && patients.length === 0 && (
         <EmptyState
-          title="No patients yet"
-          description={(() => {
-            const mode = typeof window !== 'undefined' ? localStorage.getItem(APP_MODE_STORAGE_KEY) : null;
-            const dataScope = mode === 'practice' ? 'doctor' : 'tenant';
-            const tid = getActiveTenantId();
-            const did = selfDoctor?.id != null ? String(selfDoctor.id) : 'n/a';
-            return `No patients found for doctor_id ${did} / tenant_id ${tid ?? 'none'} (X-Data-Scope ${dataScope}). Book a visit or add a patient.`;
-          })()}
+          title="No patients found"
+          description={`scope: ${resolvedMode} · tenant: ${getActiveTenantId() ?? 'none'} · doctor: ${user?.doctor_id ?? (selfDoctor?.id != null ? String(selfDoctor.id) : 'none')}. Book a visit or add a patient when your practice allows it.`}
         />
       )}
 

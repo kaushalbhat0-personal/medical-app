@@ -50,6 +50,8 @@ class UserRead(BaseModel):
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None
+    """Primary doctor row for this user when one is linked (SSOT for X-Data-Scope doctor context)."""
+    doctor_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 

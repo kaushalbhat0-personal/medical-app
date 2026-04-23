@@ -7,8 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { APP_MODE_CHANGE_EVENT } from '../constants/appMode';
 import { useAuth } from '../hooks/useAuth';
 import { doctorsApi } from '../services';
+import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
 import type { Doctor } from '../types';
 
 function resolveSelfDoctorFromList(
@@ -67,6 +69,18 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const onScope = () => {
+      void load();
+    };
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, onScope);
+    window.addEventListener(APP_MODE_CHANGE_EVENT, onScope);
+    return () => {
+      window.removeEventListener(TENANT_ID_STORAGE_EVENT, onScope);
+      window.removeEventListener(APP_MODE_CHANGE_EVENT, onScope);
+    };
   }, [load]);
 
   const profilePartial = !loading && !error && selfDoctor === null;

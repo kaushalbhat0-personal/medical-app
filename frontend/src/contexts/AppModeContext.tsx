@@ -9,14 +9,14 @@ import {
 } from 'react';
 import type { User } from '../types';
 import { getEffectiveRoles, normalizeRoles } from '../utils/roles';
-import { type AppMode, readStoredAppMode, writeStoredAppMode } from '../constants/appMode';
+import {
+  APP_MODE_STORAGE_KEY,
+  type AppMode,
+  readStoredAppMode,
+  writeStoredAppMode,
+  dispatchAppModeChangeEvent,
+} from '../constants/appMode';
 import { useAuth } from '../hooks/useAuth';
-
-const MODE_EVENT = 'app_mode_changed';
-
-function dispatchModeEvent(): void {
-  window.dispatchEvent(new Event(MODE_EVENT));
-}
 
 export interface AppModeContextValue {
   isDualModeUser: boolean;
@@ -73,7 +73,7 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback((m: AppMode) => {
     setModeState(m);
     writeStoredAppMode(m);
-    dispatchModeEvent();
+    dispatchAppModeChangeEvent();
   }, []);
 
   const resolvedMode: AppMode = useMemo(() => {
@@ -91,6 +91,19 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
       document.documentElement.removeAttribute('data-app-mode');
     };
   }, [resolvedMode]);
+
+  // Persist canonical mode for API headers (X-Data-Scope). No global event: avoids refetch storm on init.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    try {
+      const current = readStoredAppMode();
+      if (current !== resolvedMode) {
+        localStorage.setItem(APP_MODE_STORAGE_KEY, resolvedMode);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isAuthenticated, resolvedMode]);
 
   const value = useMemo<AppModeContextValue>(
     () => ({
@@ -115,4 +128,4 @@ export function useAppMode(): AppModeContextValue {
   return ctx;
 }
 
-export { MODE_EVENT };
+export { APP_MODE_CHANGE_EVENT } from '../constants/appMode';

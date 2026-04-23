@@ -9,6 +9,8 @@ export interface User {
   is_owner?: boolean;
   /** Primary tenant from login / JWT when applicable */
   tenant_id?: string | null;
+  /** Linked doctor row (GET /me); use for doctor-scoped UI and params. */
+  doctor_id?: string | null;
   /** When true, client must complete password reset before using the app */
   force_password_reset?: boolean;
 }
@@ -22,6 +24,7 @@ export interface MeUserResponse {
   is_active: boolean;
   is_owner: boolean;
   tenant_id: string | null;
+  doctor_id: string | null;
   created_at: string;
   updated_at: string;
 }

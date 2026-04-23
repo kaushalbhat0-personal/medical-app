@@ -20,7 +20,7 @@ import { authApi, formatLoginError, patientsApi } from '../services';
 import { isOwnerFromToken, roleFromToken, rolesFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
 import { getEffectiveRoles, isPatientRole, mergeRoleSources } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
-import { setActiveTenantId } from '../utils/tenantIdForRequest';
+import { ACTIVE_TENANT_ID_ALIAS_KEY, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { clearStoredAppMode } from '../constants/appMode';
 
 interface AuthContextValue {
@@ -276,6 +276,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPatientId(null);
         setPatientProfileError(null);
         setPatientProfileLoading(false);
+        void authApi
+          .getMe()
+          .then((me) => {
+            patchUser({
+              doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
+            });
+          })
+          .catch(() => {});
       }
       return {
         success: true,
@@ -289,7 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [loadPatientProfile]);
+  }, [loadPatientProfile, patchUser]);
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResult> => {
     setIsLoading(true);
@@ -327,6 +335,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setPatientId(null);
           setPatientProfileError(null);
           setPatientProfileLoading(false);
+          void authApi
+            .getMe()
+            .then((me) => {
+              patchUser({
+                doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
+              });
+            })
+            .catch(() => {});
         }
 
         return {
@@ -346,13 +362,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [loadPatientProfile]);
+  }, [loadPatientProfile, patchUser]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     clearStoredAppMode();
     localStorage.removeItem('activeTenantId');
+    try {
+      localStorage.removeItem(ACTIVE_TENANT_ID_ALIAS_KEY);
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem('tenant_id');
     localStorage.removeItem('adminSelectedTenantId');
     setIsAuthenticated(false);
@@ -383,6 +404,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           roles: me.roles?.length ? me.roles : [me.role],
           is_owner: me.is_owner,
           tenant_id: me.tenant_id ?? undefined,
+          doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
         };
         if (prev?.force_password_reset !== undefined) {
           next.force_password_reset = prev.force_password_reset;

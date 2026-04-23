@@ -192,7 +192,9 @@ export function DoctorAppointmentsPage() {
                 bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
                 doctorTimeZone={DISPLAY_TIMEZONE}
-                onBooked={() => void refetch()}
+                onBooked={async () => {
+                  await refetch();
+                }}
               />
             </CardContent>
           </Card>

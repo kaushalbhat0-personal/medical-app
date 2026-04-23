@@ -9,8 +9,9 @@ import { createPatientHandler } from '../handlers';
 import { patientsApi } from '../services';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
+import { useAuth } from '../hooks/useAuth';
+import { useAppMode } from '../contexts/AppModeContext';
 import { getActiveTenantId } from '../utils/tenantIdForRequest';
-import { APP_MODE_STORAGE_KEY } from '../constants/appMode';
 import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card as CommonCard, Input } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
 export function Patients() {
+  const { user } = useAuth();
+  const { resolvedMode } = useAppMode();
   const location = useLocation();
 
   // Search state with debounce
@@ -142,13 +145,8 @@ export function Patients() {
 
       {!error && isEmpty && (
         <EmptyState
-          title="No data available"
-          description={(() => {
-            const mode = typeof window !== 'undefined' ? localStorage.getItem(APP_MODE_STORAGE_KEY) : null;
-            const dataScope = mode === 'practice' ? 'doctor' : 'tenant';
-            const tid = getActiveTenantId();
-            return `There are no patients to display at the moment. (No patients for tenant_id ${tid ?? 'none'} / X-Data-Scope ${dataScope})`;
-          })()}
+          title="No patients found"
+          description={`scope: ${resolvedMode} · tenant: ${getActiveTenantId() ?? 'none'} · doctor: ${user?.doctor_id ?? 'none'}`}
         />
       )}
       {/* Header */}

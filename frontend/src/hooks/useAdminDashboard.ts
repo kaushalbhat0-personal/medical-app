@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { APP_MODE_CHANGE_EVENT } from '../constants/appMode';
 import { dashboardApi } from '../services';
 import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
 import type {
@@ -67,11 +68,15 @@ export function useAdminDashboard(): UseAdminDashboardResult {
   }, [load]);
 
   useEffect(() => {
-    const onTenantChange = () => {
+    const onScopeChange = () => {
       void load();
     };
-    window.addEventListener(TENANT_ID_STORAGE_EVENT, onTenantChange);
-    return () => window.removeEventListener(TENANT_ID_STORAGE_EVENT, onTenantChange);
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, onScopeChange);
+    window.addEventListener(APP_MODE_CHANGE_EVENT, onScopeChange);
+    return () => {
+      window.removeEventListener(TENANT_ID_STORAGE_EVENT, onScopeChange);
+      window.removeEventListener(APP_MODE_CHANGE_EVENT, onScopeChange);
+    };
   }, [load]);
 
   return {

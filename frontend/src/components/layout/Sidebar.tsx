@@ -44,6 +44,7 @@ const patientFallbackNavItems = [
 
 const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/patients', label: 'Patients', icon: Users },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope },
   { path: '/admin/inventory', label: 'Inventory', icon: Package },
   { path: '/dashboard', label: 'Reports', icon: BarChart3 },
