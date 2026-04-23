@@ -44,7 +44,7 @@ export function SignupPatient() {
     });
     if (result.success) {
       toast.success('Account created');
-      navigate(postLoginHomePath(result.role));
+      navigate(postLoginHomePath(result.roles ?? ['patient']));
     } else {
       toast.error(result.error || 'Signup failed');
     }

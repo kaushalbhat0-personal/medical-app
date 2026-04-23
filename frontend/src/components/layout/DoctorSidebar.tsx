@@ -2,15 +2,19 @@ import { X, Stethoscope, UserRound, Home, Calendar, Receipt, Package, Clock, Use
 import type { User } from '../../types';
 import { NavItem } from './NavItem';
 
-const links = [
-  { path: '/doctor/home', label: 'Overview', icon: Home },
-  { path: '/doctor/doctors', label: 'Doctors', icon: Stethoscope },
-  { path: '/doctor/patients', label: 'Patients', icon: Users },
+const overview = { path: '/doctor/home', label: 'Overview', icon: Home };
+const doctorCore = [
+  { path: '/doctor/availability', label: 'Availability', icon: Clock },
   { path: '/doctor/appointments', label: 'Appointments', icon: Calendar },
+  { path: '/doctor/patients', label: 'Patients', icon: Users },
+] as const;
+const moreLinks = [
+  { path: '/doctor/doctors', label: 'Doctors', icon: Stethoscope },
   { path: '/doctor/bills', label: 'Bills', icon: Receipt },
   { path: '/doctor/inventory', label: 'Inventory', icon: Package },
-  { path: '/doctor/availability', label: 'Availability', icon: Clock },
 ] as const;
+
+const links = [overview, ...doctorCore, ...moreLinks] as const;
 
 interface DoctorSidebarProps {
   user: User | null;

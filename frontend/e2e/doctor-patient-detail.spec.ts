@@ -60,21 +60,20 @@ test.describe('Doctor patient detail page', () => {
     await expect(page.getByText('Access denied').first()).toBeVisible({ timeout: 20_000 });
   });
 
-  test('deep link from patient opens appointment in schedule with hash and target visible', async ({
-    page,
-  }) => {
+  test('visit link from patient opens appointment detail route', async ({ page }) => {
     const c = loadCreds();
     await loginAsDoctor(page, c.doctorEmail, c.doctorPassword);
 
     await page.goto(`/doctor/patients/${c.doctorLinkedPatientId}`);
 
-    await page.getByRole('link', { name: 'Open in schedule' }).first().click();
+    await page.getByRole('link', { name: 'View visit' }).first().click();
     await expect(page).toHaveURL(
-      new RegExp(`/doctor/appointments#appt-${c.doctorLinkedAppointmentId}$`)
+      new RegExp(`/doctor/appointments/${c.doctorLinkedAppointmentId}$`)
     );
-    const card = page.locator(`#appt-${c.doctorLinkedAppointmentId}`);
-    await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card).toBeInViewport();
-    await expect(card).toHaveClass(/ring-2/);
+    await expect(page.getByRole('heading', { name: 'Visit', level: 1 })).toBeVisible({
+      timeout: 15_000,
+    });
+    const target = page.locator(`#appt-${c.doctorLinkedAppointmentId}`);
+    await expect(target).toBeVisible();
   });
 });

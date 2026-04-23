@@ -11,25 +11,28 @@ from app.models.user import User, UserRole
 from app.schemas.auth import ResetPasswordRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services import auth_service
+from app.services.user_roles_service import compute_roles_for_user, user_response_with_roles
 
 router = APIRouter(tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
-def _build_token_payload(user) -> dict:
+def _build_token_payload(user, db: Session) -> dict:
     """
     Build the JWT payload used by the frontend to determine:
     - **who** the user is (`sub`)
-    - **what** the user can see (`role`)
+    - **what** the user can see (`role`, `roles`)
     - **which tenant** to scope requests to (`tenant_id`, when applicable)
 
     ``super_admin`` has no fixed tenant (client sends ``X-Tenant-ID`` per request).
     Otherwise we prefer ``users.tenant_id``, then legacy ``user_tenant`` primary row.
     """
+    eff_roles = compute_roles_for_user(db, user)
     payload = {
         "sub": str(user.id),
         "type": "access",
         "role": user.role.value if user.role else "admin",
+        "roles": eff_roles,
         "tenant_id": None,
         "is_owner": user.is_owner,
     }
@@ -51,11 +54,11 @@ def _build_token_payload(user) -> dict:
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
     """Create a new user and return an access token for immediate sign-in."""
     user = auth_service.register_user(db, payload)
-    access_token = create_access_token(_build_token_payload(user))
+    access_token = create_access_token(_build_token_payload(user, db))
     return Token(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse.model_validate(user)
+        user=user_response_with_roles(db, user),
     )
 
 
@@ -70,12 +73,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = auth_service.authenticate_user(db, form_data.username, form_data.password)
     if user.force_password_reset:
         logger.warning("[PASSWORD RESET REQUIRED] user_id=%s", user.id)
-    token_payload = _build_token_payload(user)
+    token_payload = _build_token_payload(user, db)
     access_token = create_access_token(token_payload)
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "role": token_payload["role"],
+        "roles": token_payload["roles"],
         "tenant_id": token_payload["tenant_id"],
         "is_owner": user.is_owner,
         "force_password_reset": user.force_password_reset,

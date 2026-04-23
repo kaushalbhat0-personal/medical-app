@@ -13,11 +13,17 @@ export interface AppointmentFilters {
   doctor_id?: string;
   patient_id?: string;
   status?: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  /** `past` = completed + cancelled; `upcoming` = scheduled (server). */
+  type?: 'past' | 'upcoming';
   skip?: number;
   limit?: number;
 }
 
 export const appointmentsApi = {
+  getById: async (id: string): Promise<Appointment> => {
+    const response = await api.get<Appointment>(`/appointments/${id}`);
+    return response.data;
+  },
   getAll: async (filters?: AppointmentFilters): Promise<Appointment[]> => {
     try {
       const params: Record<string, string | number | undefined> = {

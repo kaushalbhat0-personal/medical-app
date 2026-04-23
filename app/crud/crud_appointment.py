@@ -112,16 +112,32 @@ def get_appointments(
     created_by: UUID | None = None,
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
+    list_type: str | None = None,
 ) -> list[Appointment]:
+    order_by: tuple = (Appointment.created_at.desc(),)
+    if list_type == "past":
+        order_by = (Appointment.appointment_time.desc(),)
+    elif list_type == "upcoming":
+        order_by = (Appointment.appointment_time.asc(),)
+
     stmt = (
         select(Appointment)
         .where(Appointment.is_deleted == False)
-        .order_by(Appointment.created_at.desc())
+        .order_by(*order_by)
         .options(
             joinedload(Appointment.patient),
             joinedload(Appointment.doctor),
         )
     )
+
+    if list_type == "past":
+        stmt = stmt.where(
+            Appointment.status.in_(
+                (AppointmentStatus.completed, AppointmentStatus.cancelled)
+            )
+        )
+    elif list_type == "upcoming":
+        stmt = stmt.where(Appointment.status == AppointmentStatus.scheduled)
 
     if doctor_id is not None:
         stmt = stmt.where(Appointment.doctor_id == doctor_id)

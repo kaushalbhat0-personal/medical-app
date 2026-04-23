@@ -44,7 +44,7 @@ export function Login({ onLogin }: LoginPageProps) {
             duration: 2000,
             icon: '👋',
           });
-          navigate(postLoginHomePath(result.role, { is_owner: result.is_owner }));
+          navigate(postLoginHomePath(result.roles ?? ['admin'], { is_owner: result.is_owner }));
         }
       } else {
         const errorMessage = result.error || 'Login failed. Please check your credentials and try again.';

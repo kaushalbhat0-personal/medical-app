@@ -1,32 +1,62 @@
 import { getActiveTenantId } from './tenantIdForRequest';
+import { roleFromToken, rolesFromToken } from './jwtPayload';
+import { readStoredAppMode, type AppMode } from '../constants/appMode';
 
-/** Backend sends role enum as lowercase string (e.g. patient, admin, doctor). */
-export function isPatientRole(role: string | null | undefined): boolean {
-  return role?.toLowerCase() === 'patient';
+export function normalizeRoles(roles: string | string[] | null | undefined): string[] {
+  if (roles == null) return [];
+  if (Array.isArray(roles)) {
+    return roles.map((r) => String(r).toLowerCase());
+  }
+  return [String(roles).toLowerCase()];
 }
 
-export function isDoctorRole(role: string | null | undefined): boolean {
-  return role?.toLowerCase() === 'doctor';
+type RoleHint = { roles?: string[]; role?: string } | null | undefined;
+
+/**
+ * Authoritative list for the signed-in user: user blob first, then JWT.
+ */
+export function getEffectiveRoles(user: RoleHint, token: string | null): string[] {
+  if (user?.roles && user.roles.length > 0) {
+    return normalizeRoles(user.roles);
+  }
+  if (user?.role) {
+    return normalizeRoles([user.role]);
+  }
+  const fromToken = rolesFromToken(token);
+  if (fromToken && fromToken.length > 0) {
+    return normalizeRoles(fromToken);
+  }
+  const single = roleFromToken(token);
+  return single ? normalizeRoles([single]) : [];
+}
+
+/** Backend sends role enum as lowercase string (e.g. patient, admin, doctor). */
+export function isPatientRole(roles: string | string[] | null | undefined): boolean {
+  return normalizeRoles(roles).includes('patient');
+}
+
+export function isDoctorRole(roles: string | string[] | null | undefined): boolean {
+  return normalizeRoles(roles).includes('doctor');
 }
 
 /** Admin dashboard and admin-only APIs (admin or super_admin). */
-export function isAdminRole(role: string | null | undefined): boolean {
-  const r = role?.toLowerCase();
-  return r === 'admin' || r === 'super_admin';
+export function isAdminRole(roles: string | string[] | null | undefined): boolean {
+  return normalizeRoles(roles).some((r) => r === 'admin' || r === 'super_admin');
 }
 
 /** Admin dashboard, inventory, billing, settings — admin/super_admin or practice owner (solo doctor). */
 export function canAccessAdminUI(
-  role: string | null | undefined,
+  roles: string | string[] | null | undefined,
   user?: { is_owner?: boolean } | null
 ): boolean {
-  if (isAdminRole(role)) return true;
-  if (isDoctorRole(role) && user?.is_owner === true) return true;
+  const r = normalizeRoles(roles);
+  if (r.some((x) => x === 'admin' || x === 'super_admin')) return true;
+  if (r.includes('doctor') && user?.is_owner === true) return true;
   return false;
 }
 
-export function isSuperAdminRole(role: string | null | undefined): boolean {
-  return role?.toLowerCase() === 'super_admin';
+export function isSuperAdminRole(roles: string | string[] | null | undefined): boolean {
+  return normalizeRoles(roles).includes('super_admin');
 }
 
 export function staffHomePath(): string {
@@ -43,15 +73,22 @@ export function doctorHomePath(): string {
 
 /** Default landing path after login or post-registration, by role. */
 export function postLoginHomePath(
-  role: string | null | undefined,
+  roles: string | string[] | null | undefined,
   user?: { is_owner?: boolean } | null
 ): string {
-  if (isPatientRole(role)) return patientHomePath();
-  if (isDoctorRole(role) && user?.is_owner === true) {
+  const r = normalizeRoles(roles);
+  if (r.includes('patient')) return patientHomePath();
+  const hasDoc = r.includes('doctor');
+  const hasAdm = r.some((x) => x === 'admin' || x === 'super_admin');
+  if (hasDoc && hasAdm) {
+    const m: AppMode = readStoredAppMode() ?? 'practice';
+    return m === 'admin' ? '/admin/dashboard' : '/doctor/appointments';
+  }
+  if (r.includes('doctor') && user?.is_owner === true) {
     return '/admin/dashboard';
   }
-  if (isDoctorRole(role)) return doctorHomePath();
-  if (isSuperAdminRole(role)) {
+  if (r.includes('doctor')) return doctorHomePath();
+  if (r.includes('super_admin')) {
     return getActiveTenantId() ? '/admin/dashboard' : '/admin/tenants';
   }
   return staffHomePath();

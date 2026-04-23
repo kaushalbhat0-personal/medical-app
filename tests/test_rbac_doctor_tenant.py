@@ -16,7 +16,7 @@ from app.models.tenant import Tenant, TenantType
 from app.models.user import User, UserRole
 from app.schemas.billing import BillingCreate
 from app.services import billing_service, patient_service
-from app.services.exceptions import ForbiddenError
+from app.services.exceptions import ForbiddenError, ValidationError
 from tests.factories import create_doctor_profile, create_patient_profile, create_user
 
 
@@ -57,7 +57,7 @@ def _doctor_user_and_billing_for_tenant(
             "patient_id": patient.id,
             "doctor_id": doctor.id,
             "appointment_time": datetime.now(timezone.utc) + timedelta(hours=2),
-            "status": AppointmentStatus.scheduled,
+            "status": AppointmentStatus.completed,
             "created_by": pat_user.id,
             "tenant_id": tenant.id,
         },
@@ -274,7 +274,7 @@ def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
             "patient_id": patient.id,
             "doctor_id": doctor.id,
             "appointment_time": datetime.now(timezone.utc) + timedelta(hours=2),
-            "status": AppointmentStatus.scheduled,
+            "status": AppointmentStatus.completed,
             "created_by": pat_user.id,
             "tenant_id": tenant.id,
         },
@@ -289,4 +289,66 @@ def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
     with pytest.raises(ForbiddenError, match="Doctor profile not found for this user"):
         billing_service.authorize_bill_create(
             db_session, billing_in, doc_user_no_profile, tenant_id=tenant.id
+        )
+
+
+def test_doctor_create_bill_persists_for_completed_appointment(
+    db_session: Session,
+) -> None:
+    tenant = _tenant(db_session, TenantType.clinic)
+    doc_user, billing_in = _doctor_user_and_billing_for_tenant(
+        db_session, tenant, "ccreate"
+    )
+    bill = billing_service.create_bill(
+        db_session, billing_in, doc_user, tenant_id=tenant.id
+    )
+    assert bill.appointment_id == billing_in.appointment_id
+    assert bill.patient_id == billing_in.patient_id
+
+
+def test_doctor_create_bill_rejects_scheduled_appointment(
+    db_session: Session,
+) -> None:
+    tenant = _tenant(db_session, TenantType.hospital)
+    doc_user = create_user(
+        db_session,
+        email=f"sched_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+    )
+    doctor = create_doctor_profile(db_session, tenant_id=tenant.id, user_id=doc_user.id)
+    pat_user = create_user(
+        db_session,
+        email=f"schedp_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=tenant.id,
+    )
+    patient = create_patient_profile(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=pat_user.id,
+        created_by=pat_user.id,
+    )
+    appt: Any = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(hours=2),
+            "status": AppointmentStatus.scheduled,
+            "created_by": pat_user.id,
+            "tenant_id": tenant.id,
+        },
+    )
+    db_session.commit()
+    billing_in = BillingCreate(
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        amount=Decimal("50.00"),
+    )
+    with pytest.raises(ValidationError, match="completed"):
+        billing_service.create_bill(
+            db_session, billing_in, doc_user, tenant_id=tenant.id
         )

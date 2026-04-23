@@ -20,6 +20,18 @@ export interface AppointmentDataResult {
   doctors: Doctor[];
 }
 
+/** Doctor appointments page: list tab + full list for the day calendar. */
+export interface DoctorAppointmentsViewData {
+  /** Rows for the active Upcoming or Past list (server `type=upcoming` / `type=past`). */
+  appointments: Appointment[];
+  /** Unscoped list for calendar (all statuses) — still doctor-scoped on the server. */
+  calendarAppointments: Appointment[];
+  patients: Patient[];
+  doctors: Doctor[];
+}
+
+export type DoctorAppointmentsListTab = 'upcoming' | 'past';
+
 /**
  * Fetch appointments with filters, plus patients and doctors for dropdowns
  */
@@ -37,6 +49,30 @@ export const fetchAppointmentDataHandler = async (
 
   return {
     appointments: safeArray<Appointment>(appointmentsData),
+    patients: safeArray<Patient>(patientsData),
+    doctors: safeArray<Doctor>(doctorsData),
+  };
+};
+
+/**
+ * List tab (server-filtered) plus all appointments for the day calendar, in parallel.
+ */
+export const fetchDoctorAppointmentsViewHandler = async (
+  listTab: DoctorAppointmentsListTab
+): Promise<DoctorAppointmentsViewData> => {
+  const t: 'upcoming' | 'past' = listTab === 'past' ? 'past' : 'upcoming';
+  const [listRaw, calendarRaw, patientsData, doctorsData] = await Promise.all([
+    appointmentsApi.getAll({
+      ...APPOINTMENT_DEFAULT_PARAMS,
+      type: t,
+    }),
+    appointmentsApi.getAll({ ...APPOINTMENT_DEFAULT_PARAMS }),
+    patientsApi.getAll(),
+    doctorsApi.getAll(),
+  ]);
+  return {
+    appointments: safeArray<Appointment>(listRaw),
+    calendarAppointments: safeArray<Appointment>(calendarRaw),
     patients: safeArray<Patient>(patientsData),
     doctors: safeArray<Doctor>(doctorsData),
   };

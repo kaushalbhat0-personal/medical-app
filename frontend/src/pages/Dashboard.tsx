@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Users, Stethoscope, Calendar, DollarSign } from 'lucide-react';
 import { useAuth, useDashboard } from '../hooks';
-import { isPatientRole } from '../utils/roles';
+import { getEffectiveRoles, isPatientRole } from '../utils/roles';
 import { ErrorState, EmptyState, Button } from '../components/common';
 import { SkeletonCard } from '../components/common/skeletons';
 import { FadeContent, staggerContainer, staggerItem } from '../animations';
@@ -14,7 +14,7 @@ export function Dashboard() {
 
   // Data fetching via hook
   const { stats, loading, error, refetch } = useDashboard();
-  const showStaffQuickActions = !isPatientRole(user?.role);
+  const showStaffQuickActions = !isPatientRole(getEffectiveRoles(user, localStorage.getItem('token')));
 
   // Quick action navigation handlers
   const handleAddPatient = () => navigate('/patients', { state: { showForm: true } });

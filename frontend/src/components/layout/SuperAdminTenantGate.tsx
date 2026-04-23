@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import type { User } from '../../types';
-import { roleFromToken } from '../../utils/jwtPayload';
-import { isSuperAdminRole } from '../../utils/roles';
+import { getEffectiveRoles, isSuperAdminRole } from '../../utils/roles';
 import { getActiveTenantId } from '../../utils/tenantIdForRequest';
 
 interface SuperAdminTenantGateProps {
@@ -16,9 +15,9 @@ interface SuperAdminTenantGateProps {
  */
 export function SuperAdminTenantGate({ user, children }: SuperAdminTenantGateProps) {
   const { pathname } = useLocation();
-  const role = user?.role ?? roleFromToken(localStorage.getItem('token'));
+  const eff = getEffectiveRoles(user, localStorage.getItem('token'));
 
-  if (!isSuperAdminRole(role)) {
+  if (!isSuperAdminRole(eff)) {
     return <>{children}</>;
   }
 

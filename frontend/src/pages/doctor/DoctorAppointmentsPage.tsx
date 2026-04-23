@@ -1,23 +1,22 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useAppointments } from '../../hooks';
+import { useDoctorAppointmentsView, useBilling, useModalFocusTrap } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { ErrorState, EmptyState } from '../../components/common';
 import { DayCalendar } from '../../components/doctor/calendar/DayCalendar';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
-import type { Appointment } from '../../types';
+import { billingApi } from '../../services';
+import type { Appointment, Bill } from '../../types';
 
 type Tab = 'upcoming' | 'past';
-
-function appointmentTime(a: Appointment): number {
-  const t = a.appointment_time || a.scheduled_at;
-  return t ? new Date(t).getTime() : 0;
-}
 
 function apptStatusBadgeVariant(
   s: Appointment['status']
@@ -28,35 +27,37 @@ function apptStatusBadgeVariant(
   return 'outline';
 }
 
+function billCoversAppointment(bills: Bill[], appt: Appointment): boolean {
+  const aid = String(appt.id);
+  return bills.some((b) => b.appointment_id && String(b.appointment_id) === aid);
+}
+
 export function DoctorAppointmentsPage() {
   const [tab, setTab] = useState<Tab>('upcoming');
-  const { appointments, patients, loading, error, refetch } = useAppointments();
+  const {
+    listAppointments: appointments,
+    calendarAppointments,
+    patients,
+    loading,
+    error,
+    refetch,
+  } = useDoctorAppointmentsView(tab);
+  const { bills, loading: billsLoading, refetch: refetchBills } = useBilling();
   const { isIndependent, selfDoctor, isReadOnly } = useDoctorWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
-  const [now] = useState(() => Date.now());
   const calendarRef = useRef<HTMLDivElement>(null);
   const scheduleFocusRef = useRef(false);
-  const apptHashHandledRef = useRef<string>('');
   const [bookPatientId, setBookPatientId] = useState<string | null>(null);
+  const [billDialogAppt, setBillDialogAppt] = useState<Appointment | null>(null);
+  const [billAmount, setBillAmount] = useState('');
+  const [billDescription, setBillDescription] = useState('');
+  const [billSubmitting, setBillSubmitting] = useState(false);
+  const billDialogRef = useRef<HTMLDivElement>(null);
 
-  const { upcoming, past } = useMemo(() => {
-    const u: Appointment[] = [];
-    const p: Appointment[] = [];
-    for (const a of appointments) {
-      const t = appointmentTime(a);
-      if (t >= now && (a.status === 'scheduled' || a.status === 'pending')) {
-        u.push(a);
-      } else {
-        p.push(a);
-      }
-    }
-    u.sort((a, b) => appointmentTime(a) - appointmentTime(b));
-    p.sort((a, b) => appointmentTime(b) - appointmentTime(a));
-    return { upcoming: u, past: p };
-  }, [appointments, now]);
+  useModalFocusTrap(billDialogRef, Boolean(billDialogAppt));
 
-  const list = tab === 'upcoming' ? upcoming : past;
+  const list = appointments;
 
 
   const clearApptPageNavState = useCallback(() => {
@@ -73,6 +74,12 @@ export function DoctorAppointmentsPage() {
   }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
+    if (location.pathname !== '/doctor/appointments') {
+      return;
+    }
+    if (tab === 'past') {
+      return;
+    }
     const st = location.state as { openSchedule?: boolean; bookPatientId?: string } | null;
     if (st?.bookPatientId) {
       setBookPatientId(String(st.bookPatientId));
@@ -89,32 +96,53 @@ export function DoctorAppointmentsPage() {
     if (st && typeof st === 'object' && ('openSchedule' in st || 'bookPatientId' in st)) {
       clearApptPageNavState();
     }
-  }, [location.state, isIndependent, clearApptPageNavState]);
-
-  useLayoutEffect(() => {
-    if (loading) return;
-    const h = location.hash || '';
-    if (!h.startsWith('#appt-')) {
-      apptHashHandledRef.current = '';
-      return;
-    }
-    if (apptHashHandledRef.current === h) return;
-    const raw = h.replace(/^#/, '');
-    const appt = appointments.find((x) => `appt-${x.id}` === raw);
-    if (!appt) return;
-    const t = appointmentTime(appt);
-    const inUp = t >= now && (appt.status === 'scheduled' || appt.status === 'pending');
-    setTab(inUp ? 'upcoming' : 'past');
-    apptHashHandledRef.current = h;
-    const raf = requestAnimationFrame(() => {
-      document.getElementById(raw)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [location.hash, loading, appointments, now]);
+  }, [location.pathname, location.state, isIndependent, clearApptPageNavState, tab]);
 
   const scrollToCalendar = () => {
     calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const closeBillDialog = useCallback(() => {
+    setBillDialogAppt(null);
+    setBillAmount('');
+    setBillDescription('');
+  }, []);
+
+  const submitBillFromAppointment = useCallback(async () => {
+    if (!billDialogAppt) return;
+    const pid = billDialogAppt.patient_id != null ? String(billDialogAppt.patient_id) : '';
+    if (!pid) {
+      toast.error('Missing patient for this visit');
+      return;
+    }
+    const n = parseFloat(billAmount);
+    if (Number.isNaN(n) || n <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    setBillSubmitting(true);
+    try {
+      await billingApi.create({
+        patient_id: pid,
+        appointment_id: String(billDialogAppt.id),
+        amount: n,
+        currency: 'INR',
+        description: billDescription.trim() || undefined,
+      });
+      toast.success('Bill created');
+      closeBillDialog();
+      void refetchBills();
+      void refetch();
+    } catch (e) {
+      const msg =
+        axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
+          ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not create bill')
+          : 'Could not create bill';
+      toast.error(msg, { duration: 5000 });
+    } finally {
+      setBillSubmitting(false);
+    }
+  }, [billDialogAppt, billAmount, billDescription, closeBillDialog, refetch, refetchBills]);
 
   if (error) {
     return <ErrorState title="Could not load appointments" description="" error={error} onRetry={refetch} />;
@@ -160,7 +188,7 @@ export function DoctorAppointmentsPage() {
                 doctorId={String(selfDoctor.id)}
                 isInteractive={isIndependent}
                 patients={patients}
-                appointments={appointments}
+                appointments={calendarAppointments}
                 bookPatientId={bookPatientId}
                 hasAvailabilityWindows={selfDoctor.has_availability_windows}
                 doctorTimeZone={DISPLAY_TIMEZONE}
@@ -191,25 +219,28 @@ export function DoctorAppointmentsPage() {
       {!loading && list.length === 0 && (
         <EmptyState
           title={tab === 'upcoming' ? 'No upcoming appointments' : 'No past appointments'}
-          description="Your list will show here; book from the schedule above when slots are open."
+          description={
+            tab === 'upcoming'
+              ? 'Your list will show here; book from the schedule above when slots are open.'
+              : 'Completed and cancelled visits appear here when available.'
+          }
         />
       )}
 
       {!loading &&
         list.map((a) => {
-          const hashTarget = (location.hash || '').replace(/^#/, '') === `appt-${a.id}`;
           const pid = a.patient_id != null ? String(a.patient_id) : '';
           const pName =
             patients.find((p) => String(p.id) === pid)?.name || a.patient?.name || 'Patient';
+          const showCreateBill =
+            tab === 'past' &&
+            isIndependent &&
+            !isReadOnly &&
+            a.status === 'completed' &&
+            !billsLoading &&
+            !billCoversAppointment(bills, a);
           return (
-            <Card
-              key={String(a.id)}
-              id={`appt-${a.id}`}
-              className={cn(
-                'scroll-mt-4 transition-colors',
-                hashTarget && 'bg-primary/10 ring-2 ring-primary/30 shadow-sm'
-              )}
-            >
+            <Card key={String(a.id)} id={`appt-${a.id}`} className="scroll-mt-4 transition-colors">
               <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 space-y-1">
                   {pid ? (
@@ -228,14 +259,110 @@ export function DoctorAppointmentsPage() {
                       DISPLAY_TIMEZONE
                     )}
                   </span>
+                  <div>
+                    <Link
+                      to={`/doctor/appointments/${a.id}`}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Open visit
+                    </Link>
+                  </div>
                 </div>
-                <Badge variant={apptStatusBadgeVariant(a.status)} className="capitalize shrink-0">
-                  {a.status}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {showCreateBill && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setBillDialogAppt(a);
+                        setBillAmount('');
+                        setBillDescription('');
+                      }}
+                    >
+                      Create bill
+                    </Button>
+                  )}
+                  <Badge variant={apptStatusBadgeVariant(a.status)} className="capitalize shrink-0">
+                    {a.status}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           );
         })}
+
+      {billDialogAppt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => !billSubmitting && closeBillDialog()}
+        >
+          <div
+            ref={billDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="appt-bill-title"
+            className="w-full max-w-md rounded-xl border border-border bg-card text-foreground shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-border px-4 py-3">
+              <h2 id="appt-bill-title" className="text-lg font-semibold">
+                New bill
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                For this completed visit — amount in INR.
+              </p>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Visit</p>
+                <p className="text-sm mt-1">
+                  {formatAppointmentDateTimeWithZoneLabel(
+                    billDialogAppt.appointment_time || billDialogAppt.scheduled_at || '',
+                    DISPLAY_TIMEZONE
+                  )}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="appt-bill-amt" className="text-xs font-medium text-muted-foreground">
+                  Amount
+                </label>
+                <Input
+                  id="appt-bill-amt"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="mt-1"
+                  value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value)}
+                  disabled={billSubmitting}
+                />
+              </div>
+              <div>
+                <label htmlFor="appt-bill-desc" className="text-xs font-medium text-muted-foreground">
+                  Description (optional)
+                </label>
+                <Input
+                  id="appt-bill-desc"
+                  className="mt-1"
+                  value={billDescription}
+                  onChange={(e) => setBillDescription(e.target.value)}
+                  disabled={billSubmitting}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+              <Button type="button" variant="outline" onClick={closeBillDialog} disabled={billSubmitting}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void submitBillFromAppointment()} disabled={billSubmitting}>
+                {billSubmitting ? 'Creating…' : 'Create bill'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -534,10 +534,10 @@ export function DoctorPatientDetailPage() {
                                     </Badge>
                                   </p>
                                   <Link
-                                    to={`/doctor/appointments#appt-${a.id}`}
+                                    to={`/doctor/appointments/${a.id}`}
                                     className="text-primary text-xs font-medium hover:underline shrink-0"
                                   >
-                                    Open in schedule
+                                    View visit
                                   </Link>
                                 </div>
                                 {canCompleteOrCancel && (
@@ -600,14 +600,22 @@ export function DoctorPatientDetailPage() {
                                     {st.label}
                                   </Badge>
                                 </p>
-                                {b.appointment_id && (
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 shrink-0">
                                   <Link
-                                    to={`/doctor/appointments#appt-${b.appointment_id}`}
-                                    className="text-primary text-xs font-medium hover:underline shrink-0"
+                                    to={`/doctor/bills/${b.id}`}
+                                    className="text-primary text-xs font-medium hover:underline"
                                   >
-                                    Visit
+                                    View bill
                                   </Link>
-                                )}
+                                  {b.appointment_id && (
+                                    <Link
+                                      to={`/doctor/appointments/${b.appointment_id}`}
+                                      className="text-primary text-xs font-medium hover:underline"
+                                    >
+                                      View visit
+                                    </Link>
+                                  )}
+                                </div>
                               </div>
                               {canPay && (
                                 <div className="flex flex-wrap gap-2">
@@ -671,21 +679,22 @@ export function DoctorPatientDetailPage() {
                       {b.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2">{b.description}</p>
                       )}
-                      {b.appointment_id && (
-                        <p className="text-xs text-muted-foreground">
-                          Visit:{' '}
-                          <Link
-                            to={
-                              b.appointment_id
-                                ? `/doctor/appointments#appt-${b.appointment_id}`
-                                : '/doctor/appointments'
-                            }
-                            className="text-primary hover:underline"
-                          >
-                            {apptTime || 'View appointment'}
-                          </Link>
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        <Link to={`/doctor/bills/${b.id}`} className="text-primary font-medium hover:underline">
+                          View bill
+                        </Link>
+                        {b.appointment_id && (
+                          <>
+                            {' · '}
+                            <Link
+                              to={`/doctor/appointments/${b.appointment_id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {apptTime ? `Visit (${apptTime})` : 'View visit'}
+                            </Link>
+                          </>
+                        )}
+                      </p>
                     </div>
                     <Badge
                       variant="outline"

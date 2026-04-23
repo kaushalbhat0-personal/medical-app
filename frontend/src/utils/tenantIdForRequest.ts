@@ -1,4 +1,4 @@
-import { tenantIdFromToken } from './jwtPayload';
+import { roleFromToken, rolesFromToken, tenantIdFromToken } from './jwtPayload';
 
 /** Canonical localStorage key for the org switcher (super admin) and aligned tenant header for staff. */
 export const ACTIVE_TENANT_ID_STORAGE_KEY = 'activeTenantId';
@@ -39,8 +39,20 @@ export function setActiveTenantId(tenantId: string): void {
   window.dispatchEvent(new Event(TENANT_ID_STORAGE_EVENT));
 }
 
-function isSuperAdminRoleLocal(role: string | null | undefined): boolean {
-  return role?.toLowerCase() === 'super_admin';
+function isSuperAdminFromStoredUser(userStr: string | null, token: string | null): boolean {
+  if (userStr) {
+    try {
+      const u = JSON.parse(userStr) as { roles?: string[]; role?: string };
+      if (Array.isArray(u.roles) && u.roles.some((r) => String(r).toLowerCase() === 'super_admin')) {
+        return true;
+      }
+      if (u.role && String(u.role).toLowerCase() === 'super_admin') return true;
+    } catch {
+      // ignore
+    }
+  }
+  const fromJwt = rolesFromToken(token) ?? (roleFromToken(token) ? [roleFromToken(token)!] : []);
+  return fromJwt.some((r) => r.toLowerCase() === 'super_admin');
 }
 
 /**
@@ -51,19 +63,10 @@ function isSuperAdminRoleLocal(role: string | null | undefined): boolean {
 export function getTenantIdForRequest(): string | undefined {
   const token = localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
-  let role: string | undefined;
-  if (userStr) {
-    try {
-      role = (JSON.parse(userStr) as { role?: string }).role;
-    } catch {
-      // ignore
-    }
-  }
-  role = role ?? undefined;
 
   const active = getActiveTenantId() ?? undefined;
 
-  if (isSuperAdminRoleLocal(role)) {
+  if (isSuperAdminFromStoredUser(userStr, token)) {
     return active;
   }
 

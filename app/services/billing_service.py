@@ -99,7 +99,7 @@ def authorize_bill_create(
         ) and not (current_user.role == UserRole.doctor and current_user.is_owner):
             log_rbac_mutation_violation(current_user, "billing")
             raise ForbiddenError(
-                "Bills without an appointment can only be created by administrators"
+                "Bills without an appointment can only be created by administrators or practice owners"
             )
         return
 
@@ -118,9 +118,6 @@ def authorize_bill_create(
         )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
-        return
-
-    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.doctor:
@@ -181,6 +178,10 @@ def create_bill(
             patient_id=billing_in.patient_id,
             appointment_id=billing_in.appointment_id,
         )
+        if current_user.role == UserRole.doctor and appointment.status != AppointmentStatus.completed:
+            raise ValidationError(
+                "Doctors can only create bills for completed appointments"
+            )
     _validate_idempotency_key(db, billing_in.idempotency_key)
 
     billing_data = billing_in.model_dump()
@@ -265,9 +266,7 @@ def get_bills(
     eff_user_id: UUID | None = None
     eff_tenant_id = tenant_id
 
-    if current_user.role == UserRole.doctor and current_user.is_owner:
-        pass
-    elif current_user.role == UserRole.doctor:
+    if current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
@@ -313,9 +312,6 @@ def authorize_bill_read(
     )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
-        return
-
-    if current_user.role == UserRole.doctor and current_user.is_owner:
         return
 
     if current_user.role == UserRole.patient:
@@ -387,10 +383,12 @@ def authorize_bill_mutate(
     if current_user.role in (UserRole.admin, UserRole.staff):
         return
 
-    if current_user.role == UserRole.doctor and current_user.is_owner:
-        return
-
     if current_user.role == UserRole.doctor:
+        if bill.appointment_id is None:
+            log_rbac_mutation_violation(
+                current_user, "billing", action=rbac_action
+            )
+            raise ForbiddenError("Not allowed to access this bill")
         appointment = appointment_service.get_appointment_or_404(db, bill.appointment_id)
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user

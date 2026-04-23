@@ -47,7 +47,21 @@ const handleApiError = (error: unknown): never => {
 };
 
 export const billingApi = {
-  getAll: async (params?: { skip?: number; limit?: number; patient_id?: string; status?: string }): Promise<Bill[]> => {
+  getById: async (id: string): Promise<Bill> => {
+    try {
+      const response = await api.get<Bill>(`/bills/${id}`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+  getAll: async (params?: {
+    skip?: number;
+    limit?: number;
+    patient_id?: string;
+    appointment_id?: string;
+    status?: string;
+  }): Promise<Bill[]> => {
     try {
       const response = await api.get('/bills', { params: { skip: 0, limit: 100, ...params } });
       // Debug log in development

@@ -1,3 +1,4 @@
+from enum import Enum
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Response
@@ -18,6 +19,11 @@ from app.schemas.appointment import AppointmentCreate, AppointmentRead, Appointm
 from app.services import appointment_service
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+
+
+class AppointmentListType(str, Enum):
+    past = "past"
+    upcoming = "upcoming"
 
 
 @router.post("", response_model=AppointmentRead, status_code=201)
@@ -49,6 +55,7 @@ def read_appointments(
     limit: int = Query(default=10, ge=1, le=100),
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
+    appt_type: AppointmentListType | None = Query(default=None, alias="type"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
@@ -63,6 +70,7 @@ def read_appointments(
         patient_id=patient_id,
         tenant_id=tenant_id,
         acting_doctor=acting_doctor,
+        list_type=appt_type.value if appt_type is not None else None,
     )
 
 

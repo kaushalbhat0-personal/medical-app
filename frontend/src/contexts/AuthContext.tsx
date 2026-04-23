@@ -17,10 +17,11 @@ import type {
   RegisterResponse,
 } from '../types';
 import { authApi, formatLoginError, patientsApi } from '../services';
-import { isOwnerFromToken, roleFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
-import { isPatientRole } from '../utils/roles';
+import { isOwnerFromToken, roleFromToken, rolesFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
+import { getEffectiveRoles, isPatientRole } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
 import { setActiveTenantId } from '../utils/tenantIdForRequest';
+import { clearStoredAppMode } from '../constants/appMode';
 
 interface AuthContextValue {
   user: User | null;
@@ -45,11 +46,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function coalesceRoles(...candidates: (string[] | string | undefined)[]): string[] {
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length > 0) return c;
+    if (typeof c === 'string' && c.length > 0) return [c];
+  }
+  return [];
+}
+
 const safeParseUser = (): User | null => {
   try {
     const storedUser = localStorage.getItem('user');
     if (!storedUser || storedUser === 'undefined') return null;
-    return JSON.parse(storedUser) as User;
+    const raw = JSON.parse(storedUser) as User & { role?: string };
+    if (!raw.roles || !Array.isArray(raw.roles) || raw.roles.length === 0) {
+      if (typeof raw.role === 'string' && raw.role) {
+        raw.roles = [raw.role];
+      } else {
+        raw.roles = [];
+      }
+    }
+    const { role: _drop, ...rest } = raw;
+    void _drop;
+    return rest as User;
   } catch {
     return null;
   }
@@ -57,9 +76,14 @@ const safeParseUser = (): User | null => {
 
 function buildUserFromLogin(credentials: LoginCredentials, response: LoginResponse): User {
   const base = response.user;
-  // Role/tenant can come from either the API response (preferred) or the token payload.
-  // We keep the fallback so the UI stays usable even if the backend returns a minimal login response.
-  const role = response.role ?? base?.role ?? roleFromToken(response.access_token) ?? 'admin';
+  // Roles: API body + JWT; keep fallbacks for minimal login responses.
+  const roles = coalesceRoles(
+    response.roles,
+    base?.roles,
+    response.role,
+    rolesFromToken(response.access_token),
+    roleFromToken(response.access_token) ? [roleFromToken(response.access_token)!] : undefined
+  );
   const tenantRaw = response.tenant_id ?? base?.tenant_id ?? tenantIdFromToken(response.access_token);
   const isOwner =
     base?.is_owner ??
@@ -72,7 +96,7 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     email: base?.email ?? credentials.email,
     full_name: base?.full_name ?? credentials.email.split('@')[0] ?? 'User',
     is_active: base?.is_active ?? true,
-    role,
+    roles: roles.length > 0 ? roles : ['admin'],
     is_owner: isOwner,
     ...(tenantRaw !== undefined ? { tenant_id: tenantRaw } : {}),
     ...(response.force_password_reset !== undefined
@@ -82,27 +106,42 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
 }
 
 function buildUserFromRegister(response: RegisterResponse): User {
-  const role = response.user?.role ?? roleFromToken(response.access_token) ?? 'patient';
+  const u = response.user;
+  const roles = coalesceRoles(
+    u.roles,
+    u.role,
+    rolesFromToken(response.access_token),
+    roleFromToken(response.access_token) ? [roleFromToken(response.access_token)!] : undefined
+  );
   const tenantRaw = tenantIdFromToken(response.access_token);
   return {
-    id: response.user.id as unknown as number,
-    email: response.user.email,
-    full_name: response.user.full_name ?? response.user.email.split('@')[0] ?? 'User',
-    is_active: response.user.is_active ?? true,
-    role,
-    is_owner: response.user.is_owner ?? isOwnerFromToken(response.access_token) ?? false,
+    id: u.id as unknown as number,
+    email: u.email,
+    full_name: u.full_name ?? u.email.split('@')[0] ?? 'User',
+    is_active: u.is_active ?? true,
+    roles: roles.length > 0 ? roles : ['patient'],
+    is_owner: u.is_owner ?? isOwnerFromToken(response.access_token) ?? false,
     ...(tenantRaw !== undefined && tenantRaw !== null ? { tenant_id: tenantRaw } : {}),
   };
 }
 
 function mergeUserWithToken(user: User, token: string | null): User {
   if (!token) return user;
-  const role = user.role || roleFromToken(token);
+  const fromToken = rolesFromToken(token);
+  const single = roleFromToken(token);
+  const roles =
+    user.roles && user.roles.length > 0
+      ? user.roles
+      : fromToken && fromToken.length > 0
+        ? fromToken
+        : single
+          ? [single]
+          : user.roles;
   const tenant_id = user.tenant_id ?? tenantIdFromToken(token) ?? undefined;
   const ownerHint = isOwnerFromToken(token);
   return {
     ...user,
-    ...(role ? { role } : {}),
+    roles: roles && roles.length > 0 ? roles : user.roles,
     ...(tenant_id !== undefined ? { tenant_id } : {}),
     ...(ownerHint !== undefined && user.is_owner === undefined ? { is_owner: ownerHint } : {}),
   };
@@ -136,14 +175,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Token exists but user blob is missing/corrupted; synthesize a minimal user so routes can render.
         // We intentionally keep this minimal to avoid "inventing" profile fields.
-        const role = roleFromToken(token);
-        if (role) {
+        const tr = rolesFromToken(token);
+        const single = roleFromToken(token);
+        const roles = tr?.length ? tr : single ? [single] : [];
+        if (roles.length > 0) {
           const minimal: User = {
             id: 0,
             email: '',
             full_name: 'User',
             is_active: true,
-            role,
+            roles,
             is_owner: isOwnerFromToken(token) ?? false,
             tenant_id: tenantIdFromToken(token) ?? undefined,
           };
@@ -158,8 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadPatientProfile = useCallback(async (userOverride?: User | null) => {
     const effectiveUser = userOverride ?? user;
     const token = localStorage.getItem('token');
-    const role = effectiveUser?.role ?? roleFromToken(token);
-    if (!isPatientRole(role)) {
+    const effRoles = getEffectiveRoles(effectiveUser, token);
+    if (!isPatientRole(effRoles)) {
       setPatientId(null);
       setPatientProfileError(null);
       setPatientProfileLoading(false);
@@ -224,14 +265,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true);
       const userData = buildUserFromRegister(response);
       localStorage.setItem('user', JSON.stringify(userData));
-      if (userData.role !== 'super_admin' && userData.tenant_id) {
+      if (!userData.roles.includes('super_admin') && userData.tenant_id) {
         setActiveTenantId(String(userData.tenant_id));
       }
-      if (isPatientRole(userData.role)) {
+      if (isPatientRole(userData.roles)) {
         skipPatientProfileEffectRef.current = true;
       }
       setUser(userData);
-      if (isPatientRole(userData.role)) {
+      if (isPatientRole(userData.roles)) {
         await loadPatientProfile(userData);
       } else {
         setPatientId(null);
@@ -240,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return {
         success: true,
-        role: userData.role,
+        roles: userData.roles,
         is_owner: userData.is_owner,
         forcePasswordReset: false,
       };
@@ -264,7 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (import.meta.env.DEV) {
         console.log('[Auth] Login response:', {
           hasToken: !!response.access_token,
-          role: response.role,
+          roles: response.roles ?? response.role,
         });
       }
 
@@ -274,15 +315,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const userData = buildUserFromLogin(credentials, response);
         localStorage.setItem('user', JSON.stringify(userData));
-        if (userData.role !== 'super_admin' && userData.tenant_id) {
+        if (!userData.roles.includes('super_admin') && userData.tenant_id) {
           setActiveTenantId(String(userData.tenant_id));
         }
-        if (isPatientRole(userData.role)) {
+        if (isPatientRole(userData.roles)) {
           skipPatientProfileEffectRef.current = true;
         }
         setUser(userData);
 
-        if (isPatientRole(userData.role)) {
+        if (isPatientRole(userData.roles)) {
           await loadPatientProfile(userData);
         } else {
           setPatientId(null);
@@ -292,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return {
           success: true,
-          role: userData.role,
+          roles: userData.roles,
           is_owner: userData.is_owner,
           forcePasswordReset: response.force_password_reset === true,
         };
@@ -312,6 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    clearStoredAppMode();
     localStorage.removeItem('activeTenantId');
     localStorage.removeItem('tenant_id');
     localStorage.removeItem('adminSelectedTenantId');
@@ -340,7 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: me.email,
           full_name: prev?.full_name ?? me.email.split('@')[0] ?? 'User',
           is_active: me.is_active,
-          role: me.role,
+          roles: me.roles?.length ? me.roles : [me.role],
           is_owner: me.is_owner,
           tenant_id: me.tenant_id ?? undefined,
         };

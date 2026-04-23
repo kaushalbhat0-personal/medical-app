@@ -25,6 +25,21 @@ export function roleFromToken(token: string | null): string | undefined {
   return typeof role === 'string' ? role : undefined;
 }
 
+/** `roles` claim when present; otherwise a single `role` string as a one-element list. */
+export function rolesFromToken(token: string | null): string[] | undefined {
+  if (!token) return undefined;
+  const payload = decodeJwtPayload(token);
+  const raw = payload?.roles;
+  if (Array.isArray(raw) && raw.every((x) => typeof x === 'string')) {
+    return raw as string[];
+  }
+  const single = payload?.role;
+  if (typeof single === 'string') {
+    return [single];
+  }
+  return undefined;
+}
+
 export function tenantIdFromToken(token: string | null): string | null | undefined {
   if (!token) return undefined;
   const payload = decodeJwtPayload(token);

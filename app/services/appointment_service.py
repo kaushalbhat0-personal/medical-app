@@ -340,6 +340,7 @@ def get_appointments(
     tenant_id: UUID | None = None,
     *,
     acting_doctor: Doctor | None = None,
+    list_type: str | None = None,
 ) -> list[Appointment]:
     _ensure_can_list_appointments(current_user)
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
@@ -347,9 +348,7 @@ def get_appointments(
     eff_patient_id = patient_id
     eff_tenant_id = tenant_id
 
-    if current_user.role == UserRole.doctor and current_user.is_owner:
-        pass
-    elif current_user.role == UserRole.doctor:
+    if current_user.role == UserRole.doctor:
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
@@ -369,6 +368,7 @@ def get_appointments(
         doctor_id=eff_doctor_id,
         patient_id=eff_patient_id,
         tenant_id=eff_tenant_id,
+        list_type=list_type,
     )
     return _update_status_for_past_appointments(db, appointments)
 

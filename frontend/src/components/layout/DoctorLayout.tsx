@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { DoctorWorkspaceProvider, useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { useAppMode } from '../../contexts/AppModeContext';
 import { Header } from './Header';
 import { DoctorSidebar } from './DoctorSidebar';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +10,19 @@ import { cn } from '@/lib/utils';
 
 function DoctorLayoutInner() {
   const { user, logout } = useAuth();
+  const { resolvedMode } = useAppMode();
   const { isIndependent, selfDoctor, profilePartial, loading, error } = useDoctorWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen w-full overflow-y-auto bg-background text-foreground">
+    <div
+      className={cn(
+        'flex min-h-screen w-full overflow-y-auto text-foreground',
+        resolvedMode === 'practice' &&
+          'bg-gradient-to-b from-sky-50/50 via-background to-emerald-50/30 dark:from-sky-950/20 dark:via-background dark:to-emerald-950/20',
+        resolvedMode === 'admin' && 'bg-background'
+      )}
+    >
       <div className="hidden w-64 flex-shrink-0 self-stretch lg:block">
         <DoctorSidebar user={user} />
       </div>

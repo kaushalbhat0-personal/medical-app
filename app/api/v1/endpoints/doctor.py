@@ -34,6 +34,7 @@ from app.schemas.doctor import (
     DoctorUpdate,
 )
 from app.services import doctor_availability_service, doctor_service, doctor_slot_service
+from app.services.user_roles_service import user_read_with_roles
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -95,7 +96,7 @@ def promote_doctor_to_admin(
     user = doctor_service.promote_doctor_to_admin(db, doctor_id, tenant_id)
     db.commit()
     db.refresh(user)
-    return user
+    return user_read_with_roles(db, user)
 
 
 @router.get("/{doctor_id}/slots", response_model=list[DoctorSlotRead])

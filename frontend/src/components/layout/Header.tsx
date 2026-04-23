@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Menu, Bell, Settings, ChevronDown, Building2 } from 'lucide-react';
 import { tenantsApi } from '../../services';
 import type { Tenant, User } from '../../types';
-import { isSuperAdminRole } from '../../utils/roles';
+import { getEffectiveRoles, isSuperAdminRole } from '../../utils/roles';
 import {
   getActiveTenantId,
   TENANT_ID_STORAGE_EVENT,
   setActiveTenantId,
 } from '../../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
+import { ModeSwitcher } from './ModeSwitcher';
 
 export interface HeaderProps {
   user: User | null;
@@ -26,7 +27,7 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
   );
   const switcherRef = useRef<HTMLDivElement>(null);
 
-  const showSwitcher = isSuperAdminRole(user?.role);
+  const showSwitcher = isSuperAdminRole(getEffectiveRoles(user, localStorage.getItem('token')));
 
   const loadTenants = useCallback(async () => {
     if (!showSwitcher) return;
@@ -91,6 +92,8 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
         </button>
 
         {centerSlot && <div className="min-w-0 flex-1">{centerSlot}</div>}
+
+        {user && <ModeSwitcher />}
 
         {showSwitcher && activeTenantId && !centerSlot ? (
           <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">

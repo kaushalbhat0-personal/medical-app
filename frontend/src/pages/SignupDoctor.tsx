@@ -42,7 +42,7 @@ export function SignupDoctor() {
     });
     if (result.success) {
       toast.success('Account created');
-      navigate(postLoginHomePath(result.role, { is_owner: result.is_owner }));
+      navigate(postLoginHomePath(result.roles ?? ['doctor'], { is_owner: result.is_owner }));
     } else {
       toast.error(result.error || 'Signup failed');
     }

@@ -173,3 +173,79 @@ async def test_get_appointments_includes_doctor_timezone(
     assert doc_out["timezone"] == doctor.timezone
 
     assert created.json()["doctor"]["timezone"] == doctor.timezone
+
+
+@pytest.mark.asyncio
+async def test_get_appointments_type_past_and_upcoming(
+    client: AsyncClient, db_session: Session
+) -> None:
+    """GET ?type=past returns completed (and cancelled); ?type=upcoming returns scheduled only."""
+    doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+
+    login_pat = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": pat_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login_pat.status_code == 200
+    pat_headers = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
+    create_payload = {
+        "patient_id": str(patient.id),
+        "doctor_id": str(doctor.id),
+        "appointment_time": slot.isoformat(),
+    }
+    created = await client.post(
+        "/api/v1/appointments", json=create_payload, headers=pat_headers
+    )
+    assert created.status_code == 201, created.text
+    appt_id = created.json()["id"]
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {"Authorization": f"Bearer {doc_login.json()['access_token']}"}
+
+    up = await client.get(
+        "/api/v1/appointments", params={"type": "upcoming", "limit": 100}, headers=doc_headers
+    )
+    assert up.status_code == 200
+    assert appt_id in {r["id"] for r in up.json()}
+
+    pa = await client.get(
+        "/api/v1/appointments", params={"type": "past", "limit": 100}, headers=doc_headers
+    )
+    assert pa.status_code == 200
+    assert appt_id not in {r["id"] for r in pa.json()}
+
+    done = await client.put(
+        f"/api/v1/appointments/{appt_id}", json={"status": "completed"}, headers=doc_headers
+    )
+    assert done.status_code == 200, done.text
+
+    up2 = await client.get(
+        "/api/v1/appointments", params={"type": "upcoming", "limit": 100}, headers=doc_headers
+    )
+    assert up2.status_code == 200
+    assert appt_id not in {r["id"] for r in up2.json()}
+
+    past2 = await client.get(
+        "/api/v1/appointments", params={"type": "past", "limit": 100}, headers=doc_headers
+    )
+    assert past2.status_code == 200
+    row = next((r for r in past2.json() if r["id"] == appt_id), None)
+    assert row is not None
+    assert row["status"] == "completed"

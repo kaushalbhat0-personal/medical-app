@@ -15,8 +15,10 @@ import {
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { canAccessAdminUI, isPatientRole, isSuperAdminRole } from '../../utils/roles';
+import { canAccessAdminUI, getEffectiveRoles, isPatientRole, isSuperAdminRole } from '../../utils/roles';
+import { useAppMode } from '../../contexts/AppModeContext';
 import { NavItem } from './NavItem';
+import { cn } from '@/lib/utils';
 
 interface SidebarProps {
   user: User | null;
@@ -40,21 +42,51 @@ const patientFallbackNavItems = [
   { path: '/patient/bills', label: 'Bills', icon: Receipt },
 ];
 
+const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
+  { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/doctors', label: 'Doctors', icon: Stethoscope },
+  { path: '/admin/inventory', label: 'Inventory', icon: Package },
+  { path: '/dashboard', label: 'Reports', icon: BarChart3 },
+  { path: '/billing', label: 'Billing', icon: CreditCard },
+];
+
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
+  const { resolvedMode } = useAppMode();
+  const effRoles = getEffectiveRoles(user, localStorage.getItem('token'));
+  const useAdminModeLayout =
+    canAccessAdminUI(effRoles, user) && resolvedMode === 'admin' && !isPatientRole(effRoles);
+
   const staffNavItems = useMemo(() => {
-    if (!canAccessAdminUI(user?.role, user)) return staffNavBase;
+    if (!canAccessAdminUI(effRoles, user)) return staffNavBase;
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
-    const mid = isSuperAdminRole(user?.role)
+    const mid = isSuperAdminRole(effRoles)
       ? [adminItem, tenantsItem, inventoryItem]
       : [adminItem, inventoryItem];
     return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
-  }, [user?.role]);
+  }, [user, effRoles]);
 
-  const navItems = isPatientRole(user?.role) ? patientFallbackNavItems : staffNavItems;
+  const adminModeItems = useMemo(() => {
+    if (!isSuperAdminRole(effRoles)) {
+      return adminModeNavBase;
+    }
+    const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
+    return [adminModeNavBase[0], tenantsItem, ...adminModeNavBase.slice(1)];
+  }, [effRoles]);
+
+  const navItems = isPatientRole(effRoles)
+    ? patientFallbackNavItems
+    : useAdminModeLayout
+      ? adminModeItems
+      : staffNavItems;
   return (
-    <div className="flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white">
+    <div
+      className={cn(
+        'flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white',
+        useAdminModeLayout && 'border-slate-200/80 bg-slate-50/95 dark:border-slate-800 dark:bg-slate-950/50'
+      )}
+    >
       <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border/80 px-3">
         <div
           className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${
@@ -146,7 +178,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
                 {user.full_name || user.email || 'User'}
               </p>
               <p className="max-w-[140px] truncate text-xs capitalize text-muted-foreground">
-                {user.role || 'Unknown'}
+                {effRoles.length ? effRoles.join(', ') : 'Unknown'}
               </p>
             </div>
           </div>

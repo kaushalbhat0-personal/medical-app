@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import type { User } from '../../types';
-import { roleFromToken } from '../../utils/jwtPayload';
-import { isDoctorRole, isPatientRole, patientHomePath, staffHomePath } from '../../utils/roles';
+import { getEffectiveRoles, isDoctorRole, isPatientRole, patientHomePath, staffHomePath } from '../../utils/roles';
+import { useAppMode } from '../../contexts/AppModeContext';
 
 interface DoctorRouteProps {
   user: User | null;
@@ -10,11 +10,15 @@ interface DoctorRouteProps {
 
 /** Clinician shell; patients and staff are redirected to their own areas. */
 export function DoctorRoute({ user, children }: DoctorRouteProps) {
-  const role = user?.role ?? roleFromToken(localStorage.getItem('token'));
-  if (isDoctorRole(role)) {
+  const { isDualModeUser, resolvedMode } = useAppMode();
+  const eff = getEffectiveRoles(user, localStorage.getItem('token'));
+  if (isDualModeUser && resolvedMode === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  if (isDoctorRole(eff)) {
     return <>{children}</>;
   }
-  if (isPatientRole(role)) {
+  if (isPatientRole(eff)) {
     return <Navigate to={patientHomePath()} replace />;
   }
   return <Navigate to={staffHomePath()} replace />;

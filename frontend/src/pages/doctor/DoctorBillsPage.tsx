@@ -14,11 +14,6 @@ import type { Appointment, Bill } from '../../types';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 
-function appointmentTimeMs(a: Appointment): number {
-  const t = a.appointment_time || a.scheduled_at;
-  return t ? new Date(t).getTime() : 0;
-}
-
 function patientName(map: Map<string, string>, id: string): string {
   return map.get(id) || 'Patient';
 }
@@ -49,13 +44,12 @@ export function DoctorBillsPage() {
   const bookableAppointments = useMemo(() => {
     const selfId = selfDoctor != null ? String(selfDoctor.id) : '';
     if (!selfId) return [];
-    const now = Date.now();
     return appointments.filter((a) => {
       if (String(a.doctor_id) !== selfId) return false;
-      if (a.status === 'cancelled' || a.status === 'completed') return false;
-      if (a.status !== 'scheduled' && a.status !== 'pending') return false;
+      if (a.status === 'cancelled') return false;
+      if (a.status !== 'completed') return false;
       if (billCoversAppointment(bills, a)) return false;
-      return appointmentTimeMs(a) > now;
+      return true;
     });
   }, [appointments, selfDoctor, bills]);
 
@@ -188,8 +182,7 @@ export function DoctorBillsPage() {
 
       {isIndependent && selfDoctor && bookableAppointments.length === 0 && !listLoading && (
         <p className="text-sm text-muted-foreground rounded-lg border border-border px-3 py-2">
-          Create or schedule a future visit with an outstanding bill to add billing here. Existing visits already billed are not
-          listed.
+          Bill completed visits that do not have a charge yet. Visits you have already billed are not listed here.
         </p>
       )}
 
@@ -206,22 +199,33 @@ export function DoctorBillsPage() {
       {!listLoading && bills.length > 0 && (
         <div className="space-y-3">
           {bills.map((b) => (
-            <Card key={b.id}>
+            <Card key={b.id} id={b.id ? `bill-${b.id}` : undefined}>
               <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to={`/doctor/bills/${b.id}`}
+                    className="font-medium text-primary hover:underline block"
+                  >
+                    {b.currency} {Number(b.amount).toFixed(2)}
+                  </Link>
                   <Link
                     to={`/doctor/patients/${b.patient_id}`}
-                    className="font-medium text-primary hover:underline"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline mt-0.5 block"
                   >
                     {patientName(patientNameById, String(b.patient_id))}
                   </Link>
-                  {b.description && <p className="text-xs text-muted-foreground truncate max-w-md">{b.description}</p>}
+                  {b.description && (
+                    <p className="text-xs text-muted-foreground truncate max-w-md mt-1">{b.description}</p>
+                  )}
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold tabular-nums">
-                    {b.currency} {Number(b.amount).toFixed(2)}
-                  </p>
+                <div className="text-right shrink-0">
                   <p className="text-xs capitalize text-muted-foreground">{b.status}</p>
+                  <Link
+                    to={`/doctor/bills/${b.id}`}
+                    className="text-xs font-medium text-primary hover:underline mt-1 inline-block"
+                  >
+                    Open
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -247,7 +251,7 @@ export function DoctorBillsPage() {
               <h2 id="create-bill-title" className="text-lg font-semibold">
                 New bill
               </h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Tie the charge to a scheduled visit you own.</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Tie the charge to a completed visit you own.</p>
             </div>
             <div className="space-y-3 px-4 py-4">
               <div>

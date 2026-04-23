@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuth, AuthProvider } from './hooks/useAuth';
+import { AppModeProvider } from './contexts/AppModeContext';
 import { initDoctorSlotsCacheCrossTabSync } from './services';
 import { setNavigator } from './utils/navigation';
-import { postLoginHomePath } from './utils/roles';
-import { roleFromToken } from './utils/jwtPayload';
+import { getEffectiveRoles, postLoginHomePath } from './utils/roles';
 import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AdminRoute } from './components/layout/AdminRoute';
@@ -35,7 +35,9 @@ import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
 import { DoctorPatientDetailPage } from './pages/doctor/DoctorPatientDetailPage';
 import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
+import { DoctorAppointmentDetailPage } from './pages/doctor/DoctorAppointmentDetailPage';
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
+import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
 import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
@@ -71,11 +73,11 @@ function AnimatedRoutes() {
     setNavigator(navigate);
   }, [navigate]);
 
-  const effectiveRole = user?.role ?? roleFromToken(localStorage.getItem('token'));
+  const effectiveRoles = getEffectiveRoles(user, localStorage.getItem('token'));
   const needsPasswordReset = user?.force_password_reset === true;
   const loginRedirect = needsPasswordReset
     ? '/reset-password'
-    : postLoginHomePath(effectiveRole, user ?? undefined);
+    : postLoginHomePath(effectiveRoles, user ?? undefined);
 
   if (
     !isLoading &&
@@ -142,7 +144,7 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               {isAuthenticated && !needsPasswordReset ? (
-                <Navigate to={postLoginHomePath(effectiveRole, user ?? undefined)} replace />
+                <Navigate to={postLoginHomePath(effectiveRoles, user ?? undefined)} replace />
               ) : (
                 <ResetPassword />
               )}
@@ -320,10 +322,26 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="appointments/:appointmentId"
+            element={
+              <AnimatedPage>
+                <DoctorAppointmentDetailPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
             path="appointments"
             element={
               <AnimatedPage>
                 <DoctorAppointmentsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="bills/:billId"
+            element={
+              <AnimatedPage>
+                <DoctorBillDetailPage />
               </AnimatedPage>
             }
           />
@@ -443,7 +461,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AnimatedRoutes />
+        <AppModeProvider>
+          <AnimatedRoutes />
+        </AppModeProvider>
         <Toaster
           position="top-right"
           toastOptions={{

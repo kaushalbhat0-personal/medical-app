@@ -43,6 +43,10 @@ class UserRead(BaseModel):
     id: UUID
     email: str
     role: UserRole
+    roles: list[str] = Field(
+        default_factory=list,
+        description="Account role plus doctor when a doctor profile is linked to this user.",
+    )
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None
@@ -80,6 +84,10 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     role: UserRole
+    roles: list[str] = Field(
+        default_factory=list,
+        description="Account role plus doctor when a doctor profile is linked to this user.",
+    )
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None

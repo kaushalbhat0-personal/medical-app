@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../hooks/useAuth';
 import { authApi, formatLoginError } from '../services';
-import { postLoginHomePath } from '../utils/roles';
+import { getEffectiveRoles, postLoginHomePath } from '../utils/roles';
 import { resetPasswordSchema, type ResetPasswordFormData } from '../validation';
 import { Button, Card, Input } from '../components/common';
 
@@ -30,7 +30,10 @@ export function ResetPassword() {
       await authApi.resetPassword(data.old_password, data.new_password);
       patchUser({ force_password_reset: false });
       toast.success('Password updated. You are all set.');
-      navigate(postLoginHomePath(user?.role, user ?? undefined), { replace: true });
+      navigate(
+        postLoginHomePath(getEffectiveRoles(user, localStorage.getItem('token')), user ?? undefined),
+        { replace: true }
+      );
     } catch (err) {
       const msg = axios.isAxiosError(err)
         ? formatLoginError(err)

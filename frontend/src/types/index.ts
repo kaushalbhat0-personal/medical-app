@@ -3,7 +3,8 @@ export interface User {
   email: string;
   full_name: string;
   is_active: boolean;
-  role: string;
+  /** Effective roles: account role plus `doctor` when a doctor profile is linked (from API / JWT). */
+  roles: string[];
   /** Practice owner: solo doctor who created the tenant; admin-equivalent in UI/API */
   is_owner?: boolean;
   /** Primary tenant from login / JWT when applicable */
@@ -17,6 +18,7 @@ export interface MeUserResponse {
   id: string;
   email: string;
   role: string;
+  roles: string[];
   is_active: boolean;
   is_owner: boolean;
   tenant_id: string | null;
@@ -183,8 +185,9 @@ export interface LoginCredentials {
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  /** Present on OAuth login response */
+  /** Primary account role (legacy; prefer `roles`). */
   role?: string;
+  roles?: string[];
   tenant_id?: string | null;
   is_owner?: boolean;
   user?: User;
@@ -194,7 +197,7 @@ export interface LoginResponse {
 export interface LoginResult {
   success: boolean;
   error?: string;
-  role?: string;
+  roles?: string[];
   is_owner?: boolean;
   forcePasswordReset?: boolean;
 }
@@ -203,6 +206,7 @@ export interface RegisterResponseUser {
   id: string;
   email: string;
   role: string;
+  roles?: string[];
   is_active: boolean;
   is_owner?: boolean;
   full_name?: string;
