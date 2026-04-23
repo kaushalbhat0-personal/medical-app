@@ -1,5 +1,6 @@
 import { X, Stethoscope, UserRound, Home, Calendar, Receipt, Clock, Users } from 'lucide-react';
 import type { User } from '../../types';
+import { getEffectiveRoles, isDoctorRole } from '../../utils/roles';
 import { NavItem } from './NavItem';
 
 const overview = { path: '/doctor/home', label: 'Overview', icon: Home };
@@ -10,14 +11,21 @@ const doctorCore = [
 ] as const;
 const moreLinks = [{ path: '/doctor/bills', label: 'Bills', icon: Receipt }] as const;
 
-const links = [overview, ...doctorCore, ...moreLinks] as const;
-
 interface DoctorSidebarProps {
   user: User | null;
   onClose?: () => void;
 }
 
 export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const eff = getEffectiveRoles(user, token);
+  const isDoctor = isDoctorRole(eff);
+  const links = [
+    overview,
+    ...(isDoctor ? doctorCore : doctorCore.filter((l) => l.path !== '/doctor/availability')),
+    ...moreLinks,
+  ] as const;
+
   return (
     <div className="flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white">
       <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border/80 px-4">

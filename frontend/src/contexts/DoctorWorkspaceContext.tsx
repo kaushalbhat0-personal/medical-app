@@ -10,6 +10,7 @@ import {
 import { APP_MODE_CHANGE_EVENT } from '../constants/appMode';
 import { useAuth } from '../hooks/useAuth';
 import { doctorsApi } from '../services';
+import { getEffectiveRoles, isDoctorRole } from '../utils/roles';
 import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
 import type { Doctor } from '../types';
 
@@ -57,7 +58,16 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const list = await doctorsApi.getAll();
-      const me = resolveSelfDoctorFromList(list, user?.email);
+      let me = resolveSelfDoctorFromList(list, user?.email);
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+      const eff = getEffectiveRoles(user, token);
+      if (me == null && isDoctorRole(eff) && user?.doctor_id) {
+        try {
+          me = await doctorsApi.getOne(String(user.doctor_id));
+        } catch {
+          me = null;
+        }
+      }
       setSelfDoctor(me);
     } catch {
       setSelfDoctor(null);
@@ -65,7 +75,7 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user?.email]);
+  }, [user?.email, user?.doctor_id, user?.tenant_id]);
 
   useEffect(() => {
     void load();

@@ -65,6 +65,7 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
       setModeState(defaultDualMode(readStoredAppMode()));
     } else if (d && !a) {
       setModeState('practice');
+      writeStoredAppMode('practice');
     } else {
       setModeState('admin');
     }

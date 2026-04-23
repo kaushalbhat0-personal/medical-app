@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useAppMode } from '../../contexts/AppModeContext';
+import { getEffectiveRoles } from '../../utils/roles';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -31,8 +34,12 @@ function nonTemp(windows: DoctorAvailabilityWindow[]) {
 }
 
 export function DoctorAvailabilityPage() {
+  const { user } = useAuth();
+  const { resolvedMode } = useAppMode();
   const { isIndependent, isReadOnly, selfDoctor, loading: workspaceLoading, error: workspaceError, refetch: refetchWorkspace } =
     useDoctorWorkspace();
+  /** Editing is allowed when the workspace resolved a single doctor profile (solo or clinic); not "clinic-only" as a product mode. */
+  const canManageOwnSchedule = isIndependent;
   const [windows, setWindows] = useState<DoctorAvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -63,6 +70,16 @@ export function DoctorAvailabilityPage() {
   useEffect(() => {
     void loadWindows();
   }, [loadWindows]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !user) return;
+    console.log('[AVAILABILITY_CHECK]', {
+      roles: getEffectiveRoles(user, localStorage.getItem('token')),
+      tenant_id: user.tenant_id ?? null,
+      mode: resolvedMode,
+      selfDoctorId: selfDoctor?.id ?? null,
+    });
+  }, [user, resolvedMode, selfDoctor?.id]);
 
   const windowsForDay = useMemo(() => {
     return nonTemp(windows)
@@ -118,7 +135,7 @@ export function DoctorAvailabilityPage() {
     end_time: string;
     slot_duration: number;
   }) => {
-    if (!doctorId || !isIndependent) return;
+    if (!doctorId || !canManageOwnSchedule) return;
 
     if (modalMode === 'create') {
       const tempId = `temp-${crypto.randomUUID()}`;
@@ -185,7 +202,7 @@ export function DoctorAvailabilityPage() {
   };
 
   const onDelete = async (w: DoctorAvailabilityWindow) => {
-    if (!doctorId || !isIndependent) return;
+    if (!doctorId || !canManageOwnSchedule) return;
     if (!window.confirm(`Remove this window (${formatTimeShort(w.start_time)}–${formatTimeShort(w.end_time)})?`)) {
       return;
     }
@@ -204,7 +221,7 @@ export function DoctorAvailabilityPage() {
 
   const copyToTargets = useCallback(
     async (targetDows: number[]) => {
-      if (!doctorId || !isIndependent) return;
+      if (!doctorId || !canManageOwnSchedule) return;
       const source = nonTemp(windows).filter((w) => w.day_of_week === selectedDow);
       if (source.length === 0) {
         toast.error('No windows to copy for this day');
@@ -231,7 +248,7 @@ export function DoctorAvailabilityPage() {
         setCopyBusy(false);
       }
     },
-    [doctorId, isIndependent, windows, selectedDow, afterMutation, loadWindows]
+    [doctorId, canManageOwnSchedule, windows, selectedDow, afterMutation, loadWindows]
   );
 
   const copyToAllOtherDays = () => {
@@ -239,7 +256,7 @@ export function DoctorAvailabilityPage() {
   };
 
   const applyMonFriPreset = useCallback(async () => {
-    if (!doctorId || !isIndependent) return;
+    if (!doctorId || !canManageOwnSchedule) return;
     setPresetBusy(true);
     try {
       const next: DoctorAvailabilityWindow[] = [...nonTemp(windows)];
@@ -261,7 +278,7 @@ export function DoctorAvailabilityPage() {
     } finally {
       setPresetBusy(false);
     }
-  }, [doctorId, isIndependent, windows, afterMutation]);
+  }, [doctorId, canManageOwnSchedule, windows, afterMutation]);
 
   if (workspaceLoading) {
     return (
@@ -337,7 +354,7 @@ export function DoctorAvailabilityPage() {
               <CardTitle className="text-base">Week</CardTitle>
               <CardDescription>Pick a day, then add or adjust windows for that day.</CardDescription>
             </div>
-            {isIndependent && (
+            {canManageOwnSchedule && (
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -392,7 +409,7 @@ export function DoctorAvailabilityPage() {
               })}
             </div>
 
-            {isIndependent && !loading && windowsForDay.length > 0 && (
+            {canManageOwnSchedule && !loading && windowsForDay.length > 0 && (
               <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
                 <p className="text-xs text-muted-foreground">Copy the windows for {AVAILABILITY_WEEKDAYS.find((x) => x.dow === selectedDow)?.label}</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -455,7 +472,7 @@ export function DoctorAvailabilityPage() {
                         {w.id.toString().startsWith('temp-') ? ' · saving…' : null}
                       </p>
                     </div>
-                    {isIndependent && !String(w.id).startsWith('temp-') && (
+                    {canManageOwnSchedule && !String(w.id).startsWith('temp-') && (
                       <div className="flex items-center gap-1">
                         <Button
                           type="button"
@@ -500,7 +517,7 @@ export function DoctorAvailabilityPage() {
         />
       )}
 
-      {isIndependent && (
+      {canManageOwnSchedule && (
         <AvailabilityWindowModal
           open={modalOpen}
           onClose={() => setModalOpen(false)}

@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { authApi, formatLoginError, patientsApi } from '../services';
 import { isOwnerFromToken, roleFromToken, rolesFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
-import { getEffectiveRoles, isPatientRole, mergeRoleSources } from '../utils/roles';
+import { getEffectiveRoles, isDoctorRole, isPatientRole, mergeRoleSources } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
 import { ACTIVE_TENANT_ID_ALIAS_KEY, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { clearStoredAppMode } from '../constants/appMode';
@@ -154,6 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [patientProfileError, setPatientProfileError] = useState<string | null>(null);
   /** Skip one post-login profile effect run when login() already prefetched the patient. */
   const skipPatientProfileEffectRef = useRef(false);
+  /** One GET /me sync per auth session (tenant + doctor_id for scoped APIs) when login blob is incomplete. */
+  const profileFromMeRef = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -252,6 +254,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  function shouldBootstrapProfileFromGetMe(
+    u: User | null,
+    token: string | null
+  ): boolean {
+    if (!u) return false;
+    const eff = getEffectiveRoles(u, token);
+    if (isPatientRole(eff)) return false;
+    if (eff.some((r) => String(r).toLowerCase() === 'super_admin')) return false;
+    if (u.tenant_id == null || u.tenant_id === '') return true;
+    if (isDoctorRole(eff) && (u.doctor_id == null || u.doctor_id === '')) return true;
+    return false;
+  }
+
   const signUp = useCallback(async (payload: RegisterPayload): Promise<LoginResult> => {
     setIsLoading(true);
     try {
@@ -276,14 +291,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPatientId(null);
         setPatientProfileError(null);
         setPatientProfileLoading(false);
-        void authApi
-          .getMe()
-          .then((me) => {
-            patchUser({
-              doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
-            });
-          })
-          .catch(() => {});
       }
       return {
         success: true,
@@ -297,7 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [loadPatientProfile, patchUser]);
+  }, [loadPatientProfile]);
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResult> => {
     setIsLoading(true);
@@ -335,14 +342,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setPatientId(null);
           setPatientProfileError(null);
           setPatientProfileLoading(false);
-          void authApi
-            .getMe()
-            .then((me) => {
-              patchUser({
-                doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
-              });
-            })
-            .catch(() => {});
         }
 
         return {
@@ -362,7 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [loadPatientProfile, patchUser]);
+  }, [loadPatientProfile]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
@@ -382,6 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPatientProfileError(null);
     setPatientProfileLoading(false);
     skipPatientProfileEffectRef.current = false;
+    profileFromMeRef.current = false;
     // Hard navigation guarantees all state is reset (including any in-memory caches).
     window.location.href = '/login';
   }, []);
@@ -395,6 +395,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return;
     try {
       const me = await authApi.getMe();
+      const roles = me.roles?.length ? me.roles : [me.role];
+      if (me.tenant_id && !roles.map((r) => String(r).toLowerCase()).includes('super_admin')) {
+        setActiveTenantId(String(me.tenant_id));
+      }
       setUser((prev) => {
         const next: User = {
           id: me.id as unknown as number,
@@ -416,6 +420,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Silent: not worth interrupting admin flows; failed auth would surface on next request.
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      profileFromMeRef.current = false;
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || !user) return;
+    if (profileFromMeRef.current) return;
+    const token = localStorage.getItem('token');
+    if (isPatientRole(getEffectiveRoles(user, token))) {
+      profileFromMeRef.current = true;
+      return;
+    }
+    profileFromMeRef.current = true;
+    if (shouldBootstrapProfileFromGetMe(user, token)) {
+      void refreshUser();
+    }
+  }, [isLoading, isAuthenticated, user, refreshUser]);
 
   const value = useMemo(
     () => ({
