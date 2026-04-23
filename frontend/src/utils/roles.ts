@@ -64,6 +64,12 @@ export function isDoctorRole(roles: string | string[] | null | undefined): boole
   return normalizeRoles(roles).includes('doctor');
 }
 
+/** Solo doctor account: effective roles are only `doctor` (not org admin, patient, etc.). */
+export function isDoctorOnlyRole(user: RoleHint, token: string | null): boolean {
+  const r = getEffectiveRoles(user, token);
+  return r.length === 1 && r[0] === 'doctor';
+}
+
 /** Admin dashboard and admin-only APIs (admin or super_admin). */
 export function isAdminRole(roles: string | string[] | null | undefined): boolean {
   return normalizeRoles(roles).some((r) => r === 'admin' || r === 'super_admin');

@@ -5,9 +5,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAppointments, usePatients } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { useAuth } from '../../hooks/useAuth';
+import { isDoctorOnlyRole } from '../../utils/roles';
 import { ErrorState } from '../../components/common';
 import type { Appointment } from '../../types';
-import { UserPlus, CalendarPlus, Receipt } from 'lucide-react';
+import { UserPlus, CalendarPlus, Receipt, Building2 } from 'lucide-react';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import {
   appointmentCalendarDayYmd,
@@ -26,7 +28,12 @@ function isAppointmentToday(a: Appointment): boolean {
 
 export function DoctorHome() {
   const navigate = useNavigate();
-  const { isIndependent, selfDoctor } = useDoctorWorkspace();
+  const { user } = useAuth();
+  const { isIndependent, selfDoctor, tenantDoctorCount, loading: workspaceLoading } =
+    useDoctorWorkspace();
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const showGrowPractice =
+    isDoctorOnlyRole(user, token) && tenantDoctorCount === 1 && !workspaceLoading;
   const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments();
   const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients();
 
@@ -70,6 +77,27 @@ export function DoctorHome() {
             : 'A snapshot of patients and visits associated with you in this organization.'}
         </p>
       </div>
+
+      {showGrowPractice && (
+        <Card className="border-primary/20 bg-gradient-to-r from-sky-50/80 to-emerald-50/50 dark:from-sky-950/30 dark:to-emerald-950/20">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <div className="flex gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Building2 className="h-5 w-5" aria-hidden />
+              </div>
+              <div>
+                <CardTitle className="text-base">Grow your practice</CardTitle>
+                <CardDescription className="text-sm leading-relaxed max-w-prose">
+                  Add more doctors, manage staff, and scale your clinic.
+                </CardDescription>
+              </div>
+            </div>
+            <Button type="button" onClick={() => navigate('/onboarding/clinic')}>
+              Create Clinic
+            </Button>
+          </CardHeader>
+        </Card>
+      )}
 
       {isIndependent && (
         <div className="flex flex-wrap gap-2">

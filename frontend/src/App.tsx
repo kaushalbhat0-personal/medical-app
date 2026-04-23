@@ -44,6 +44,7 @@ import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
 import { ResetPassword } from './pages/ResetPassword';
+import { ClinicOnboardingPage } from './pages/doctor/ClinicOnboardingPage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -148,6 +149,21 @@ function AnimatedRoutes() {
               ) : (
                 <ResetPassword />
               )}
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/create-tenant" element={<Navigate to="/onboarding/clinic" replace />} />
+
+        <Route
+          path="/onboarding/clinic"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <DoctorRoute user={user}>
+                <AnimatedPage>
+                  <ClinicOnboardingPage />
+                </AnimatedPage>
+              </DoctorRoute>
             </ProtectedRoute>
           }
         />

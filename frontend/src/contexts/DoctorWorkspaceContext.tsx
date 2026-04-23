@@ -31,6 +31,8 @@ function resolveSelfDoctorFromList(
 export interface DoctorWorkspaceContextValue {
   /** The doctor row for the signed-in user, when it can be resolved from GET /doctors. */
   selfDoctor: Doctor | null;
+  /** Number of doctor profiles in the active tenant (from GET /doctors). */
+  tenantDoctorCount: number;
   /**
    * True when the signed-in user is linked to a doctor row in the current org (full mutating
    * workspace). Same behavior for all tenant types; server scopes by `tenant_id`.
@@ -50,6 +52,7 @@ const DoctorWorkspaceContext = createContext<DoctorWorkspaceContextValue | null>
 export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [selfDoctor, setSelfDoctor] = useState<Doctor | null>(null);
+  const [tenantDoctorCount, setTenantDoctorCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,20 +63,30 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
       const eff = getEffectiveRoles(user, token);
       let me: Doctor | null = null;
-      if (isDoctorRole(eff) && user?.doctor_id) {
-        try {
-          me = await doctorsApi.getOne(String(user.doctor_id));
-        } catch {
-          me = null;
+      if (!isDoctorRole(eff)) {
+        setSelfDoctor(null);
+        setTenantDoctorCount(0);
+        return;
+      }
+      const list = await doctorsApi.getAll();
+      setTenantDoctorCount(list.length);
+      if (user?.doctor_id) {
+        me = list.find((d) => String(d.id) === String(user.doctor_id)) ?? null;
+        if (me == null) {
+          try {
+            me = await doctorsApi.getOne(String(user.doctor_id));
+          } catch {
+            me = null;
+          }
         }
       }
       if (me == null) {
-        const list = await doctorsApi.getAll();
         me = resolveSelfDoctorFromList(list, user?.email);
       }
       setSelfDoctor(me);
     } catch {
       setSelfDoctor(null);
+      setTenantDoctorCount(0);
       setError('Could not load your organization profile');
     } finally {
       setLoading(false);
@@ -103,6 +116,7 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       selfDoctor,
+      tenantDoctorCount,
       isIndependent,
       isReadOnly,
       profilePartial,
@@ -110,7 +124,7 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
       error,
       refetch: load,
     }),
-    [selfDoctor, isIndependent, isReadOnly, profilePartial, loading, error, load]
+    [selfDoctor, tenantDoctorCount, isIndependent, isReadOnly, profilePartial, loading, error, load]
   );
 
   return (
