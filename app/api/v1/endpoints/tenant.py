@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user, get_current_user_optional
 from app.core.database import get_db
 from app.crud import crud_tenant
-from app.models.tenant import Tenant
+from app.models.tenant import Tenant, TenantType
 from app.models.user import User, UserRole
 from app.schemas.tenant import (
     TenantCreate,
@@ -75,8 +75,8 @@ def read_tenants(
     current_user: User | None = Depends(get_current_user_optional),
 ) -> list[TenantPublicRead]:
     """
-    Super admins (authenticated) see all active hospitals and clinics.
-    Everyone else gets the public hospital list (e.g. patient marketplace).
+    Super admins (authenticated) see all active tenants.
+    Everyone else gets active tenants of type organization or individual (e.g. marketplace).
     """
     if (
         current_user is not None
@@ -88,7 +88,11 @@ def read_tenants(
         )
     else:
         rows = crud_tenant.list_tenants(
-            db, type="hospital", is_active=True, skip=skip, limit=limit
+            db,
+            type_in=(TenantType.organization.value, TenantType.individual.value),
+            is_active=True,
+            skip=skip,
+            limit=limit,
         )
     return [TenantPublicRead.model_validate(t) for t in rows]
 

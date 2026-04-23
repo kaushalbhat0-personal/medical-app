@@ -20,10 +20,8 @@ from app.core.database import Base
 
 
 class TenantType(str, enum.Enum):
-    hospital = "hospital"
-    independent_doctor = "independent_doctor"
-    clinic = "clinic"
-    # Self-service signup: solo practice vs org-owned tenant
+    """Solo practice vs multi-staff org; only these values are stored."""
+
     individual = "individual"
     organization = "organization"
 
@@ -38,6 +36,10 @@ class Tenant(Base):
             "phone IS NULL OR length(phone) <= 50",
             name="chk_tenants_phone_length",
         ),
+        CheckConstraint(
+            "type IN ('individual', 'organization')",
+            name="chk_tenants_type_values",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -50,7 +52,7 @@ class Tenant(Base):
     type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        default=TenantType.hospital,
+        default=TenantType.organization,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)

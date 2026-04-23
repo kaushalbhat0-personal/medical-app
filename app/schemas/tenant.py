@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.tenant import TenantType
 
@@ -15,7 +15,7 @@ class TenantAdminCreate(BaseModel):
 
 class TenantCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    type: TenantType = TenantType.hospital
+    type: TenantType = TenantType.organization
     admin: TenantAdminCreate | None = None
     address: str | None = Field(default=None, max_length=500)
     phone: str | None = Field(default=None, max_length=50)
@@ -24,12 +24,6 @@ class TenantCreate(BaseModel):
         max_length=255,
         description="URL-safe identifier (e.g. apollo-hospital-pune). Stored lowercased.",
     )
-
-    @model_validator(mode="after")
-    def reject_unsupported_org_type(self) -> TenantCreate:
-        if self.type == TenantType.independent_doctor:
-            raise ValueError("independent_doctor is not supported for this endpoint")
-        return self
 
 
 class TenantPublicRead(BaseModel):

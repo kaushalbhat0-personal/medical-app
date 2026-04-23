@@ -16,7 +16,7 @@ export const tenantsApi = {
     return response.data as Tenant;
   },
 
-  create: async (payload: { name: string; type: 'clinic' | 'hospital' }): Promise<Tenant> => {
+  create: async (payload: { name: string; type: 'organization' }): Promise<Tenant> => {
     const response = await api.post('/tenants', payload);
     return response.data as Tenant;
   },

@@ -22,11 +22,11 @@ from tests.factories import (
 
 @pytest.mark.asyncio
 async def test_public_tenants_counts_and_sole_doctor(client: AsyncClient, db_session: Session) -> None:
-    clinic = create_tenant(db_session, name="Apollo Multi", tenant_type=TenantType.clinic)
+    clinic = create_tenant(db_session, name="Apollo Multi", tenant_type=TenantType.organization)
     create_doctor_profile(db_session, tenant_id=clinic.id)
     create_doctor_profile(db_session, tenant_id=clinic.id)
 
-    solo_t = create_tenant(db_session, name="Solo Practice", tenant_type=TenantType.clinic)
+    solo_t = create_tenant(db_session, name="Solo Practice", tenant_type=TenantType.organization)
     d_solo = create_doctor_profile(db_session, tenant_id=solo_t.id)
     d_solo.name = "Dr Solo"
     db_session.flush()

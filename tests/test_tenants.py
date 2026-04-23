@@ -49,7 +49,7 @@ async def test_create_hospital_creates_admin_user_and_mapping(
         "/api/v1/tenants",
         json={
             "name": hospital_name,
-            "type": "hospital",
+            "type": "organization",
             "admin": {"email": admin_email_mixed, "password": "Hospital9!"},
             "phone": "  +1 555 0100  ",
         },
@@ -58,7 +58,7 @@ async def test_create_hospital_creates_admin_user_and_mapping(
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["name"] == hospital_name
-    assert data["type"] == "hospital"
+    assert data["type"] == "organization"
     assert data["admin_email"] == expected_email
     assert data["phone"] == "+1 555 0100"
 
@@ -114,12 +114,12 @@ async def test_create_hospital_duplicate_name_race(
     hospital_name = f"Race Hospital {suffix}"
     body_a = {
         "name": hospital_name,
-        "type": "hospital",
+        "type": "organization",
         "admin": {"email": f"admin_race_a_{suffix}@example.com", "password": "Hospital9!"},
     }
     body_b = {
         "name": hospital_name,
-        "type": "hospital",
+        "type": "organization",
         "admin": {"email": f"admin_race_b_{suffix}@example.com", "password": "Hospital9!"},
     }
     auth = {"Authorization": f"Bearer {token}"}
@@ -163,7 +163,7 @@ async def test_create_hospital_idempotency_key_returns_same_tenant(
     admin_email = f"admin_idem_{suffix}@example.com"
     body = {
         "name": hospital_name,
-        "type": "hospital",
+        "type": "organization",
         "admin": {"email": admin_email, "password": "Hospital9!"},
     }
     key = f"idem-{suffix}"
@@ -203,13 +203,13 @@ async def test_create_org_minimal_clinic_no_admin(
     clinic_name = f"Minimal Clinic {suffix}"
     resp = await client.post(
         "/api/v1/tenants",
-        json={"name": clinic_name, "type": "clinic"},
+        json={"name": clinic_name, "type": "organization"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["name"] == clinic_name
-    assert data["type"] == "clinic"
+    assert data["type"] == "organization"
     assert data.get("admin_email") is None
     tid = UUID(data["id"])
     tenant = db.get(Tenant, tid)
@@ -229,7 +229,7 @@ async def test_super_admin_list_includes_clinics(
         role=UserRole.super_admin,
     )
     suffix = uuid.uuid4().hex[:8]
-    create_tenant(db, name=f"List Clinic {suffix}", tenant_type=TenantType.clinic)
+    create_tenant(db, name=f"List Clinic {suffix}", tenant_type=TenantType.organization)
     db.commit()
 
     login = await client.post(
@@ -244,7 +244,7 @@ async def test_super_admin_list_includes_clinics(
     )
     assert resp.status_code == 200
     types = {row["type"] for row in resp.json()}
-    assert "clinic" in types
+    assert "organization" in types
 
 
 @pytest.mark.asyncio
@@ -260,7 +260,7 @@ async def test_get_tenant_by_id_super_admin(
         role=UserRole.super_admin,
     )
     suffix = uuid.uuid4().hex[:8]
-    t = create_tenant(db, name=f"Detail Clinic {suffix}", tenant_type=TenantType.clinic)
+    t = create_tenant(db, name=f"Detail Clinic {suffix}", tenant_type=TenantType.organization)
     db.commit()
 
     login = await client.post(
@@ -406,3 +406,61 @@ async def test_upgrade_to_organization_preserves_data_and_enables_admin(
     }
     r_docs = await client.get("/api/v1/doctors", headers=admin_headers)
     assert r_docs.status_code == 200, r_docs.text
+
+
+@pytest.mark.asyncio
+async def test_create_tenant_rejects_legacy_type_value(client: AsyncClient, db_session: Session) -> None:
+    db = db_session
+    super_email = f"sa_badtype_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    db.commit()
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    r = await client.post(
+        "/api/v1/tenants",
+        json={
+            "name": f"Legacy {uuid.uuid4().hex[:8]}",
+            "type": "hospital",
+            "admin": {"email": f"adm_{uuid.uuid4().hex[:8]}@example.com", "password": "Hospital9!"},
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_tenant_rejects_individual_type(client: AsyncClient, db_session: Session) -> None:
+    db = db_session
+    super_email = f"sa_ind_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    db.commit()
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    r = await client.post(
+        "/api/v1/tenants",
+        json={
+            "name": f"Solo {uuid.uuid4().hex[:8]}",
+            "type": "individual",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
+    assert "individual" in r.json()["detail"].lower()

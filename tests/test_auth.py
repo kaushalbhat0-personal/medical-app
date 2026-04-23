@@ -8,6 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
+from app.models.tenant import TenantType
 from app.models.user import User, UserRole
 from tests.factories import create_tenant, create_user
 
@@ -119,3 +120,36 @@ async def test_reset_password_updates_hash_and_clears_flag(
     )
     assert login2.status_code == 200
     assert login2.json().get("force_password_reset") is False
+
+
+@pytest.mark.asyncio
+async def test_me_includes_tenant_id_and_type(client: AsyncClient, db_session: Session) -> None:
+    db = db_session
+    tenant = create_tenant(
+        db, name=f"solo_{uuid.uuid4().hex[:8]}", tenant_type=TenantType.individual
+    )
+    email = f"me_{uuid.uuid4().hex[:10]}@example.com"
+    create_user(
+        db,
+        email=email,
+        password="SecretPass9!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+    )
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": email, "password": "SecretPass9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    r = await client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["tenant_id"] == str(tenant.id)
+    assert data["tenant"] is not None
+    assert data["tenant"]["id"] == str(tenant.id)
+    assert data["tenant"]["type"] == "individual"

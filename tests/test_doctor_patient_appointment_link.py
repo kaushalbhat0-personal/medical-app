@@ -34,7 +34,7 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
     db_session: Session,
 ) -> None:
     """Appointment links patient to doctor; doctor did not create the patient record."""
-    tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"doclink_{uuid.uuid4().hex[:8]}@test.local",
@@ -100,7 +100,7 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
 def test_two_doctors_same_tenant_patient_list_isolated(
     db_session: Session,
 ) -> None:
-    tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     doc_a_user = create_user(
         db_session,
         email=f"da_{uuid4().hex[:8]}@test.local",

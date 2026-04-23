@@ -89,6 +89,13 @@ class OrganizationUserCreate(BaseModel):
         return v
 
 
+class UserMeTenantBrief(BaseModel):
+    """Tenant context for the authenticated user (GET /me); type is the UI/org-mode source of truth."""
+
+    id: UUID
+    type: str
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,6 +111,8 @@ class UserRead(BaseModel):
     tenant_id: UUID | None = None
     """Primary doctor row for this user when one is linked (SSOT for X-Data-Scope doctor context)."""
     doctor_id: UUID | None = None
+    tenant: UserMeTenantBrief | None = None
+    """Resolved from ``users.tenant_id``; ``type`` is ``individual`` or ``organization``."""
     created_at: datetime
     updated_at: datetime
 

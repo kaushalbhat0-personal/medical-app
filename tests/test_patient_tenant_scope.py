@@ -47,7 +47,7 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
     db_session: Session,
 ) -> None:
     """Admin tenant scope lists by ``Patient.tenant_id``; booking aligns tenant like ``create_appointment``."""
-    tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
         email=f"adm_tnull_{uuid.uuid4().hex[:8]}@test.local",
@@ -176,8 +176,8 @@ def test_admin_sees_patient_with_foreign_tenant_id_when_appointment_in_tenant(
     db_session: Session,
 ) -> None:
     """Cross-clinic: admin lists by appointment tenant even when patient.tenant_id is another org."""
-    tenant_home = create_tenant(db_session, tenant_type=TenantType.clinic)
-    tenant_visit = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant_home = create_tenant(db_session, tenant_type=TenantType.organization)
+    tenant_visit = create_tenant(db_session, tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
         email=f"adm_xc_{uuid.uuid4().hex[:8]}@test.local",
@@ -236,7 +236,7 @@ def test_doctor_read_requires_appointment_not_created_by(
     db_session: Session,
 ) -> None:
     """Doctor without an appointment to the patient is denied; creator-only is not enough."""
-    tenant = create_tenant(db_session, tenant_type=TenantType.hospital)
+    tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     doc_a = create_user(
         db_session,
         email=f"dca_{uuid.uuid4().hex[:8]}@test.local",
@@ -304,8 +304,8 @@ async def test_admin_sees_all_patients_in_tenant(
     client: AsyncClient, db_session: Session
 ) -> None:
     """GET /patients with tenant scope lists patients where ``patient.tenant_id`` matches the org."""
-    t1 = create_tenant(db_session, tenant_type=TenantType.clinic)
-    t_other = create_tenant(db_session, tenant_type=TenantType.clinic)
+    t1 = create_tenant(db_session, tenant_type=TenantType.organization)
+    t_other = create_tenant(db_session, tenant_type=TenantType.organization)
 
     admin = create_user(
         db_session,
@@ -427,7 +427,7 @@ async def test_doctor_sees_only_own_patients(
     client: AsyncClient, db_session: Session
 ) -> None:
     """Practice-scoped listing includes only patients with an appointment to the logged-in doctor."""
-    t1 = create_tenant(db_session, tenant_type=TenantType.clinic)
+    t1 = create_tenant(db_session, tenant_type=TenantType.organization)
 
     d1_user = create_user(
         db_session,
@@ -523,7 +523,7 @@ async def test_doctor_sees_only_own_patients(
 
 def test_patient_visible_after_booking(db_session: Session) -> None:
     """After an appointment exists, the doctor can list that patient in practice scope."""
-    tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"doc_pb_{uuid.uuid4().hex[:8]}@test.local",
@@ -572,7 +572,7 @@ def test_patient_visible_after_booking(db_session: Session) -> None:
 
 def test_admin_sees_all_patients(db_session: Session) -> None:
     """Admin tenant scope returns every patient row with that ``tenant_id``."""
-    t1 = create_tenant(db_session, tenant_type=TenantType.clinic)
+    t1 = create_tenant(db_session, tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
         email=f"adm_sa_{uuid.uuid4().hex[:8]}@test.local",

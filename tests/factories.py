@@ -32,7 +32,7 @@ def _wall_clock_to_utc_appointment(d: date, t: time, zone: ZoneInfo) -> datetime
     return normalize_appointment_time_utc(datetime.combine(d, t, tzinfo=zone).astimezone(timezone.utc))
 
 
-def create_tenant(db: Session, *, name: str | None = None, tenant_type: TenantType = TenantType.clinic) -> Tenant:
+def create_tenant(db: Session, *, name: str | None = None, tenant_type: TenantType = TenantType.organization) -> Tenant:
     t = Tenant(name=name or f"Test Tenant {uuid.uuid4().hex[:8]}", type=tenant_type.value)
     db.add(t)
     db.flush()
@@ -192,7 +192,7 @@ def seed_bookable_doctor_and_patient(
     patient_password: str,
     doctor_force_password_reset: bool = False,
 ) -> tuple[Doctor, Patient, datetime]:
-    tenant = create_tenant(db, tenant_type=TenantType.clinic)
+    tenant = create_tenant(db, tenant_type=TenantType.organization)
     doc_user = create_user(
         db,
         email=doctor_email,
@@ -362,7 +362,7 @@ def extend_playwright_e2e_seed(
 
 def seed_e2e_hospital_doctor(db: Session) -> dict[str, str]:
     """Organization-managed (hospital) doctor for read-only schedule UI E2E."""
-    tenant = create_tenant(db, name="E2E Hospital Tenant", tenant_type=TenantType.hospital)
+    tenant = create_tenant(db, name="E2E Hospital Tenant", tenant_type=TenantType.organization)
     doc_user = create_user(
         db,
         email="e2e-hospital-doctor@local.test",

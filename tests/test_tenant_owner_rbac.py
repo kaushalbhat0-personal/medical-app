@@ -21,7 +21,7 @@ def _headers(token: str, tenant_id) -> dict[str, str]:
 
 @pytest.mark.asyncio
 async def test_owner_doctor_can_access_admin_metrics(client: AsyncClient, db_session: Session) -> None:
-    tenant = create_tenant(db_session, name=f"own-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, name=f"own-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.organization)
     owner = create_user(
         db_session,
         email=f"owner_{uuid.uuid4().hex[:8]}@t.local",
@@ -47,7 +47,7 @@ async def test_owner_doctor_can_access_admin_metrics(client: AsyncClient, db_ses
 async def test_non_owner_doctor_cannot_access_admin_metrics(
     client: AsyncClient, db_session: Session
 ) -> None:
-    tenant = create_tenant(db_session, name=f"no-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, name=f"no-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.organization)
     doc = create_user(
         db_session,
         email=f"doc_{uuid.uuid4().hex[:8]}@t.local",
@@ -73,7 +73,7 @@ async def test_non_owner_doctor_cannot_access_admin_metrics(
 async def test_owner_retains_admin_access_after_second_doctor_added(
     client: AsyncClient, db_session: Session
 ) -> None:
-    tenant = create_tenant(db_session, name=f"two-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, name=f"two-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.organization)
     owner = create_user(
         db_session,
         email=f"own2_{uuid.uuid4().hex[:8]}@t.local",
@@ -108,7 +108,7 @@ async def test_owner_retains_admin_access_after_second_doctor_added(
 async def test_cannot_delete_practice_owner_doctor_profile(
     client: AsyncClient, db_session: Session
 ) -> None:
-    tenant = create_tenant(db_session, name=f"del-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.clinic)
+    tenant = create_tenant(db_session, name=f"del-{uuid.uuid4().hex[:6]}", tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
         email=f"adm_{uuid.uuid4().hex[:8]}@t.local",

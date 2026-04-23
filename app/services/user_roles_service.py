@@ -8,8 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.doctor import Doctor
+from app.models.tenant import Tenant
 from app.models.user import User, UserRole
-from app.schemas.user import UserRead, UserResponse
+from app.schemas.user import UserMeTenantBrief, UserRead, UserResponse
 
 
 def _linked_doctor_id(db: Session, user: User) -> uuid.UUID | None:
@@ -47,7 +48,14 @@ def roles_and_doctor_id_for_user(db: Session, user: User) -> tuple[list[str], uu
 def user_read_with_roles(db: Session, user: User) -> UserRead:
     base = UserRead.model_validate(user)
     roles, doctor_id = roles_and_doctor_id_for_user(db, user)
-    return base.model_copy(update={"roles": roles, "doctor_id": doctor_id})
+    tenant_brief: UserMeTenantBrief | None = None
+    if user.tenant_id is not None:
+        row = db.get(Tenant, user.tenant_id)
+        if row is not None:
+            tenant_brief = UserMeTenantBrief(id=row.id, type=str(row.type))
+    return base.model_copy(
+        update={"roles": roles, "doctor_id": doctor_id, "tenant": tenant_brief}
+    )
 
 
 def user_response_with_roles(db: Session, user: User) -> UserResponse:

@@ -78,7 +78,7 @@ def _doctor_user_and_billing_for_tenant(
 
 
 def test_clinic_doctor_can_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"clinicdoc_{uuid.uuid4().hex[:8]}@test.local",
@@ -96,7 +96,7 @@ def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
     db_session: Session,
 ) -> None:
     """Doctors only see patients with a non-deleted appointment to them."""
-    tenant = _tenant(db_session, TenantType.hospital)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_a_user = create_user(
         db_session,
         email=f"hos_a_{uuid.uuid4().hex[:8]}@test.local",
@@ -168,8 +168,8 @@ def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
 
 
 def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> None:
-    tenant_a = _tenant(db_session, TenantType.hospital)
-    tenant_b = _tenant(db_session, TenantType.hospital)
+    tenant_a = _tenant(db_session, TenantType.organization)
+    tenant_b = _tenant(db_session, TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"cross_a_{uuid.uuid4().hex[:8]}@test.local",
@@ -199,7 +199,7 @@ def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> No
 
 
 def test_hospital_doctor_can_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.hospital)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"hosdoc_{uuid.uuid4().hex[:8]}@test.local",
@@ -214,7 +214,7 @@ def test_hospital_doctor_can_create_patient(db_session: Session) -> None:
 
 
 def test_hospital_doctor_can_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.hospital)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user, billing_in = _doctor_user_and_billing_for_tenant(
         db_session, tenant, "hb"
     )
@@ -224,7 +224,7 @@ def test_hospital_doctor_can_create_bill(db_session: Session) -> None:
 
 
 def test_clinic_doctor_can_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user, billing_in = _doctor_user_and_billing_for_tenant(
         db_session, tenant, "cb"
     )
@@ -234,7 +234,7 @@ def test_clinic_doctor_can_create_bill(db_session: Session) -> None:
 
 
 def test_doctor_without_profile_cannot_create_patient(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"nodoc_{uuid.uuid4().hex[:8]}@test.local",
@@ -249,7 +249,7 @@ def test_doctor_without_profile_cannot_create_patient(db_session: Session) -> No
 
 
 def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user_no_profile = create_user(
         db_session,
         email=f"nodocb_{uuid.uuid4().hex[:8]}@test.local",
@@ -306,7 +306,7 @@ def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
 def test_doctor_create_bill_persists_for_completed_appointment(
     db_session: Session,
 ) -> None:
-    tenant = _tenant(db_session, TenantType.clinic)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user, billing_in = _doctor_user_and_billing_for_tenant(
         db_session, tenant, "ccreate"
     )
@@ -320,7 +320,7 @@ def test_doctor_create_bill_persists_for_completed_appointment(
 def test_doctor_create_bill_rejects_scheduled_appointment(
     db_session: Session,
 ) -> None:
-    tenant = _tenant(db_session, TenantType.hospital)
+    tenant = _tenant(db_session, TenantType.organization)
     doc_user = create_user(
         db_session,
         email=f"sched_{uuid.uuid4().hex[:8]}@test.local",

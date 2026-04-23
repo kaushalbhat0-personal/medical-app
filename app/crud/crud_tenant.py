@@ -94,7 +94,7 @@ def create_tenant_tx(
     db: Session,
     *,
     name: str,
-    type: TenantType | str = TenantType.hospital,
+    type: TenantType | str = TenantType.organization,
     is_active: bool = True,
     address: str | None = None,
     phone: str | None = None,
@@ -119,12 +119,15 @@ def list_tenants(
     db: Session,
     *,
     type: str | None = None,
+    type_in: tuple[str, ...] | None = None,
     is_active: bool | None = True,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Tenant]:
     stmt = select(Tenant).order_by(Tenant.created_at.desc())
-    if type is not None:
+    if type_in is not None:
+        stmt = stmt.where(Tenant.type.in_(type_in))
+    elif type is not None:
         stmt = stmt.where(Tenant.type == type)
     if is_active is not None:
         stmt = stmt.where(Tenant.is_active == is_active)

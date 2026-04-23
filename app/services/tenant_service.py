@@ -18,7 +18,7 @@ from app.services.security_audit import log_audit_mutation
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_ORG_TYPES = frozenset({TenantType.hospital, TenantType.clinic})
+_ALLOWED_SUPERADMIN_CREATE_TYPES = frozenset({TenantType.organization})
 
 
 def _tenant_payload_hash(tenant_in: TenantCreate) -> str:
@@ -65,8 +65,8 @@ def create_tenant_minimal(
 ) -> tuple[Tenant, None]:
     if tenant_in.admin is not None:
         raise ValidationError("Admin credentials are not used for organization-only creation")
-    if tenant_in.type not in _ALLOWED_ORG_TYPES:
-        raise ValidationError("Type must be hospital or clinic")
+    if tenant_in.type not in _ALLOWED_SUPERADMIN_CREATE_TYPES:
+        raise ValidationError("Type must be organization")
 
     if idempotency_key is not None:
         idempotency_key = idempotency_key.strip() or None
@@ -152,8 +152,8 @@ def create_tenant_with_admin(
 ) -> tuple[Tenant, str]:
     if tenant_in.admin is None:
         raise ValidationError("Admin credentials are required for this creation mode")
-    if tenant_in.type not in _ALLOWED_ORG_TYPES:
-        raise ValidationError("Type must be hospital or clinic")
+    if tenant_in.type not in _ALLOWED_SUPERADMIN_CREATE_TYPES:
+        raise ValidationError("Type must be organization")
 
     if idempotency_key is not None:
         idempotency_key = idempotency_key.strip() or None
@@ -305,9 +305,9 @@ def create_tenant(
 ) -> tuple[Tenant, str | None]:
     if current_user.role != UserRole.super_admin:
         raise ForbiddenError("Only super administrators can create tenants")
-    if tenant_in.type == TenantType.independent_doctor:
+    if tenant_in.type == TenantType.individual:
         raise ValidationError(
-            "Tenant type independent_doctor is deprecated; use clinic (solo practice uses the same type)"
+            "Tenant type individual is reserved for doctor self-signup; use organization for this API"
         )
     if tenant_in.admin is None:
         tenant, _ = create_tenant_minimal(

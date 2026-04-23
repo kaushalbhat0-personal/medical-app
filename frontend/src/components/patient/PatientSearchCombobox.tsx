@@ -25,9 +25,8 @@ const DEBOUNCE_MS = 200;
 
 function typeLabel(t: PublicTenantDiscovery): string {
   if (t.organization_label) return t.organization_label;
-  if (t.type === 'hospital') return 'Hospital';
-  if (t.type === 'clinic') return 'Clinic';
-  if (t.type === 'independent_doctor') return 'Practice';
+  if (t.type === 'individual') return 'Individual practice';
+  if (t.type === 'organization') return 'Organization';
   return t.type;
 }
 

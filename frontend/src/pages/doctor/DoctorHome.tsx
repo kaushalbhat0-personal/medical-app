@@ -10,7 +10,8 @@ import { useAppointments, useModalFocusTrap, usePatients } from '../../hooks';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { useAuth } from '../../hooks/useAuth';
-import { isDoctorOnlyRole, normalizeRoles } from '../../utils/roles';
+import { isDoctorOnlyRole } from '../../utils/roles';
+import { isIndividualTenantUser } from '../../utils/tenantMode';
 import { ErrorState } from '../../components/common';
 import { tenantsApi } from '../../services/tenants';
 import type { Appointment } from '../../types';
@@ -55,19 +56,11 @@ export function DoctorHome() {
   const navigate = useNavigate();
   const { user, patchUser, refreshUser } = useAuth();
   const { setMode } = useAppMode();
-  const { isIndependent, selfDoctor, loading: workspaceLoading, refetch: refetchWorkspace } =
-    useDoctorWorkspace();
+  const { selfDoctor, loading: workspaceLoading, refetch: refetchWorkspace } = useDoctorWorkspace();
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
-  const userRoles = user?.roles;
-  const isRolesOnlyDoctor =
-    Array.isArray(userRoles) &&
-    userRoles.length === 1 &&
-    normalizeRoles(userRoles)[0] === 'doctor';
+  const isIndividualDoctor = isIndividualTenantUser(user);
   const showUpgradeToClinic =
-    isRolesOnlyDoctor &&
-    isDoctorOnlyRole(user, token) &&
-    selfDoctor?.tenant_type === 'individual' &&
-    !workspaceLoading;
+    isIndividualDoctor && isDoctorOnlyRole(user, token) && !workspaceLoading;
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [clinicName, setClinicName] = useState('');
   const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
@@ -149,7 +142,7 @@ export function DoctorHome() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {isIndependent
+          {isIndividualDoctor
             ? 'A snapshot of your practice today — add care and billing as you go.'
             : 'A snapshot of patients and visits associated with you in this organization.'}
         </p>
@@ -235,7 +228,7 @@ export function DoctorHome() {
         </div>
       )}
 
-      {isIndependent && (
+      {isIndividualDoctor && selfDoctor && (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -275,7 +268,7 @@ export function DoctorHome() {
           <CardHeader>
             <CardTitle>Schedule</CardTitle>
             <CardDescription>
-              {isIndependent
+              {isIndividualDoctor
                 ? 'Book visits from the full day calendar on Appointments. This page stays a quick overview.'
                 : 'Your visit list and organization schedule live on Appointments.'}
             </CardDescription>

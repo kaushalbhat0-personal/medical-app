@@ -32,6 +32,6 @@ def ensure_default_tenant_exists() -> None:
             {
                 "id": as_db_uuid(str(DEFAULT_TENANT_ID), conn),
                 "name": DEFAULT_TENANT_NAME,
-                "type": TenantType.hospital.value,
+                "type": TenantType.organization.value,
             },
         )

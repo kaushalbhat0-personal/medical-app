@@ -63,7 +63,11 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
     const { isDoctor: d, isAdmin: a, isDual: dual } = detect(user, t);
     const raw = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [];
     const rawNorm = normalizeRoles(raw);
-    if (rawNorm.length === 1 && rawNorm[0] === 'doctor') {
+    // Tenant type from GET /me is the source of truth for practice vs org shell (not role alone).
+    if (user.tenant?.type === 'individual') {
+      setModeState('practice');
+      writeStoredAppMode('practice');
+    } else if (rawNorm.length === 1 && rawNorm[0] === 'doctor') {
       setModeState('practice');
       writeStoredAppMode('practice');
     } else if (dual) {
@@ -76,16 +80,6 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated, user]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !user) return;
-    console.log('[ROLE_DEBUG]', {
-      roles: user.roles,
-      mode,
-      doctor_id: user.doctor_id,
-      tenant_id: user.tenant_id,
-    });
-  }, [isAuthenticated, user, mode]);
-
   const setMode = useCallback((m: AppMode) => {
     setModeState(m);
     writeStoredAppMode(m);
@@ -94,11 +88,12 @@ export function AppModeProvider({ children }: { children: ReactNode }) {
 
   const resolvedMode: AppMode = useMemo(() => {
     if (!isAuthenticated) return 'practice';
+    if (user?.tenant?.type === 'individual') return 'practice';
     if (isDoctor && !isAdmin) return 'practice';
     if (isAdmin && !isDoctor) return 'admin';
     if (isDualModeUser) return mode;
     return 'admin';
-  }, [isAuthenticated, isAdmin, isDoctor, isDualModeUser, mode]);
+  }, [isAuthenticated, user?.tenant?.type, isAdmin, isDoctor, isDualModeUser, mode]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

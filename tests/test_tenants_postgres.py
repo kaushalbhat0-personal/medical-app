@@ -57,7 +57,7 @@ async def test_create_hospital_concurrent_name_collision_single_201(
             "/api/v1/tenants",
             json={
                 "name": hospital_name,
-                "type": "hospital",
+                "type": "organization",
                 "admin": {
                     "email": f"admin_pg_conc_{suffix}_{n}@example.com",
                     "password": "Hospital9!",

@@ -34,8 +34,8 @@ def _seed_tenant_a_metrics(
     db: Session,
 ) -> tuple[object, float, float, int, int, float, object, str, str]:
     """Returns (tenant, exp_total_rev, exp_rev_today, appts_today, completed, pending_sum, other_tenant, admin_email, admin_password)."""
-    tenant_a = create_tenant(db, name="metrics-a", tenant_type=TenantType.hospital)
-    tenant_b = create_tenant(db, name="metrics-b", tenant_type=TenantType.hospital)
+    tenant_a = create_tenant(db, name="metrics-a", tenant_type=TenantType.organization)
+    tenant_b = create_tenant(db, name="metrics-b", tenant_type=TenantType.organization)
     other = tenant_b
 
     admin = create_user(
@@ -434,8 +434,8 @@ def _seed_tenant_revenue_trend_minimal(
     db: Session,
 ) -> tuple[object, str, str, object, object]:
     """tenant_a, admin_email, admin_password, tenant_b, b_bill (for isolation check)."""
-    tenant_a = create_tenant(db, name="rtrend-a", tenant_type=TenantType.hospital)
-    tenant_b = create_tenant(db, name="rtrend-b", tenant_type=TenantType.hospital)
+    tenant_a = create_tenant(db, name="rtrend-a", tenant_type=TenantType.organization)
+    tenant_b = create_tenant(db, name="rtrend-b", tenant_type=TenantType.organization)
     admin = create_user(
         db,
         email=f"rt_ad_{uuid.uuid4().hex[:10]}@test.local",
@@ -585,8 +585,8 @@ def _seed_doctor_performance_tenant(
       exp_revenue,
     ).
     """
-    tenant_a = create_tenant(db, name="dperf-a", tenant_type=TenantType.hospital)
-    tenant_b = create_tenant(db, name="dperf-b", tenant_type=TenantType.hospital)
+    tenant_a = create_tenant(db, name="dperf-a", tenant_type=TenantType.organization)
+    tenant_b = create_tenant(db, name="dperf-b", tenant_type=TenantType.organization)
 
     admin = create_user(
         db,
@@ -809,7 +809,7 @@ async def test_doctor_performance_respects_tenant_isolation(
     t_a, d_data, d_empty, ad_email, ad_pw, _n, _c, exp_rev = _seed_doctor_performance_tenant(
         db_session
     )
-    t_b = create_tenant(db_session, name="dperf-iso", tenant_type=TenantType.hospital)
+    t_b = create_tenant(db_session, name="dperf-iso", tenant_type=TenantType.organization)
     db_session.commit()
     token = (
         await client.post(

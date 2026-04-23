@@ -20,7 +20,6 @@ import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForReques
 import { cn } from '@/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
-type OrgType = 'clinic' | 'hospital';
 type AddAdminTab = 'create' | 'promote';
 
 export function AdminTenantsPage() {
@@ -31,7 +30,6 @@ export function AdminTenantsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [createName, setCreateName] = useState('');
-  const [createType, setCreateType] = useState<OrgType>('clinic');
   const [creating, setCreating] = useState(false);
 
   const [addAdminTenant, setAddAdminTenant] = useState<Tenant | null>(null);
@@ -78,7 +76,6 @@ export function AdminTenantsPage() {
 
   const openCreate = () => {
     setCreateName('');
-    setCreateType('clinic');
     setModalOpen(true);
   };
 
@@ -90,7 +87,7 @@ export function AdminTenantsPage() {
     }
     setCreating(true);
     try {
-      const created = await tenantsApi.create({ name, type: createType });
+      const created = await tenantsApi.create({ name, type: 'organization' });
       setModalOpen(false);
       toast.success(`Created ${created.name}`);
       await load();
@@ -213,13 +210,13 @@ export function AdminTenantsPage() {
           <div>
             <h1 className="text-xl font-semibold text-foreground">Organizations</h1>
             <p className="text-sm text-muted-foreground">
-              Create hospitals and clinics, then choose which one to manage.
+              Create organizations, then choose which one to manage.
             </p>
           </div>
         </div>
         <Button onClick={openCreate} className="gap-2 shrink-0">
           <Plus className="h-4 w-4" />
-          Create clinic
+          Create organization
         </Button>
       </div>
 
@@ -503,20 +500,6 @@ export function AdminTenantsPage() {
                 placeholder="Apollo Clinic Pune"
                 autoComplete="off"
               />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="tenant-type" className="text-sm font-medium">
-                Type
-              </label>
-              <select
-                id="tenant-type"
-                value={createType}
-                onChange={(e) => setCreateType(e.target.value as OrgType)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="clinic">Clinic</option>
-                <option value="hospital">Hospital</option>
-              </select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>

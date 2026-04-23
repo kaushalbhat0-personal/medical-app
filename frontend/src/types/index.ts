@@ -1,3 +1,9 @@
+/** Nested tenant on GET /me — source of truth for individual vs organization UI mode. */
+export interface MeTenantBrief {
+  id: string;
+  type: 'individual' | 'organization' | string;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -11,6 +17,8 @@ export interface User {
   tenant_id?: string | null;
   /** Linked doctor row (GET /me); use for doctor-scoped UI and params. */
   doctor_id?: string | null;
+  /** From GET /me after sync — use ``type`` for practice vs org mode (not roles/localStorage). */
+  tenant?: MeTenantBrief | null;
   /** When true, client must complete password reset before using the app */
   force_password_reset?: boolean;
 }
@@ -25,6 +33,7 @@ export interface MeUserResponse {
   is_owner: boolean;
   tenant_id: string | null;
   doctor_id: string | null;
+  tenant: MeTenantBrief | null;
   created_at: string;
   updated_at: string;
 }

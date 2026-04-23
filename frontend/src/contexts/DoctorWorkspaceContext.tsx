@@ -91,7 +91,7 @@ export function DoctorWorkspaceProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user?.email, user?.doctor_id, user?.tenant_id]);
+  }, [user?.email, user?.doctor_id, user?.tenant_id, user?.tenant?.type]);
 
   useEffect(() => {
     void load();
