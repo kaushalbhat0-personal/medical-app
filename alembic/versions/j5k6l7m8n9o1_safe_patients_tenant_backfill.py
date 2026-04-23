@@ -44,13 +44,19 @@ AND p.tenant_id IS NULL
 
 
 def upgrade() -> None:
+    """Run backfill in a SAVEPOINT so a failed statement does not abort the migration txn."""
     bind = op.get_bind()
     dialect = bind.dialect.name
-    try:
+
+    def _backfill() -> None:
         if dialect == "postgresql":
             op.execute(text(_BACKFILL_PG))
         else:
             op.execute(text(_BACKFILL_SQLITE))
+
+    try:
+        with bind.begin_nested():
+            _backfill()
     except Exception:
         pass
 
