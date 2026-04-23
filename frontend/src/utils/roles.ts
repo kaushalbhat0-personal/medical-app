@@ -12,22 +12,47 @@ export function normalizeRoles(roles: string | string[] | null | undefined): str
 
 type RoleHint = { roles?: string[]; role?: string } | null | undefined;
 
+/** Merge role lists from multiple sources (local user blob, JWT). Preserves first-seen order, dedupes. */
+export function mergeRoleSources(
+  ...sources: (string[] | string | null | undefined)[]
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of sources) {
+    if (s == null) continue;
+    const arr = Array.isArray(s) ? s : [s];
+    for (const r of normalizeRoles(arr)) {
+      if (!seen.has(r)) {
+        seen.add(r);
+        out.push(r);
+      }
+    }
+  }
+  return out;
+}
+
 /**
- * Authoritative list for the signed-in user: user blob first, then JWT.
+ * Authoritative list for the signed-in user: merges stored `user.roles` with JWT `roles` /
+ * `role` so a stale localStorage blob (e.g. only `admin`) cannot hide `doctor` from the token.
  */
 export function getEffectiveRoles(user: RoleHint, token: string | null): string[] {
-  if (user?.roles && user.roles.length > 0) {
-    return normalizeRoles(user.roles);
-  }
-  if (user?.role) {
-    return normalizeRoles([user.role]);
-  }
-  const fromToken = rolesFromToken(token);
-  if (fromToken && fromToken.length > 0) {
-    return normalizeRoles(fromToken);
-  }
+  const fromUser =
+    user?.roles && user.roles.length > 0
+      ? user.roles
+      : user?.role
+        ? [user.role]
+        : [];
+  const tr = rolesFromToken(token);
   const single = roleFromToken(token);
-  return single ? normalizeRoles([single]) : [];
+  const fromToken = tr && tr.length > 0 ? tr : single ? [single] : [];
+  const merged = mergeRoleSources(fromUser, fromToken);
+  return merged.length > 0 ? merged : [];
+}
+
+/** Practice ↔ Admin toggle: must have both clinician and tenant org-admin (literal `admin`). */
+export function isDoctorAndOrgAdminRoles(roles: string | string[] | null | undefined): boolean {
+  const r = normalizeRoles(roles);
+  return r.includes('doctor') && r.includes('admin');
 }
 
 /** Backend sends role enum as lowercase string (e.g. patient, admin, doctor). */

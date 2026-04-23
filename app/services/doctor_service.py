@@ -622,6 +622,9 @@ def promote_doctor_to_admin(
     Single org admin per tenant: demote any existing ``users`` row with
     ``tenant_id`` + role *admin* to *doctor*, then set the selected doctor's
     linked user to *admin* with ``is_owner = True`` (same ``users.id``; no new row).
+    The linked :class:`~app.models.doctor.Doctor` row is **not** removed — API/JWT
+    ``roles`` from :func:`~app.services.user_roles_service.compute_roles_for_user`
+    remain ``["admin", "doctor"]`` (order may vary), not ``["admin"]`` alone.
     Caller must have already authorized admin/owner (or super_admin) for ``tenant_id``.
     """
     doctor = get_doctor_or_404(db, doctor_id)

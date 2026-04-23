@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { authApi, formatLoginError, patientsApi } from '../services';
 import { isOwnerFromToken, roleFromToken, rolesFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
-import { getEffectiveRoles, isPatientRole } from '../utils/roles';
+import { getEffectiveRoles, isPatientRole, mergeRoleSources } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
 import { setActiveTenantId } from '../utils/tenantIdForRequest';
 import { clearStoredAppMode } from '../constants/appMode';
@@ -129,14 +129,12 @@ function mergeUserWithToken(user: User, token: string | null): User {
   if (!token) return user;
   const fromToken = rolesFromToken(token);
   const single = roleFromToken(token);
-  const roles =
-    user.roles && user.roles.length > 0
-      ? user.roles
-      : fromToken && fromToken.length > 0
-        ? fromToken
-        : single
-          ? [single]
-          : user.roles;
+  const merged = mergeRoleSources(
+    user.roles?.length ? user.roles : [],
+    fromToken && fromToken.length > 0 ? fromToken : undefined,
+    single ? [single] : undefined
+  );
+  const roles = merged.length > 0 ? merged : user.roles;
   const tenant_id = user.tenant_id ?? tenantIdFromToken(token) ?? undefined;
   const ownerHint = isOwnerFromToken(token);
   return {

@@ -93,8 +93,6 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
 
         {centerSlot && <div className="min-w-0 flex-1">{centerSlot}</div>}
 
-        {user && <ModeSwitcher />}
-
         {showSwitcher && activeTenantId && !centerSlot ? (
           <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
             Managing:{' '}
@@ -154,7 +152,9 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
         ) : null}
       </div>
 
-      <div className="ml-3 flex flex-shrink-0 items-center gap-1 sm:gap-2">
+      <div className="ml-3 flex min-w-0 flex-shrink-0 items-center gap-1 sm:gap-2">
+        {user && <ModeSwitcher user={user} />}
+
         <div className="hidden items-center gap-0.5 sm:flex">
           <button
             className="relative rounded-xl p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

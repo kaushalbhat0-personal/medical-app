@@ -4,16 +4,29 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { buttonVariants } from '@/components/ui/button';
+import type { User } from '../../types';
+import { getEffectiveRoles, normalizeRoles } from '../../utils/roles';
 
 /**
- * Shown only for users with both doctor and org-admin access.
+ * Shown only for users with both `doctor` and org `admin` in effective roles.
  * UI mode does not change API permissions; it only changes navigation and theming.
  */
-export function ModeSwitcher() {
-  const { isDualModeUser, setMode, resolvedMode } = useAppMode();
+export function ModeSwitcher({ user }: { user: User | null }) {
+  const { setMode, resolvedMode } = useAppMode();
   const navigate = useNavigate();
 
-  if (!isDualModeUser) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const r = normalizeRoles(getEffectiveRoles(user, token));
+  const isDoctor = r.includes('doctor');
+  const isAdmin = r.includes('admin');
+  const showToggle = isDoctor && isAdmin;
+
+  if (import.meta.env.DEV) {
+    console.log(user?.roles);
+    console.log({ roles: r, isDoctor, isAdmin, showToggle });
+  }
+
+  if (!showToggle) {
     return null;
   }
 

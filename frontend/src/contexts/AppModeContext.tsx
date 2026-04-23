@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { User } from '../types';
-import { getEffectiveRoles, isAdminRole, isDoctorRole } from '../utils/roles';
+import { getEffectiveRoles, normalizeRoles } from '../utils/roles';
 import { type AppMode, readStoredAppMode, writeStoredAppMode } from '../constants/appMode';
 import { useAuth } from '../hooks/useAuth';
 
@@ -33,11 +33,13 @@ function detect(
   user: User | null,
   token: string | null
 ): { isDoctor: boolean; isAdmin: boolean; isDual: boolean } {
-  const r = getEffectiveRoles(user, token);
+  const r = normalizeRoles(getEffectiveRoles(user, token));
+  const isDoctor = r.includes('doctor');
+  const isAdmin = r.includes('admin');
   return {
-    isDoctor: isDoctorRole(r),
-    isAdmin: isAdminRole(r),
-    isDual: isDoctorRole(r) && isAdminRole(r),
+    isDoctor,
+    isAdmin,
+    isDual: isDoctor && isAdmin,
   };
 }
 
