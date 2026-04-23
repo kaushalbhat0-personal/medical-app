@@ -104,13 +104,26 @@ api.interceptors.response.use(
       });
     }
 
-    // Extract error message from response
-    const data = error.response?.data as { detail?: string; message?: string; errors?: string[] } | undefined;
+    // Extract error message from response (FastAPI 422 `detail` is often an array of objects)
+    const data = error.response?.data as
+      | { detail?: unknown; message?: string; errors?: string[] }
+      | undefined;
+    const rawDetail = data?.detail;
+    const detailString =
+      typeof rawDetail === 'string'
+        ? rawDetail
+        : Array.isArray(rawDetail) && rawDetail.length > 0
+          ? typeof (rawDetail[0] as { msg?: string })?.msg === 'string'
+            ? (rawDetail[0] as { msg: string }).msg
+            : 'Validation failed. Please check your input.'
+          : undefined;
     const message =
-      data?.detail ||
+      detailString ||
       data?.message ||
       data?.errors?.[0] ||
       handleApiError(error as AxiosError<ApiErrorResponse>);
+
+    const messageForToast = typeof message === 'string' ? message : 'Something went wrong.';
 
     // 401 means "your token is not valid for this request" (expired, revoked, missing, etc.).
     // This is the one case where we clear local state and force the login flow.
@@ -138,9 +151,14 @@ api.interceptors.response.use(
       toast.error('Resource not found.');
     }
 
+    // Handle 400 (service ValidationError, etc.); do not leave silent
+    else if (error.response?.status === 400) {
+      toast.error(messageForToast);
+    }
+
     // Handle validation errors (422)
     else if (error.response?.status === 422) {
-      toast.error(message);
+      toast.error(messageForToast);
     }
 
     // Handle 500+ Server errors
@@ -150,7 +168,7 @@ api.interceptors.response.use(
 
     // Generic fallback for other errors
     else if (![400, 409].includes(error.response?.status || 0)) {
-      toast.error(message);
+      toast.error(messageForToast);
     }
 
     // Return clean error data for consistent error handling

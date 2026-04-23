@@ -203,6 +203,20 @@ export const doctorsApi = {
     return response.data as Doctor;
   },
 
+  /**
+   * Set the doctor's linked user to org admin in-place (PATCH /doctors/{id}/promote).
+   * Requires X-Tenant-ID; does not create a new user.
+   */
+  promoteDoctor: async (
+    doctorId: string,
+    options: { tenantScopeId: string }
+  ): Promise<{ id: string; email: string; role: string; is_owner?: boolean }> => {
+    const { data } = await api.patch(`/doctors/${doctorId}/promote`, {}, {
+      headers: { 'X-Tenant-ID': options.tenantScopeId },
+    });
+    return data as { id: string; email: string; role: string; is_owner?: boolean };
+  },
+
   getAll: async (
     params?: { search?: string; skip?: number; limit?: number },
     options?: { tenantScopeId?: string }

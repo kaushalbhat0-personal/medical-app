@@ -11,10 +11,13 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_scoped_tenant_id,
+    get_scoped_tenant_id_active,
+    require_current_user_admin_or_owner,
 )
 from app.core.database import get_db
 from app.core.tenant_context import resolve_tenant_id_for_scoped_request
 from app.models.user import User, UserRole
+from app.schemas.user import UserRead
 from app.schemas.doctor import (
     DoctorAvailabilityCopyRequest,
     DoctorAvailabilityCreate,
@@ -80,6 +83,19 @@ def read_doctors(
         search=search,
         tenant_id=tenant_id,
     )
+
+
+@router.patch("/{doctor_id}/promote", response_model=UserRead)
+def promote_doctor_to_admin(
+    doctor_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_current_user_admin_or_owner),
+    tenant_id: UUID = Depends(get_scoped_tenant_id_active),
+) -> UserRead:
+    user = doctor_service.promote_doctor_to_admin(db, doctor_id, tenant_id)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.get("/{doctor_id}/slots", response_model=list[DoctorSlotRead])

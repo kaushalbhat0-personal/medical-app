@@ -613,6 +613,74 @@ def get_doctor_or_404(db: Session, doctor_id: UUID) -> Doctor:
     return doctor
 
 
+def promote_doctor_to_admin(
+    db: Session,
+    doctor_id: UUID,
+    tenant_id: UUID,
+) -> User:
+    """
+    Set the linked user's role to org admin in-place (same ``users.id``).
+    Does not create a new user, change ``users.tenant_id``, or alter the doctor row.
+    Caller must have already authorized admin/owner (or super_admin) for ``tenant_id``.
+    """
+    doctor = get_doctor_or_404(db, doctor_id)
+    if doctor.tenant_id is None or doctor.tenant_id != tenant_id:
+        raise NotFoundError("Doctor not found in this organization")
+    if doctor.user_id is None:
+        raise ValidationError("This doctor has no linked login account")
+    target = crud_user.get_user(db, doctor.user_id)
+    if target is None:
+        raise NotFoundError("User not found")
+    if target.role == UserRole.super_admin:
+        raise ForbiddenError("Cannot change super administrator role")
+    if target.role == UserRole.patient:
+        raise ValidationError("This account type cannot be promoted here")
+
+    if target.role == UserRole.admin:
+        ut = crud_tenant.get_user_tenant_row(
+            db, user_id=target.id, tenant_id=tenant_id
+        )
+        if ut is not None:
+            if ut.role != "admin":
+                ut.role = "admin"
+        else:
+            crud_tenant.create_user_tenant_tx(
+                db,
+                user_id=target.id,
+                tenant_id=tenant_id,
+                role=UserRole.admin.value,
+                is_primary=True,
+            )
+        db.add(target)
+        db.flush()
+        db.refresh(target)
+        return target
+
+    if target.role != UserRole.doctor:
+        raise ValidationError(
+            "Only a doctor in this organization can be promoted with this action"
+        )
+
+    target.role = UserRole.admin
+    ut = crud_tenant.get_user_tenant_row(
+        db, user_id=target.id, tenant_id=tenant_id
+    )
+    if ut is not None:
+        ut.role = "admin"
+    else:
+        crud_tenant.create_user_tenant_tx(
+            db,
+            user_id=target.id,
+            tenant_id=tenant_id,
+            role=UserRole.admin.value,
+            is_primary=True,
+        )
+    db.add(target)
+    db.flush()
+    db.refresh(target)
+    return target
+
+
 def get_doctor_or_404_with_tenant(db: Session, doctor_id: UUID) -> Doctor:
     """Doctor row with `tenant` loaded for RBAC and tenant scoping."""
     stmt = (

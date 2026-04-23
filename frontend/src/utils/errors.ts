@@ -5,15 +5,39 @@ export interface ApiErrorResponse {
   errors?: Record<string, string[]>;
 }
 
+/**
+ * Best-effort message for API rejects (`error.response.data`) or `Error` instances.
+ * FastAPI often sends `detail` as a string or a list of validation objects — never pass raw objects to React.
+ */
 export function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   if (typeof error === 'string') {
     return error;
   }
-  
+
+  if (error && typeof error === 'object' && 'detail' in error) {
+    const d = (error as { detail?: unknown }).detail;
+    if (typeof d === 'string' && d) {
+      return d;
+    }
+    if (Array.isArray(d) && d.length > 0) {
+      const first = d[0] as { msg?: string } | undefined;
+      if (first && typeof first === 'object' && typeof first.msg === 'string') {
+        return first.msg;
+      }
+    }
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const m = (error as { message?: unknown }).message;
+    if (typeof m === 'string' && m) {
+      return m;
+    }
+  }
+
   return 'An unexpected error occurred. Please try again.';
 }
 

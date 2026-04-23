@@ -166,19 +166,24 @@ export function AdminTenantsPage() {
 
   const promoteDoctorToAdmin = async (d: Doctor) => {
     if (!addAdminTenant) return;
-    const uid = d.user_id != null ? String(d.user_id) : null;
-    if (!uid) {
+    const hasLogin = d.user_id != null && String(d.user_id).length > 0;
+    if (!hasLogin) {
       toast.error('This doctor has no login account to promote.');
       return;
     }
-    setPromotingUserId(uid);
+    const doctorId = String(d.id);
+    setPromotingUserId(String(d.user_id));
     try {
-      await usersApi.patchUserRole(uid, { role: 'admin' }, addAdminTenant.id);
-      toast.success(`${d.name ?? 'Doctor'} is now an admin.`);
+      await doctorsApi.promoteDoctor(doctorId, { tenantScopeId: addAdminTenant.id });
+      toast.success(`${d.name != null && String(d.name).trim() !== '' ? String(d.name) : 'Doctor'} is now an admin.`);
       await load();
       await loadDoctorsForPromote(addAdminTenant);
-    } catch {
-      toast.error('Could not promote user');
+    } catch (e: unknown) {
+      // Network / cold start: not toasted by the axios success path; API errors are toasted in `api` interceptor
+      if (e && typeof e === 'object' && (e as { __networkError?: boolean }).__networkError) {
+        const msg = (e as { message?: string }).message;
+        toast.error(typeof msg === 'string' && msg ? msg : 'Could not complete request. Try again.');
+      }
     } finally {
       setPromotingUserId(null);
     }
