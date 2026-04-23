@@ -20,7 +20,9 @@ export default {
         primary: {
           DEFAULT: "var(--primary)",
           foreground: "var(--primary-foreground)",
+          hover: "var(--primary-hover)",
         },
+        success: "var(--success)",
         secondary: {
           DEFAULT: "var(--secondary)",
           foreground: "var(--secondary-foreground)",
@@ -41,14 +43,17 @@ export default {
         input: "var(--input)",
         ring: "var(--ring)",
         surface: {
-          DEFAULT: "#1e293b",
-          hover: "#334155",
-          light: "#475569",
+          DEFAULT: "#ffffff",
+          hover: "#f1f5f9",
+          light: "#e2e8f0",
         },
         text: {
-          primary: "#f8fafc",
-          secondary: "#94a3b8",
+          primary: "#0f172a",
+          secondary: "#64748b",
           muted: "#64748b",
+        },
+        brand: {
+          accent: "#22c55e",
         },
       },
       borderRadius: {
@@ -58,10 +63,11 @@ export default {
         xl: "24px",
       },
       boxShadow: {
-        sm: "0 1px 2px 0 rgba(0, 0, 0, 0.3)",
-        md: "0 4px 6px -1px rgba(0, 0, 0, 0.4)",
-        lg: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
-        glow: "0 0 20px rgba(37, 99, 235, 0.3)",
+        sm: "0 1px 2px 0 rgba(15, 23, 42, 0.06)",
+        md: "0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06)",
+        lg: "0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.06)",
+        glow: "0 0 20px rgba(37, 99, 235, 0.2)",
+        card: "0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04)",
       },
       transitionTimingFunction: {
         smooth: "cubic-bezier(0.4, 0, 0.2, 1)",

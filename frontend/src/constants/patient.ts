@@ -21,6 +21,18 @@ export const EMPTY_PATIENT = {
   phone: '',
 };
 
+/** Pills and search shortcuts — matches common booking intents. */
+export const POPULAR_SPECIALIZATIONS = [
+  'General Physician',
+  'Dermatology',
+  'Pediatrics',
+  'Cardiology',
+  'Gynecology',
+  'Orthopedics',
+  'ENT',
+  'Dentist',
+] as const;
+
 export const PATIENT_TABLE_COLUMNS = [
   { key: 'name', label: 'Name' },
   { key: 'email', label: 'Email' },

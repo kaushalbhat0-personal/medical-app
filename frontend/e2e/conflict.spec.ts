@@ -42,11 +42,11 @@ async function openBookingForDoctor(
   await expect(page).toHaveURL(/\/patient\/doctors/, { timeout: 15_000 });
 
   const card = page
-    .locator('div.rounded-xl.border')
+    .locator('div.rounded-2xl.border')
     .filter({
       has: page.getByRole('heading', { level: 3, name: doctorDisplayName, exact: true }),
     });
-  const bookBtn = card.getByRole('button', { name: 'Book appointment' });
+  const bookBtn = card.getByRole('button', { name: 'Select' });
   await expect(bookBtn).toBeEnabled({ timeout: 15_000 });
   await bookBtn.click();
   await expect(page.getByRole('dialog')).toBeVisible();

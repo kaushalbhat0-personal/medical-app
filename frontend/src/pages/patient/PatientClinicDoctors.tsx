@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { publicDiscoveryApi } from '../../services';
 import type { PublicTenantDoctorBrief } from '../../types';
 import { ErrorState } from '../../components/common';
 import { cn } from '@/lib/utils';
+import { DoctorRowCard } from '../../components/patient/DoctorRowCard';
+import { mockRatingFromId, mockReviewCountFromId } from '@/lib/patient/mockDoctorPresentation';
 
 export function PatientClinicDoctors() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -54,12 +57,12 @@ export function PatientClinicDoctors() {
         <Link
           to="/patient/home"
           aria-label="Back to home"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'shrink-0 -ml-2')}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'shrink-0 -ml-2 rounded-xl')}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight truncate">{title}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
           <p className="text-xs text-muted-foreground">Choose a doctor to book</p>
         </div>
       </div>
@@ -71,34 +74,33 @@ export function PatientClinicDoctors() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
+            <ul className="space-y-3" aria-hidden>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li key={i}>
+                  <Skeleton className="h-[120px] w-full rounded-2xl" />
+                </li>
+              ))}
+            </ul>
           ) : doctors.length === 0 ? (
             <p className="text-sm text-muted-foreground">No doctors listed yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {doctors.map((d) => (
                 <li key={d.id}>
-                  <button
-                    type="button"
-                    className={cn(
-                      'w-full rounded-lg border border-border bg-background px-4 py-3 text-left text-sm transition-colors',
-                      'hover:bg-accent hover:text-accent-foreground',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-                    )}
-                    onClick={() =>
-                      navigate('/patient/doctors', {
-                        state: { tenantId, preselectDoctorId: d.id },
-                      })
+                  <DoctorRowCard
+                    name={d.name}
+                    subtitle={d.specialization}
+                    rating={mockRatingFromId(d.id)}
+                    reviewCount={mockReviewCountFromId(d.id)}
+                    availabilityLabel="Available today"
+                    primaryLabel="Book Appointment"
+                    onPrimary={() =>
+                      navigate(`/patient/doctor/${d.id}`, { state: { tenantId } })
                     }
-                  >
-                    <span className="font-medium block truncate">{d.name}</span>
-                    <span className="text-xs text-muted-foreground block truncate mt-0.5">
-                      {d.specialization}
-                    </span>
-                  </button>
+                    onCardClick={() =>
+                      navigate(`/patient/doctor/${d.id}`, { state: { tenantId } })
+                    }
+                  />
                 </li>
               ))}
             </ul>

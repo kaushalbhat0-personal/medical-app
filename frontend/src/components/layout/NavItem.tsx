@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface NavItemProps {
   path: string;
@@ -19,11 +20,12 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
         to={path}
         onClick={onNavigate}
         className={({ isActive: navIsActive }) =>
-          `group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative overflow-hidden ${
+          cn(
+            'group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 transition-all duration-200',
             navIsActive || isActive
-              ? 'bg-primary/10 text-primary font-medium'
-              : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-          }`
+              ? 'bg-primary/10 font-medium text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          )
         }
       >
         {/* Active indicator bar */}
@@ -37,7 +39,7 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
         <Icon
           className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${
             isCollapsed ? 'mx-auto' : ''
-          } ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-secondary'}`}
+          } ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
         />
 
         {/* Label */}
@@ -53,7 +55,7 @@ export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: Na
 
         {/* Tooltip for collapsed state */}
         {isCollapsed && (
-          <div className="absolute left-full ml-2 px-2 py-1 bg-background text-text-primary text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 border border-border shadow-lg">
+          <div className="absolute left-full z-50 ml-2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-lg transition-all duration-200 invisible group-hover:visible group-hover:opacity-100">
             {label}
             <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-background" />
           </div>

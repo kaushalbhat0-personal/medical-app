@@ -8,16 +8,8 @@ import {
 import dayjs from 'dayjs';
 import { useAdminDashboard } from '../hooks/useAdminDashboard';
 import { ErrorState, EmptyState } from '../components/common';
-import { SkeletonCard, SkeletonTable } from '../components/common/skeletons';
+import { SkeletonCard } from '../components/common/skeletons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -117,7 +109,11 @@ export function AdminDashboard() {
             <SkeletonCard />
           </div>
           <div className="h-56 animate-pulse rounded-xl bg-surface" />
-          <SkeletonTable rows={4} columns={4} />
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted" />
+            ))}
+          </div>
         </div>
       )}
 
@@ -236,34 +232,39 @@ export function AdminDashboard() {
                   />
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Doctor name</TableHead>
-                        <TableHead className="text-right">Appointments</TableHead>
-                        <TableHead className="text-right">Completed</TableHead>
-                        <TableHead className="text-right">Revenue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {doctorPerformance.map((row) => (
-                        <TableRow key={row.doctor_id}>
-                          <TableCell className="font-medium">{row.doctor_name}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {row.appointments_count}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {row.completed_appointments}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatCurrency(row.total_revenue)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <ul className="space-y-2">
+                  {doctorPerformance.map((row) => (
+                    <li
+                      key={row.doctor_id}
+                      className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground">{row.doctor_name}</p>
+                        <p className="text-xs text-muted-foreground">Last 7 days</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-4">
+                        <div className="text-center sm:text-right">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                            Appts
+                          </p>
+                          <p className="tabular-nums text-sm font-semibold">{row.appointments_count}</p>
+                        </div>
+                        <div className="text-center sm:text-right">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                            Done
+                          </p>
+                          <p className="tabular-nums text-sm font-semibold">{row.completed_appointments}</p>
+                        </div>
+                        <div className="text-center sm:text-right">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                            Revenue
+                          </p>
+                          <p className="tabular-nums text-sm font-semibold">{formatCurrency(row.total_revenue)}</p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </CardContent>
           </Card>

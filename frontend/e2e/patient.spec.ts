@@ -31,11 +31,11 @@ test.describe('Patient portal', () => {
     await expect(page).toHaveURL(/\/patient\/doctors/, { timeout: 15_000 });
 
     const doctorCard = page
-      .locator('div.rounded-xl.border')
+      .locator('div.rounded-2xl.border')
       .filter({
         has: page.getByRole('heading', { level: 3, name: c.doctorDisplayName, exact: true }),
       });
-    const bookBtn = doctorCard.getByRole('button', { name: 'Book appointment' });
+    const bookBtn = doctorCard.getByRole('button', { name: 'Select' });
     await expect(bookBtn).toBeEnabled({ timeout: 20_000 });
     await bookBtn.click();
 

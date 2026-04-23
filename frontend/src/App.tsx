@@ -29,6 +29,7 @@ import { PatientClinicDoctors } from './pages/patient/PatientClinicDoctors';
 import { PatientDoctors } from './pages/patient/PatientDoctors';
 import { PatientAppointments } from './pages/patient/PatientAppointments';
 import { PatientBills } from './pages/patient/PatientBills';
+import { PatientDoctorDetail } from './pages/patient/PatientDoctorDetail';
 import { DoctorHome } from './pages/doctor/DoctorHome';
 import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
@@ -388,6 +389,14 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="doctor/:id"
+            element={
+              <AnimatedPage>
+                <PatientDoctorDetail />
+              </AnimatedPage>
+            }
+          />
+          <Route
             path="appointments"
             element={
               <AnimatedPage>
@@ -440,8 +449,10 @@ function App() {
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: '#ffffff',
+              color: '#0f172a',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)',
             },
             success: {
               duration: 3000,
