@@ -15,6 +15,7 @@ from app.models.patient import Patient
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.core.permissions import has_tenant_admin_privileges
+from app.crud import crud_patient
 from app.services.exceptions import ForbiddenError, ValidationError
 
 
@@ -74,18 +75,7 @@ def get_dashboard_stats_for_tenant(
             Appointment.doctor_id == doctor_id,
             Appointment.is_deleted == False,  # noqa: E712
         )
-        patient_conds = [has_appt]
-        if doctor_row.user_id is not None:
-            patient_conds.append(Patient.created_by == doctor_row.user_id)
-        total_patients = (
-            db.scalar(
-                select(func.count(Patient.id)).where(
-                    Patient.tenant_id == tenant_id,
-                    or_(*patient_conds),
-                )
-            )
-            or 0
-        )
+        total_patients = db.scalar(select(func.count(Patient.id)).where(has_appt)) or 0
         total_doctors = 1
 
         ist = pytz.timezone("Asia/Kolkata")
@@ -131,7 +121,12 @@ def get_dashboard_stats_for_tenant(
         }
 
     total_patients = (
-        db.query(Patient).filter(Patient.tenant_id == tenant_id).count()
+        db.scalar(
+            select(func.count(Patient.id)).where(
+                crud_patient.patient_member_of_tenant(tenant_id)
+            )
+        )
+        or 0
     )
     total_doctors = (
         db.query(Doctor)

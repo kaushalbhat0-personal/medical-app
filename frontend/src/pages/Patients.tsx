@@ -11,6 +11,7 @@ import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
 import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card as CommonCard, Input } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { patientSchema, type PatientFormData, type PatientFormInput } from '../validation';
 
@@ -245,7 +246,19 @@ export function Patients() {
                 <TableBody>
                   {safePatients.map((patient, index) => (
                     <TableRow key={patient?.id != null ? String(patient.id) : `patient-row-${index}`}>
-                      <TableCell className="font-medium">{formatPatientName(patient)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-medium">{formatPatientName(patient)}</span>
+                          {patient?.doctor_name ? (
+                            <Badge
+                              variant="secondary"
+                              className="w-fit max-w-full font-normal line-clamp-2 whitespace-normal"
+                            >
+                              {patient.doctor_name}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{patient?.email || '-'}</TableCell>
                       <TableCell className="text-muted-foreground">{patient?.phone || '-'}</TableCell>
                       <TableCell className="text-muted-foreground">{formatPatientDobOrAge(patient)}</TableCell>

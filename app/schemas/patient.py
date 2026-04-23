@@ -25,6 +25,12 @@ class PatientRead(BaseModel):
     clinical_notes: str | None = None
 
 
+class PatientListRead(PatientRead):
+    """GET /patients list item: same fields as PatientRead plus optional attending-doctor label."""
+
+    doctor_name: str | None = None
+
+
 class PatientUpdate(BaseModel):
     name: str | None = None
     age: int | None = None

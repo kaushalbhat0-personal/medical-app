@@ -16,7 +16,13 @@ from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
 from app.models.doctor import Doctor
 from app.models.user import User
-from app.schemas.patient import PatientCreate, PatientMyDoctorRead, PatientRead, PatientUpdate
+from app.schemas.patient import (
+    PatientCreate,
+    PatientListRead,
+    PatientMyDoctorRead,
+    PatientRead,
+    PatientUpdate,
+)
 from app.services import patient_service
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -43,7 +49,7 @@ def create_patient(
     )
 
 
-@router.get("", response_model=list[PatientRead])
+@router.get("", response_model=list[PatientListRead])
 def read_patients(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
@@ -53,7 +59,7 @@ def read_patients(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
-) -> list[PatientRead]:
+) -> list[PatientListRead]:
     return patient_service.get_patients(
         db,
         current_user,

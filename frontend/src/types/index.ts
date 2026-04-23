@@ -87,6 +87,8 @@ export interface Patient {
   created_by?: number | string;
   created_at?: string;
   updated_at?: string;
+  /** Set on GET /patients for tenant (admin) and doctor list when the backend can resolve a label. */
+  doctor_name?: string | null;
 }
 
 /** Weekly availability pattern from GET /doctors/{id}/availability-windows */

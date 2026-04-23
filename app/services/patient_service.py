@@ -11,7 +11,13 @@ from app.models.doctor import Doctor
 from app.services import doctor_service
 from app.models.patient import Patient
 from app.models.user import User, UserRole
-from app.schemas.patient import PatientCreate, PatientMyDoctorRead, PatientUpdate
+from app.schemas.patient import (
+    PatientCreate,
+    PatientListRead,
+    PatientMyDoctorRead,
+    PatientRead,
+    PatientUpdate,
+)
 from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
     assert_authorized,
@@ -290,7 +296,7 @@ def get_patients(
     *,
     acting_doctor: Doctor | None = None,
     data_scope: ResolvedDataScope,
-) -> list[Patient]:
+) -> list[PatientListRead]:
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
     user_id: UUID | None = None
     effective_tenant_id = tenant_id
@@ -321,11 +327,8 @@ def get_patients(
             linked_doctor_id = data_scope.doctor_id
 
     scope_kind = data_scope.kind.value
-    print("scope:", scope_kind)
-    print("tenant_id:", effective_tenant_id)
-    print("linked_doctor_id:", linked_doctor_id)
 
-    return crud_patient.get_patients(
+    rows = crud_patient.get_patients(
         db,
         skip=skip,
         limit=limit,
@@ -335,6 +338,28 @@ def get_patients(
         linked_doctor_id=linked_doctor_id,
         data_scope_kind=scope_kind,
     )
+
+    doctor_label: str | None = None
+    if (
+        data_scope.kind == DataScopeKind.doctor
+        and linked_doctor_id is not None
+    ):
+        if acting_doctor is not None and acting_doctor.id == linked_doctor_id:
+            doctor_label = acting_doctor.name
+        else:
+            d = db.get(Doctor, linked_doctor_id)
+            doctor_label = d.name if d is not None else None
+
+    out: list[PatientListRead] = []
+    for patient, crud_name in rows:
+        name_out = crud_name
+        if doctor_label is not None:
+            name_out = doctor_label
+        pr = PatientRead.model_validate(patient)
+        out.append(
+            PatientListRead(**pr.model_dump(), doctor_name=name_out)
+        )
+    return out
 
 
 def update_patient(
