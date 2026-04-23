@@ -109,8 +109,9 @@ def update_bill(
 def get_total_revenue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> dict[str, float]:
-    total = billing_service.get_total_revenue(db, current_user.id)
+    total = billing_service.get_total_revenue(db, tenant_id=tenant_id)
     return {"total_revenue": total}
 
 
@@ -118,8 +119,9 @@ def get_total_revenue(
 def get_today_revenue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> dict[str, float]:
-    today = billing_service.get_today_revenue(db, current_user.id)
+    today = billing_service.get_today_revenue(db, tenant_id=tenant_id)
     return {"today_revenue": today}
 
 
@@ -127,8 +129,9 @@ def get_today_revenue(
 def get_pending_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> dict[str, int | float]:
-    return billing_service.get_pending_payments(db, current_user.id)
+    return billing_service.get_pending_payments(db, tenant_id=tenant_id)
 
 
 @router.post("/{bill_id}/pay", response_model=BillingRead)

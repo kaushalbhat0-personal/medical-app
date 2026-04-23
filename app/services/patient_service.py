@@ -330,6 +330,7 @@ def get_patients(
 
     rows = crud_patient.get_patients(
         db,
+        current_user,
         skip=skip,
         limit=limit,
         search=search,
@@ -337,6 +338,15 @@ def get_patients(
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
         data_scope_kind=scope_kind,
+    )
+
+    logger.info(
+        "[PATIENT_SCOPE] scope=%s doctor_id=%s tenant_id=%s user=%s returned=%d",
+        scope_kind,
+        linked_doctor_id,
+        effective_tenant_id,
+        current_user.id,
+        len(rows),
     )
 
     doctor_label: str | None = None

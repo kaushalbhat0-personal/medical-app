@@ -208,9 +208,7 @@ def create_appointment(
         doctor_id=appt_in.doctor_id,
     )
     doctor = doctor_service.get_doctor_or_404(db, appt_in.doctor_id)
-    if doctor.tenant_id is None:
-        logger.error("[TENANT INTEGRITY] doctor.tenant_id is None for doctor_id=%s", doctor.id)
-        raise ValidationError("Doctor tenant is not set")
+    doctor = doctor_service.ensure_tenant_for_individual_doctor(db, doctor)
 
     patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
     if patient_row.tenant_id is None:
@@ -233,6 +231,8 @@ def create_appointment(
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
     appointment_data["tenant_id"] = doctor.tenant_id
+    appointment_data["doctor_id"] = appt_in.doctor_id
+    appointment_data["patient_id"] = appt_in.patient_id
 
     try:
         appointment = crud_appointment.add_appointment(db, appointment_data)
@@ -383,6 +383,14 @@ def get_appointments(
         patient_id=eff_patient_id,
         tenant_id=eff_tenant_id,
         list_type=list_type,
+    )
+    logger.info(
+        "[APPOINTMENT_SCOPE] scope=%s eff_doctor_id=%s eff_tenant_id=%s user=%s returned=%d",
+        data_scope.kind.value,
+        eff_doctor_id,
+        eff_tenant_id,
+        current_user.id,
+        len(appointments),
     )
     return _update_status_for_past_appointments(db, appointments)
 

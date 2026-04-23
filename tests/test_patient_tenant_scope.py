@@ -46,7 +46,7 @@ def _data_scope_doctor(db: Session, user) -> ResolvedDataScope:
 def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
     db_session: Session,
 ) -> None:
-    """Admin tenant scope lists by patient.tenant_id or appointment → doctor; null patient.tenant is visible when linked by appointment. Backfill still aligns patient.tenant_id."""
+    """Admin tenant scope lists by ``Patient.tenant_id``; booking aligns tenant like ``create_appointment``."""
     tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
     admin = create_user(
         db_session,
@@ -96,6 +96,11 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
         },
     )
     db_session.commit()
+    # Same as appointment_service: set patient.tenant_id from doctor org when missing
+    db_session.execute(
+        update(Patient).where(Patient.id == p.id).values(tenant_id=tenant.id)
+    )
+    db_session.commit()
 
     admin_tenant_list = patient_service.get_patients(
         db_session,
@@ -104,8 +109,6 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
         limit=100,
         data_scope=_data_scope_tenant(db_session, admin),
     )
-    # Tenant list includes patients linked via in-tenant appointments even when
-    # patient.tenant_id is null (relies on appointment → doctor, not on patient.tenant_id).
     assert p.id in {x.id for x in admin_tenant_list}
     before_row = next(x for x in admin_tenant_list if x.id == p.id)
     assert before_row.doctor_name == doc.name
@@ -120,13 +123,7 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
             data_scope=_data_scope_doctor(db_session, doc_user),
         )
     }
-    # Doctor cohort is appointment-based; patient.tenant_id may be NULL until backfill.
     assert p.id in doc_listed_before
-
-    db_session.execute(
-        update(Patient).where(Patient.id == p.id).values(tenant_id=tenant.id)
-    )
-    db_session.commit()
 
     listed = {
         x.id
@@ -248,7 +245,7 @@ def test_doctor_read_requires_appointment_not_created_by(
 async def test_admin_sees_all_patients_in_tenant(
     client: AsyncClient, db_session: Session
 ) -> None:
-    """GET /patients with tenant scope lists every patient in the org (by tenant_id or in-tenant appointment)."""
+    """GET /patients with tenant scope lists patients where ``patient.tenant_id`` matches the org."""
     t1 = create_tenant(db_session, tenant_type=TenantType.clinic)
     t_other = create_tenant(db_session, tenant_type=TenantType.clinic)
 
@@ -308,8 +305,6 @@ async def test_admin_sees_all_patients_in_tenant(
         created_by=d2_user.id,
         name="Patient Two",
     )
-    db_session.commit()
-    db_session.execute(update(Patient).where(Patient.id == p2.id).values(tenant_id=None))
     db_session.commit()
 
     other_pat_user = create_user(
@@ -471,3 +466,123 @@ async def test_doctor_sees_only_own_patients(
     ids = {row["id"] for row in resp.json()}
     assert str(p1.id) in ids
     assert str(p2.id) not in ids
+
+
+def test_patient_visible_after_booking(db_session: Session) -> None:
+    """After an appointment exists, the doctor can list that patient in practice scope."""
+    tenant = create_tenant(db_session, tenant_type=TenantType.clinic)
+    doc_user = create_user(
+        db_session,
+        email=f"doc_pb_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+    )
+    doc = create_doctor_profile(
+        db_session, tenant_id=tenant.id, user_id=doc_user.id, timezone_name="UTC"
+    )
+    pat_user = create_user(
+        db_session,
+        email=f"pat_pb_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=tenant.id,
+    )
+    p = create_patient_profile(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=pat_user.id,
+        created_by=doc_user.id,
+    )
+    db_session.commit()
+    add_appointment(
+        db_session,
+        {
+            "patient_id": p.id,
+            "doctor_id": doc.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(hours=4),
+            "status": AppointmentStatus.scheduled,
+            "created_by": doc_user.id,
+            "tenant_id": tenant.id,
+        },
+    )
+    db_session.commit()
+
+    out = patient_service.get_patients(
+        db_session,
+        doc_user,
+        tenant_id=tenant.id,
+        limit=100,
+        data_scope=_data_scope_doctor(db_session, doc_user),
+    )
+    assert p.id in {x.id for x in out}
+
+
+def test_admin_sees_all_patients(db_session: Session) -> None:
+    """Admin tenant scope returns every patient row with that ``tenant_id``."""
+    t1 = create_tenant(db_session, tenant_type=TenantType.clinic)
+    admin = create_user(
+        db_session,
+        email=f"adm_sa_{uuid.uuid4().hex[:8]}@test.local",
+        password="AdmPass123!",
+        role=UserRole.admin,
+        tenant_id=t1.id,
+    )
+    d1 = create_user(
+        db_session,
+        email=f"d_sa1_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=t1.id,
+    )
+    d2 = create_user(
+        db_session,
+        email=f"d_sa2_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=t1.id,
+    )
+    create_doctor_profile(
+        db_session, tenant_id=t1.id, user_id=d1.id, timezone_name="UTC"
+    )
+    create_doctor_profile(
+        db_session, tenant_id=t1.id, user_id=d2.id, timezone_name="UTC"
+    )
+    p1u = create_user(
+        db_session,
+        email=f"p_sa1_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=t1.id,
+    )
+    p2u = create_user(
+        db_session,
+        email=f"p_sa2_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=t1.id,
+    )
+    p1 = create_patient_profile(
+        db_session,
+        tenant_id=t1.id,
+        user_id=p1u.id,
+        created_by=d1.id,
+        name="A",
+    )
+    p2 = create_patient_profile(
+        db_session,
+        tenant_id=t1.id,
+        user_id=p2u.id,
+        created_by=d2.id,
+        name="B",
+    )
+    db_session.commit()
+
+    listed = patient_service.get_patients(
+        db_session,
+        admin,
+        tenant_id=t1.id,
+        limit=100,
+        data_scope=_data_scope_tenant(db_session, admin),
+    )
+    assert {p1.id, p2.id} <= {x.id for x in listed}

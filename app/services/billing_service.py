@@ -292,7 +292,7 @@ def get_bills(
         ):
             eff_doctor_id = data_scope.doctor_id
 
-    return crud_billing.get_bills(
+    rows = crud_billing.get_bills(
         db,
         skip=skip,
         limit=limit,
@@ -303,6 +303,15 @@ def get_bills(
         tenant_id=eff_tenant_id,
         user_id=eff_user_id,
     )
+    logger.info(
+        "[BILLING_SCOPE] scope=%s eff_doctor_id=%s tenant_id=%s user=%s returned=%d",
+        data_scope.kind.value,
+        eff_doctor_id,
+        eff_tenant_id,
+        current_user.id,
+        len(rows),
+    )
+    return rows
 
 
 def authorize_bill_read(
@@ -587,18 +596,32 @@ def update_bill(
     return updated_bill
 
 
-def get_total_revenue(db: Session, current_user_id: UUID) -> float:
-    return crud_billing.get_total_revenue(db, created_by=current_user_id)
+def get_total_revenue(
+    db: Session,
+    *,
+    tenant_id: UUID | None = None,
+) -> float:
+    if tenant_id is None:
+        return 0.0
+    return crud_billing.get_total_revenue(db, tenant_id=tenant_id)
 
 
-def get_today_revenue(db: Session, current_user_id: UUID) -> float:
-    return crud_billing.get_today_revenue(db, created_by=current_user_id)
+def get_today_revenue(
+    db: Session,
+    *,
+    tenant_id: UUID | None = None,
+) -> float:
+    if tenant_id is None:
+        return 0.0
+    return crud_billing.get_today_revenue(db, tenant_id=tenant_id)
 
 
 def get_pending_payments(
-    db: Session, current_user_id: UUID
+    db: Session, *, tenant_id: UUID | None = None
 ) -> dict[str, int | float]:
-    count, total = crud_billing.get_pending_payments(db, created_by=current_user_id)
+    if tenant_id is None:
+        return {"count": 0, "total_amount": 0.0}
+    count, total = crud_billing.get_pending_payments(db, tenant_id=tenant_id)
     return {"count": count, "total_amount": total}
 
 

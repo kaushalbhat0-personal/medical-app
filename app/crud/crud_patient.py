@@ -1,13 +1,14 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import false, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import exists
 
+from app.core.data_scope import apply_patient_scope
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.user import User
 
 
 def create_patient(db: Session, patient_data: dict[str, Any]) -> Patient:
@@ -69,23 +70,10 @@ def patient_has_active_appointment_in_tenant(
 
 def patient_member_of_tenant(tenant_id: UUID):
     """
-    Patients that belong to an organization either by row tenant_id or by a non-deleted
-    appointment with a doctor in that tenant (covers NULL patient.tenant_id).
+    Legacy helper — prefer ``apply_patient_scope`` (tenant = ``Patient.tenant_id``;
+    link doctor–patient is via ``Appointment`` only). Kept for narrow migration/debug.
     """
-    return or_(
-        Patient.tenant_id == tenant_id,
-        exists(
-            select(1)
-            .select_from(Appointment)
-            .join(Doctor, Doctor.id == Appointment.doctor_id)
-            .where(
-                Appointment.patient_id == Patient.id,
-                Doctor.tenant_id == tenant_id,
-                Appointment.is_deleted == False,  # noqa: E712
-            )
-            .correlate(Patient)
-        ),
-    )
+    return Patient.tenant_id == tenant_id
 
 
 def _primary_doctor_name_in_tenant_subquery(tenant_id: UUID):
@@ -110,6 +98,7 @@ def _primary_doctor_name_in_tenant_subquery(tenant_id: UUID):
 
 def get_patients(
     db: Session,
+    current_user: User,
     skip: int = 0,
     limit: int = 10,
     search: str | None = None,
@@ -120,10 +109,9 @@ def get_patients(
     data_scope_kind: Literal["doctor", "tenant"] = "tenant",
 ) -> list[tuple[Patient, str | None]]:
     """
-    List patients with explicit doctor vs tenant scope.
-    For tenant admin: includes patients in the tenant by patient.tenant_id **or** by
-    non-deleted appointments to doctors in that tenant; returns (Patient, doctor_name)
-    with doctor_name from appointments when available.
+    List patients using :func:`apply_patient_scope` (tenant=``Patient.tenant_id``;
+    doctor=appointment EXISTS). Returns ``(Patient, doctor_name)``; doctor_name is set
+    for tenant admin lists when derivable from appointments.
     """
     if user_id is not None:
         stmt = select(Patient).order_by(Patient.created_at.desc())
@@ -135,40 +123,36 @@ def get_patients(
         stmt = stmt.offset(skip).limit(limit)
         return [(p, None) for p in list(db.scalars(stmt).all())]
 
-    if data_scope_kind == "doctor" and linked_doctor_id is not None:
-        stmt = select(Patient).order_by(Patient.created_at.desc())
-        if search:
-            stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
-        has_appt = exists().where(
-            Appointment.patient_id == Patient.id,
-            Appointment.doctor_id == linked_doctor_id,
-            Appointment.is_deleted == False,  # noqa: E712
-        )
-        stmt = stmt.where(has_appt)
-        stmt = stmt.offset(skip).limit(limit)
-        return [(p, None) for p in list(db.scalars(stmt).all())]
-
-    if data_scope_kind == "doctor":
-        return []
-
     if data_scope_kind == "tenant" and tenant_id is not None:
         doc_name_sq = _primary_doctor_name_in_tenant_subquery(tenant_id)
-        stmt = (
-            select(Patient, doc_name_sq)
-            .where(patient_member_of_tenant(tenant_id))
-            .order_by(Patient.created_at.desc())
-        )
+        stmt = select(Patient, doc_name_sq).order_by(Patient.created_at.desc())
         if search:
             stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
+        stmt = apply_patient_scope(
+            stmt,
+            current_user,
+            data_scope_kind="tenant",
+            tenant_id=tenant_id,
+        )
         stmt = stmt.offset(skip).limit(limit)
         rows = list(db.execute(stmt).all())
         return [(row[0], row[1]) for row in rows]
 
-    stmt = select(Patient).order_by(Patient.created_at.desc())
-    if search:
-        stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
-    stmt = stmt.offset(skip).limit(limit)
-    return [(p, None) for p in list(db.scalars(stmt).all())]
+    if data_scope_kind == "doctor":
+        stmt = select(Patient).order_by(Patient.created_at.desc())
+        if search:
+            stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
+        stmt = apply_patient_scope(
+            stmt,
+            current_user,
+            data_scope_kind="doctor",
+            doctor_id=linked_doctor_id,
+            tenant_id=tenant_id,
+        )
+        stmt = stmt.offset(skip).limit(limit)
+        return [(p, None) for p in list(db.scalars(stmt).all())]
+
+    return []
 
 
 def update_patient(

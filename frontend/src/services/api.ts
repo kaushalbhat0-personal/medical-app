@@ -57,6 +57,7 @@ api.interceptors.request.use(
     }
 
     if (config.headers) {
+      // Multi-tenant scope: org + practice vs admin listing (server enforces RBAC, not the header alone).
       const hasExplicit = config.headers['X-Tenant-ID'] != null;
       if (!hasExplicit) {
         const activeTenantId = getActiveTenantId();
@@ -66,8 +67,7 @@ api.interceptors.request.use(
         }
       }
       const mode = localStorage.getItem('app_mode');
-      config.headers['X-Data-Scope'] =
-        mode === 'practice' ? 'doctor' : 'tenant';
+      config.headers['X-Data-Scope'] = mode === 'practice' ? 'doctor' : 'tenant';
     }
 
     // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).

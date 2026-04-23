@@ -50,7 +50,6 @@ def get_bills(
     patient_id: UUID | None = None,
     appointment_id: UUID | None = None,
     status: BillingStatus | None = None,
-    created_by: UUID | None = None,
     doctor_id: UUID | None = None,
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
@@ -70,8 +69,6 @@ def get_bills(
         stmt = stmt.where(Billing.appointment_id == appointment_id)
     if status is not None:
         stmt = stmt.where(Billing.status == status)
-    if created_by is not None:
-        stmt = stmt.where(Billing.created_by == created_by)
     if doctor_id is not None:
         # Restrict bills to those linked to appointments for this doctor
         stmt = stmt.join(Billing.appointment).where(
@@ -101,18 +98,18 @@ def update_bill(
     return bill
 
 
-def get_total_revenue(db: Session, created_by: UUID | None = None) -> float:
+def get_total_revenue(db: Session, *, tenant_id: UUID | None = None) -> float:
     stmt = select(func.sum(Billing.amount)).where(
         Billing.status == BillingStatus.paid,
-        Billing.is_deleted == False
+        Billing.is_deleted == False,  # noqa: E712
     )
-    if created_by is not None:
-        stmt = stmt.where(Billing.created_by == created_by)
+    if tenant_id is not None:
+        stmt = stmt.where(Billing.tenant_id == tenant_id)
     result = db.scalar(stmt)
     return float(result) if result else 0.0
 
 
-def get_today_revenue(db: Session, created_by: UUID | None = None) -> float:
+def get_today_revenue(db: Session, *, tenant_id: UUID | None = None) -> float:
     today = date.today()
     start_of_day = datetime.combine(today, datetime.min.time())
     end_of_day = datetime.combine(today, datetime.max.time())
@@ -121,27 +118,28 @@ def get_today_revenue(db: Session, created_by: UUID | None = None) -> float:
         Billing.status == BillingStatus.paid,
         Billing.paid_at >= start_of_day,
         Billing.paid_at <= end_of_day,
-        Billing.is_deleted == False,
+        Billing.is_deleted == False,  # noqa: E712
     )
-    if created_by is not None:
-        stmt = stmt.where(Billing.created_by == created_by)
+    if tenant_id is not None:
+        stmt = stmt.where(Billing.tenant_id == tenant_id)
     result = db.scalar(stmt)
     return float(result) if result else 0.0
 
 
 def get_pending_payments(
     db: Session,
-    created_by: UUID | None = None,
+    *,
+    tenant_id: UUID | None = None,
 ) -> tuple[int, float]:
     stmt = select(
         func.count(Billing.id),
         func.coalesce(func.sum(Billing.amount), 0.0),
     ).where(
         Billing.status == BillingStatus.pending,
-        Billing.is_deleted == False,
+        Billing.is_deleted == False,  # noqa: E712
     )
-    if created_by is not None:
-        stmt = stmt.where(Billing.created_by == created_by)
+    if tenant_id is not None:
+        stmt = stmt.where(Billing.tenant_id == tenant_id)
     result = db.execute(stmt).first()
     return result[0], float(result[1]) if result[1] else 0.0
 

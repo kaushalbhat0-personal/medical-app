@@ -109,7 +109,6 @@ def get_appointments(
     limit: int = 10,
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
-    created_by: UUID | None = None,
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
     list_type: str | None = None,
@@ -143,8 +142,6 @@ def get_appointments(
         stmt = stmt.where(Appointment.doctor_id == doctor_id)
     if patient_id is not None:
         stmt = stmt.where(Appointment.patient_id == patient_id)
-    if created_by is not None:
-        stmt = stmt.where(Appointment.created_by == created_by)
     if user_id is not None:
         stmt = stmt.join(Appointment.patient).where(Patient.user_id == user_id)
     if tenant_id is not None:

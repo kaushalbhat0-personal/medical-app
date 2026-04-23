@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import uuid
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -39,6 +40,51 @@ from app.services.security_audit import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_tenant_for_individual_doctor(db: Session, doctor: Doctor) -> Doctor:
+    """
+    If a doctor has no organization yet, create an ``independent_doctor`` tenant and attach it.
+
+    Ensures :attr:`Appointment.tenant_id` / :attr:`Patient.tenant_id` can follow the doctor.
+    """
+    if doctor.tenant_id is not None:
+        return doctor
+    if doctor.user_id is None:
+        raise ValidationError(
+            "Doctor must be linked to a user account before scheduling"
+        )
+    u = crud_user.get_user(db, doctor.user_id)
+    if u is None:
+        raise ValidationError("Doctor user not found")
+    label = (doctor.name or "Practice").strip() or "Practice"
+    tenant = crud_tenant.create_tenant_tx(
+        db,
+        name=f"{label} — Practice ({uuid.uuid4().hex[:8]})",
+        type=TenantType.independent_doctor,
+        is_active=True,
+    )
+    if crud_tenant.get_user_tenant_row(db, user_id=u.id, tenant_id=tenant.id) is None:
+        crud_tenant.create_user_tenant_tx(
+            db,
+            user_id=u.id,
+            tenant_id=tenant.id,
+            role="doctor",
+            is_primary=True,
+        )
+    u.is_owner = True
+    doctor.tenant_id = tenant.id
+    db.add(doctor)
+    db.add(u)
+    db.flush()
+    db.refresh(doctor)
+    logger.info(
+        "[TENANT_AUTO] individual tenant %s for doctor_id=%s user_id=%s",
+        tenant.id,
+        doctor.id,
+        u.id,
+    )
+    return doctor
 
 
 def _normalize_timezone_string(tz: str) -> str:

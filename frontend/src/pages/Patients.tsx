@@ -9,6 +9,8 @@ import { createPatientHandler } from '../handlers';
 import { patientsApi } from '../services';
 import { EMPTY_PATIENT } from '../constants';
 import { formatPatientName, formatPatientDobOrAge, formatDateSafe } from '../utils';
+import { getActiveTenantId } from '../utils/tenantIdForRequest';
+import { APP_MODE_STORAGE_KEY } from '../constants/appMode';
 import { ErrorState, EmptyState, SkeletonTable, FormWrapper, FormInput, FormSelect, Button, Card as CommonCard, Input } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -141,7 +143,12 @@ export function Patients() {
       {!error && isEmpty && (
         <EmptyState
           title="No data available"
-          description="There are no patients to display at the moment."
+          description={(() => {
+            const mode = typeof window !== 'undefined' ? localStorage.getItem(APP_MODE_STORAGE_KEY) : null;
+            const dataScope = mode === 'practice' ? 'doctor' : 'tenant';
+            const tid = getActiveTenantId();
+            return `There are no patients to display at the moment. (No patients for tenant_id ${tid ?? 'none'} / X-Data-Scope ${dataScope})`;
+          })()}
         />
       )}
       {/* Header */}

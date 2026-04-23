@@ -15,7 +15,6 @@ from app.models.patient import Patient
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.core.permissions import has_tenant_admin_privileges
-from app.crud import crud_patient
 from app.services.exceptions import ForbiddenError, ValidationError
 
 
@@ -122,9 +121,7 @@ def get_dashboard_stats_for_tenant(
 
     total_patients = (
         db.scalar(
-            select(func.count(Patient.id)).where(
-                crud_patient.patient_member_of_tenant(tenant_id)
-            )
+            select(func.count(Patient.id)).where(Patient.tenant_id == tenant_id)
         )
         or 0
     )

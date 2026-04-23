@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 from uuid import UUID
+
+from sqlalchemy import exists, false
+from sqlalchemy.sql import Select
 
 from app.core.permissions import has_tenant_admin_privileges
 from app.models.doctor import Doctor
@@ -73,3 +77,38 @@ def restrict_doctor_id_for_detail(
     if current_user.role == UserRole.doctor and current_user.is_owner:
         return data_scope.doctor_id
     return None
+
+
+def apply_patient_scope(
+    stmt: Select,
+    user: User,
+    *,
+    data_scope_kind: Literal["doctor", "tenant"],
+    doctor_id: UUID | None = None,
+    tenant_id: UUID | None = None,
+) -> Select:
+    """
+    Single source of truth for patient list visibility.
+
+    - tenant scope: ``Patient.tenant_id == tenant_id`` (org admin / super_admin / staff / owner)
+    - doctor scope: EXISTS active appointment for ``doctor_id`` (including admin viewing a single doctor)
+    """
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+
+    ex_appt = exists().where(
+        Appointment.patient_id == Patient.id,
+        Appointment.doctor_id == doctor_id,
+        Appointment.is_deleted == False,  # noqa: E712
+    )
+    if data_scope_kind == "doctor":
+        if doctor_id is None:
+            return stmt.where(false())
+        return stmt.where(ex_appt)
+    if tenant_id is None:
+        return stmt.where(false())
+    if user.role in (UserRole.admin, UserRole.staff, UserRole.super_admin):
+        return stmt.where(Patient.tenant_id == tenant_id)
+    if user.role == UserRole.doctor and user.is_owner:
+        return stmt.where(Patient.tenant_id == tenant_id)
+    return stmt.where(false())
