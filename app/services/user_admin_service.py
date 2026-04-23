@@ -30,16 +30,19 @@ def provision_organization_user(
     if not tenant.is_active:
         raise ValidationError("Tenant is not active")
 
+    if payload.role == UserRole.admin:
+        crud_tenant.demote_tenant_admins_to_doctors(db, payload.tenant_id)
+
     hashed = hash_password(payload.password)
-    user = crud_user.create_user_tx(
-        db,
-        {
-            "email": email_norm,
-            "hashed_password": hashed,
-            "role": payload.role,
-            "tenant_id": payload.tenant_id,
-        },
-    )
+    new_user: dict = {
+        "email": email_norm,
+        "hashed_password": hashed,
+        "role": payload.role,
+        "tenant_id": payload.tenant_id,
+    }
+    if payload.role == UserRole.admin:
+        new_user["is_owner"] = True
+    user = crud_user.create_user_tx(db, new_user)
     crud_tenant.create_user_tenant_tx(
         db,
         user_id=user.id,
@@ -94,7 +97,10 @@ def update_user_role_in_tenant(
             "No active doctor profile for this user in the selected organization"
         )
 
+    crud_tenant.demote_tenant_admins_to_doctors(db, tenant_id)
+
     target.role = UserRole.admin
+    target.is_owner = True
     target.tenant_id = tenant_id
 
     ut = crud_tenant.get_user_tenant_row(

@@ -31,6 +31,11 @@ interface AuthContextValue {
   logout: () => void;
   /** Merge partial fields into the signed-in user and persist to localStorage */
   patchUser: (updates: Partial<User>) => void;
+  /**
+   * Reload the signed-in user from GET /me (e.g. after server-side role changes
+   * such as org admin handoff) so the client matches the database and JWT `sub` continues to work.
+   */
+  refreshUser: () => Promise<void>;
   /** Resolved patient row id for the signed-in patient user; null for staff or unresolved. */
   patientId: string | null;
   patientProfileLoading: boolean;
@@ -324,6 +329,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadPatientProfile();
   }, [loadPatientProfile]);
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const me = await authApi.getMe();
+      setUser((prev) => {
+        const next: User = {
+          id: me.id as unknown as number,
+          email: me.email,
+          full_name: prev?.full_name ?? me.email.split('@')[0] ?? 'User',
+          is_active: me.is_active,
+          role: me.role,
+          is_owner: me.is_owner,
+          tenant_id: me.tenant_id ?? undefined,
+        };
+        if (prev?.force_password_reset !== undefined) {
+          next.force_password_reset = prev.force_password_reset;
+        }
+        localStorage.setItem('user', JSON.stringify(next));
+        return next;
+      });
+    } catch {
+      // Silent: not worth interrupting admin flows; failed auth would surface on next request.
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -333,6 +364,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       logout,
       patchUser,
+      refreshUser,
       patientId,
       patientProfileLoading,
       patientProfileError,
@@ -346,6 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       logout,
       patchUser,
+      refreshUser,
       patientId,
       patientProfileLoading,
       patientProfileError,

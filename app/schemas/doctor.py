@@ -56,6 +56,10 @@ class DoctorRead(BaseModel):
         default=None,
         description="Email of the linked login user when user_id is set",
     )
+    linked_user_role: str | None = Field(
+        default=None,
+        description="Role of the linked login user (e.g. admin, doctor) for UI badges",
+    )
 
 
 class DoctorUpdate(BaseModel):

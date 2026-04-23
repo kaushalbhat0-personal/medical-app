@@ -18,11 +18,13 @@ import { doctorsApi, tenantsApi, usersApi } from '../services';
 import type { Doctor, Tenant } from '../types';
 import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type OrgType = 'clinic' | 'hospital';
 type AddAdminTab = 'create' | 'promote';
 
 export function AdminTenantsPage() {
+  const { refreshUser } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(() => getActiveTenantId());
@@ -58,6 +60,15 @@ export function AdminTenantsPage() {
       setTenants([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const refetchTenants = useCallback(async () => {
+    try {
+      const list = await tenantsApi.getAll();
+      setTenants(list);
+    } catch {
+      toast.error('Could not refresh organizations');
     }
   }, []);
 
@@ -176,8 +187,11 @@ export function AdminTenantsPage() {
     try {
       await doctorsApi.promoteDoctor(doctorId, { tenantScopeId: addAdminTenant.id });
       toast.success(`${d.name != null && String(d.name).trim() !== '' ? String(d.name) : 'Doctor'} is now an admin.`);
-      await load();
-      await loadDoctorsForPromote(addAdminTenant);
+      await Promise.all([
+        refetchTenants(),
+        loadDoctorsForPromote(addAdminTenant),
+        refreshUser(),
+      ]);
     } catch (e: unknown) {
       // Network / cold start: not toasted by the axios success path; API errors are toasted in `api` interceptor
       if (e && typeof e === 'object' && (e as { __networkError?: boolean }).__networkError) {
@@ -396,13 +410,21 @@ export function AdminTenantsPage() {
                   promoteDoctors.map((d) => {
                     const hasLogin = d.user_id != null && String(d.user_id).length > 0;
                     const busy = promotingUserId != null;
+                    const isOrgAdmin = d.linked_user_role === 'admin';
                     return (
                       <div
                         key={String(d.id)}
                         className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
                       >
-                        <div>
-                          <p className="font-medium text-sm">{d.name ?? '—'}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-sm">{d.name ?? '—'}</p>
+                            {isOrgAdmin && (
+                              <Badge variant="secondary" className="text-xs">
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {d.specialization ?? d.specialty ?? '—'}
                           </p>
@@ -411,10 +433,14 @@ export function AdminTenantsPage() {
                           type="button"
                           size="sm"
                           variant="secondary"
-                          disabled={!hasLogin || busy}
+                          disabled={!hasLogin || busy || isOrgAdmin}
                           onClick={() => void promoteDoctorToAdmin(d)}
                         >
-                          {promotingUserId === String(d.user_id) ? 'Working…' : 'Make admin'}
+                          {promotingUserId === String(d.user_id)
+                            ? 'Working…'
+                            : isOrgAdmin
+                              ? 'Current admin'
+                              : 'Make admin'}
                         </Button>
                       </div>
                     );

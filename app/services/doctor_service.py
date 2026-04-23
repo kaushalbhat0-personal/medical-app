@@ -619,8 +619,9 @@ def promote_doctor_to_admin(
     tenant_id: UUID,
 ) -> User:
     """
-    Set the linked user's role to org admin in-place (same ``users.id``).
-    Does not create a new user, change ``users.tenant_id``, or alter the doctor row.
+    Single org admin per tenant: demote any existing ``users`` row with
+    ``tenant_id`` + role *admin* to *doctor*, then set the selected doctor's
+    linked user to *admin* with ``is_owner = True`` (same ``users.id``; no new row).
     Caller must have already authorized admin/owner (or super_admin) for ``tenant_id``.
     """
     doctor = get_doctor_or_404(db, doctor_id)
@@ -636,25 +637,7 @@ def promote_doctor_to_admin(
     if target.role == UserRole.patient:
         raise ValidationError("This account type cannot be promoted here")
 
-    if target.role == UserRole.admin:
-        ut = crud_tenant.get_user_tenant_row(
-            db, user_id=target.id, tenant_id=tenant_id
-        )
-        if ut is not None:
-            if ut.role != "admin":
-                ut.role = "admin"
-        else:
-            crud_tenant.create_user_tenant_tx(
-                db,
-                user_id=target.id,
-                tenant_id=tenant_id,
-                role=UserRole.admin.value,
-                is_primary=True,
-            )
-        db.add(target)
-        db.flush()
-        db.refresh(target)
-        return target
+    crud_tenant.demote_tenant_admins_to_doctors(db, tenant_id)
 
     if target.role != UserRole.doctor:
         raise ValidationError(
@@ -662,6 +645,9 @@ def promote_doctor_to_admin(
         )
 
     target.role = UserRole.admin
+    target.is_owner = True
+    if target.tenant_id != tenant_id:
+        target.tenant_id = tenant_id
     ut = crud_tenant.get_user_tenant_row(
         db, user_id=target.id, tenant_id=tenant_id
     )
@@ -805,6 +791,11 @@ def get_doctors(
 
         u = getattr(d, "user", None)
         setattr(d, "linked_user_email", u.email if u is not None else None)
+        setattr(
+            d,
+            "linked_user_role",
+            (u.role.value if u is not None and u.role is not None else None),
+        )
 
     return doctors
 

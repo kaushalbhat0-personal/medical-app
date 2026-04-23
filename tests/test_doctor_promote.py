@@ -64,6 +64,7 @@ async def test_super_admin_promotes_doctor_via_doctor_id(
     reloaded = db.get(User, doc_user.id)
     assert reloaded is not None
     assert reloaded.role == UserRole.admin
+    assert reloaded.is_owner is True
 
 
 async def test_org_admin_can_promote_doctor(
@@ -187,3 +188,67 @@ async def test_promote_fails_for_doctor_in_other_tenant(
         },
     )
     assert r.status_code == 404
+
+
+async def test_promote_demotes_previous_admin(
+    client: AsyncClient, db_session: Session
+) -> None:
+    """Only one org admin: promoting doctor B demotes the prior admin to doctor."""
+    db = db_session
+    org = create_tenant(db, name=f"OneAdm {uuid.uuid4().hex[:6]}")
+    old_admin = create_user(
+        db,
+        email=f"old_adm_{uuid.uuid4().hex[:8]}@example.com",
+        password="Adm9Pass!!",
+        role=UserRole.admin,
+        tenant_id=org.id,
+    )
+    doc_b = create_user(
+        db,
+        email=f"doc_b_{uuid.uuid4().hex[:8]}@example.com",
+        password="DocPass9!",
+        role=UserRole.doctor,
+        tenant_id=org.id,
+    )
+    _ = create_doctor_profile(db, tenant_id=org.id, user_id=old_admin.id)
+    doctor_b = create_doctor_profile(db, tenant_id=org.id, user_id=doc_b.id)
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": old_admin.email, "password": "Adm9Pass!!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    r = await client.patch(
+        f"/api/v1/doctors/{doctor_b.id}/promote",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant-ID": str(org.id),
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == str(doc_b.id)
+    assert r.json()["role"] == "admin"
+
+    db.expire_all()
+    reloaded_old = db.get(User, old_admin.id)
+    reloaded_b = db.get(User, doc_b.id)
+    assert reloaded_old is not None
+    assert reloaded_b is not None
+    assert reloaded_old.role == UserRole.doctor
+    assert reloaded_b.role == UserRole.admin
+    assert reloaded_b.is_owner is True
+    assert reloaded_old.is_owner is False
+
+    admin_count = db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.tenant_id == org.id,
+            User.role == UserRole.admin,
+        )
+    )
+    assert admin_count == 1

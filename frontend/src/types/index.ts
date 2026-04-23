@@ -12,6 +12,18 @@ export interface User {
   force_password_reset?: boolean;
 }
 
+/** GET /me — `UserRead` from the API */
+export interface MeUserResponse {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  is_owner: boolean;
+  tenant_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** GET /public/tenants — marketplace tenant with doctor count */
 export interface PublicTenantDiscovery {
   id: string;
@@ -119,6 +131,8 @@ export interface Doctor {
   has_availability_windows?: boolean;
   /** Login email for the linked user account (admin-created doctors) */
   linked_user_email?: string | null;
+  /** Linked user's role (admin vs doctor) for badges and promote UI */
+  linked_user_role?: string | null;
   /** From GET /doctors (DoctorRead); tenant type label for the UI. */
   tenant_type?: string | null;
   /** Derived from active doctor count in tenant; complements tenant_type. */

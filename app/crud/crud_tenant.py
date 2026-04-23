@@ -167,3 +167,22 @@ def create_user_tenant_tx(
     db.refresh(ut)
     return ut
 
+
+def demote_tenant_admins_to_doctors(db: Session, tenant_id: UUID) -> None:
+    """
+    Every user with ``users.tenant_id == tenant_id`` and role *admin* becomes *doctor*;
+    the ``user_tenant`` row for that org is set to *doctor*; ``is_owner`` is cleared.
+    """
+    stmt = select(User).where(
+        User.tenant_id == tenant_id,
+        User.role == UserRole.admin,
+    )
+    for u in db.scalars(stmt).all():
+        u.role = UserRole.doctor
+        u.is_owner = False
+        ut = get_user_tenant_row(db, user_id=u.id, tenant_id=tenant_id)
+        if ut is not None:
+            ut.role = "doctor"
+        db.add(u)
+    db.flush()
+

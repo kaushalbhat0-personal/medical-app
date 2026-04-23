@@ -1,5 +1,5 @@
 import { api, retryRequest, isNetworkError, isColdStartError } from './api';
-import type { RegisterPayload, RegisterResponse } from '../types';
+import type { MeUserResponse, RegisterPayload, RegisterResponse } from '../types';
 
 export const authApi = {
   register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
@@ -43,6 +43,12 @@ export const authApi = {
       old_password: oldPassword,
       new_password: newPassword,
     });
+  },
+
+  /** Current user from the database (authoritative role / tenant / owner flags). */
+  getMe: async (): Promise<MeUserResponse> => {
+    const { data } = await api.get<MeUserResponse>('/me');
+    return data;
   },
 };
 
