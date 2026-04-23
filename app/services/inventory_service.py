@@ -14,6 +14,7 @@ from app.models.inventory import (
     InventoryStock,
 )
 from app.models.user import User, UserRole
+from app.services import doctor_service
 from app.schemas.inventory import (
     InventoryItemCreate,
     InventoryItemUpdate,
@@ -32,6 +33,23 @@ def _forbid_patients(current_user: User, action: str = "inventory") -> None:
     if current_user.role == UserRole.patient:
         log_rbac_mutation_violation(current_user, action)
         raise ForbiddenError("Patients cannot access inventory")
+
+
+def _resolve_effective_doctor_id_for_stock(
+    db: Session,
+    current_user: User,
+    doctor_id: UUID | None,
+) -> UUID | None:
+    """Doctors are forced to their own stock scope; other roles use the request scope."""
+    if current_user.role == UserRole.doctor:
+        doc = doctor_service.require_doctor_profile(db, current_user)
+        if doctor_id is not None and doctor_id != doc.id:
+            log_rbac_mutation_violation(
+                current_user, "inventory", action="stock_scope"
+            )
+            raise ForbiddenError("You may only access your own stock")
+        return doc.id
+    return doctor_id
 
 
 def _authorize_item_tenant(
@@ -82,8 +100,9 @@ def get_stock(
     _forbid_patients(current_user)
     item = get_item_or_404(db, item_id)
     _authorize_item_tenant(item, current_user, tenant_id)
-    _validate_doctor_for_item_tenant(db, doctor_id, item.tenant_id)
-    row = db.scalars(_stock_query(item_id, doctor_id)).first()
+    eff_doctor = _resolve_effective_doctor_id_for_stock(db, current_user, doctor_id)
+    _validate_doctor_for_item_tenant(db, eff_doctor, item.tenant_id)
+    row = db.scalars(_stock_query(item_id, eff_doctor)).first()
     return int(row.quantity) if row is not None else 0
 
 
@@ -100,9 +119,10 @@ def get_bulk_stock(
     Items without a stock row get quantity 0.
     """
     _forbid_patients(current_user)
+    eff_doctor_id = _resolve_effective_doctor_id_for_stock(db, current_user, doctor_id)
     filter_tenant: UUID | None = tenant_id
-    if doctor_id is not None:
-        doctor = db.get(Doctor, doctor_id)
+    if eff_doctor_id is not None:
+        doctor = db.get(Doctor, eff_doctor_id)
         if doctor is None:
             raise NotFoundError("Doctor not found")
         if tenant_id is not None and doctor.tenant_id != tenant_id:
@@ -117,8 +137,8 @@ def get_bulk_stock(
         InventoryStock.item_id == InventoryItem.id,
         (
             InventoryStock.doctor_id.is_(None)
-            if doctor_id is None
-            else InventoryStock.doctor_id == doctor_id
+            if eff_doctor_id is None
+            else InventoryStock.doctor_id == eff_doctor_id
         ),
     )
     q = select(InventoryItem.id, func.coalesce(InventoryStock.quantity, 0)).outerjoin(
@@ -319,10 +339,13 @@ def add_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    eff_doctor = _resolve_effective_doctor_id_for_stock(
+        db, current_user, body.doctor_id
+    )
     movement, balance = _apply_movement(
         db,
         item,
-        body.doctor_id,
+        eff_doctor,
         InventoryMovementType.IN,
         body.quantity,
         billing_id=body.billing_id,
@@ -344,10 +367,13 @@ def reduce_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    eff_doctor = _resolve_effective_doctor_id_for_stock(
+        db, current_user, body.doctor_id
+    )
     movement, balance = _apply_movement(
         db,
         item,
-        body.doctor_id,
+        eff_doctor,
         InventoryMovementType.OUT,
         body.quantity,
         billing_id=body.billing_id,
@@ -369,10 +395,13 @@ def adjust_stock(
     if not item.is_active:
         raise ValidationError("Cannot adjust stock for an inactive item")
 
+    eff_doctor = _resolve_effective_doctor_id_for_stock(
+        db, current_user, body.doctor_id
+    )
     movement, balance = _apply_movement(
         db,
         item,
-        body.doctor_id,
+        eff_doctor,
         InventoryMovementType.ADJUST,
         body.quantity,
         billing_id=body.billing_id,

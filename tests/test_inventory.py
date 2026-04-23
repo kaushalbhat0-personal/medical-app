@@ -138,13 +138,14 @@ async def test_inventory_doctor_scoped_stock(
     assert add_doc.status_code == 200
     assert add_doc.json()["quantity"] == 5
 
-    add_global = await client.post(
+    # doctor_id null is resolved to the logged-in doctor; stock accumulates in one scope
+    add_again = await client.post(
         "/api/v1/inventory/stock/add",
         json={"item_id": item_id, "quantity": 12, "doctor_id": None},
         headers=auth,
     )
-    assert add_global.status_code == 200
-    assert add_global.json()["quantity"] == 12
+    assert add_again.status_code == 200
+    assert add_again.json()["quantity"] == 17
 
 
 @pytest.mark.asyncio

@@ -196,7 +196,10 @@ export function PatientAppointments() {
               When you book with a doctor, your visits will show up here.
             </CardDescription>
             <div className="flex justify-center pt-4">
-              <Button type="button" onClick={() => navigate('/patient/doctors')}>
+              <Button
+                type="button"
+                onClick={() => navigate('/patient/doctors', { state: { browseAllDoctors: true } })}
+              >
                 Book your first appointment
               </Button>
             </div>

@@ -19,6 +19,11 @@ class UserCreate(BaseModel):
 class OrganizationUserCreate(BaseModel):
     """Super-admin provisioning: tenant-bound admin or staff account."""
 
+    name: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Display label in UI only; not stored until User supports full name",
+    )
     email: str
     password: str = Field(min_length=8)
     role: UserRole

@@ -29,6 +29,7 @@ def _after_commit_purge_slot_cache(session: Session) -> None:
     from app.services import doctor_slot_service
 
     for doc_id in pending:
+        print("INVALIDATING SLOT CACHE FOR:", doc_id)
         doctor_slot_service.invalidate_all_slots_cache_for_doctor(doc_id)
 
 

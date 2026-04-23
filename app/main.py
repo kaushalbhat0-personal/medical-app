@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+import app.core.slot_cache_invalidation  # noqa: F401 — register after_commit / rollback slot cache hooks
 from app.core.tenancy import ensure_default_tenant_exists
 from app.core.rate_limit import (
     AuthenticatedWritePostRateLimitMiddleware,

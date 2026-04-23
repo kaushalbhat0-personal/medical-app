@@ -87,6 +87,8 @@ def get_patients(
             )
         else:
             stmt = stmt.where(has_appt)
+        if tenant_id is not None:
+            stmt = stmt.where(Patient.tenant_id == tenant_id)
     elif user_id is not None:
         stmt = stmt.where(Patient.user_id == user_id)
         if tenant_id is not None:

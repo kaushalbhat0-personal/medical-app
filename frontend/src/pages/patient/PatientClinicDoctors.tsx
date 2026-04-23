@@ -89,7 +89,9 @@ export function PatientClinicDoctors() {
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                     )}
                     onClick={() =>
-                      navigate('/patient/doctors', { state: { preselectDoctorId: d.id } })
+                      navigate('/patient/doctors', {
+                        state: { tenantId, preselectDoctorId: d.id },
+                      })
                     }
                   >
                     <span className="font-medium block truncate">{d.name}</span>

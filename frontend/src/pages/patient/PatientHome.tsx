@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { patientsApi, publicDiscoveryApi } from '../../services';
 import type { PatientMyDoctor, PublicTenantDiscovery } from '../../types';
 import { ErrorState } from '../../components/common';
+import { PATIENT_CLINIC_BOOKING_SCOPE_KEY } from '../../constants/patient';
 
 function SectionSkeleton({ lines = 3 }: { lines?: number }) {
   return (
@@ -39,6 +40,14 @@ export function PatientHome() {
   const [myDoctors, setMyDoctors] = useState<PatientMyDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(PATIENT_CLINIC_BOOKING_SCOPE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +234,7 @@ export function PatientHome() {
           <div className="flex justify-center pt-2">
             <Link
               to="/patient/doctors"
+              state={{ browseAllDoctors: true }}
               className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-muted-foreground')}
             >
               Browse all booking options

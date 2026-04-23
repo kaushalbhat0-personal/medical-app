@@ -106,6 +106,32 @@ def get_patient_by_user_id(db: Session, user_id: UUID) -> Patient:
     return patient
 
 
+def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patient:
+    """
+    App users (patient role) need a row in ``patients`` to book. Creates a minimal
+    profile in the current transaction if missing.
+    """
+    if current_user.role != UserRole.patient:
+        raise ValidationError("Only patient accounts can own a patient profile")
+    existing = crud_patient.get_patient_by_user_id(db, current_user.id)
+    if existing is not None:
+        return existing
+    local = (current_user.email or "patient").split("@", 1)[0].strip() or "Patient"
+    name = (local[:255]) if local else "Patient"
+    return crud_patient.create_patient_tx(
+        db,
+        {
+            "name": name,
+            "age": 0,
+            "gender": "other",
+            "phone": "0000000000",
+            "user_id": current_user.id,
+            "created_by": current_user.id,
+            "tenant_id": None,
+        },
+    )
+
+
 def list_my_doctors(db: Session, current_user: User) -> list[PatientMyDoctorRead]:
     if current_user.role != UserRole.patient:
         raise ForbiddenError("Only patients can list their doctors")
@@ -171,19 +197,24 @@ def authorize_patient_access(
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
-        if (
+        in_same_tenant = (
             patient.tenant_id is not None
             and doc.tenant_id is not None
             and patient.tenant_id == doc.tenant_id
-        ):
-            return
-        if patient.created_by == current_user.id and (
-            patient.tenant_id is None or patient.tenant_id == doc.tenant_id
-        ):
-            return
-        if crud_patient.patient_has_appointment_with_doctor(
+        )
+        linked_via_appt = crud_patient.patient_has_appointment_with_doctor(
             db, patient.id, doc.id
-        ):
+        )
+        if not in_same_tenant and not (patient.tenant_id is None and linked_via_appt):
+            log_rbac_mutation_violation(
+                current_user,
+                "patient",
+                action=rbac_action,
+            )
+            raise ForbiddenError("Not allowed to modify this patient")
+        if patient.created_by == current_user.id:
+            return
+        if linked_via_appt:
             return
         log_rbac_mutation_violation(
             current_user,
@@ -230,8 +261,8 @@ def get_patients(
             db, current_user
         )
         effective_tenant_id = doc.tenant_id
-        linked_doctor_id = None
-        doctor_created_by_user_id = None
+        linked_doctor_id = doc.id
+        doctor_created_by_user_id = current_user.id
     elif current_user.role == UserRole.patient:
         user_id = current_user.id
         # Own profile is keyed by user_id; patient rows may not carry tenant_id

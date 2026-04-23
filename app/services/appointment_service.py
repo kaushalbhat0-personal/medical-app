@@ -169,9 +169,15 @@ def create_appointment(
 ) -> tuple[Appointment, bool]:
     """Returns (appointment, idempotent_replay) where idempotent_replay is True if this response replays a prior create."""
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
+    appt_in = appointment_in
+    if current_user.role == UserRole.patient:
+        ensured = patient_service.ensure_patient_profile_for_user_tx(
+            db, current_user
+        )
+        appt_in = appt_in.model_copy(update={"patient_id": ensured.id})
     authorize_appointment_create(
         db,
-        appointment_in,
+        appt_in,
         current_user,
         tenant_id,
         acting_doctor=acting_doctor,
@@ -180,7 +186,7 @@ def create_appointment(
     if idempotency_key is not None:
         idempotency_key = idempotency_key.strip() or None
 
-    body_hash = _appointment_payload_hash(appointment_in)
+    body_hash = _appointment_payload_hash(appt_in)
     if idempotency_key:
         existing = crud_appointment.get_appointment_idempotency_record(
             db, current_user.id, idempotency_key
@@ -194,24 +200,33 @@ def create_appointment(
 
     _validate_patient_and_doctor_exist(
         db,
-        patient_id=appointment_in.patient_id,
-        doctor_id=appointment_in.doctor_id,
+        patient_id=appt_in.patient_id,
+        doctor_id=appt_in.doctor_id,
     )
-    doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
+    doctor = doctor_service.get_doctor_or_404(db, appt_in.doctor_id)
     if doctor.tenant_id is None:
         logger.error("[TENANT INTEGRITY] doctor.tenant_id is None for doctor_id=%s", doctor.id)
         raise ValidationError("Doctor tenant is not set")
+
+    patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
+    if patient_row.tenant_id is None:
+        patient_row.tenant_id = doctor.tenant_id
+        db.add(patient_row)
+        db.flush()
+    elif patient_row.tenant_id != doctor.tenant_id:
+        raise ValidationError("Patient is not in this organization")
+
     doctor_slot_service.assert_appointment_time_matches_doctor_slots(
-        db, doctor, appointment_in.appointment_time
+        db, doctor, appt_in.appointment_time
     )
     _validate_doctor_availability(
         db,
-        doctor_id=appointment_in.doctor_id,
-        appointment_time=appointment_in.appointment_time,
+        doctor_id=appt_in.doctor_id,
+        appointment_time=appt_in.appointment_time,
     )
-    _validate_slot_not_double_booked(db, appointment_in.doctor_id, appointment_in.appointment_time)
-    _validate_appointment_time_in_future(appointment_in.appointment_time)
-    appointment_data = appointment_in.model_dump()
+    _validate_slot_not_double_booked(db, appt_in.doctor_id, appt_in.appointment_time)
+    _validate_appointment_time_in_future(appt_in.appointment_time)
+    appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
     appointment_data["tenant_id"] = doctor.tenant_id
 

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
-import { tenantsApi } from '../services';
+import { tenantsApi, usersApi } from '../services';
 import type { Tenant } from '../types';
 import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
@@ -31,8 +31,16 @@ export function AdminTenantsPage() {
   const [createType, setCreateType] = useState<OrgType>('clinic');
   const [creating, setCreating] = useState(false);
 
+  const [addAdminTenant, setAddAdminTenant] = useState<Tenant | null>(null);
+  const [addAdminName, setAddAdminName] = useState('');
+  const [addAdminEmail, setAddAdminEmail] = useState('');
+  const [addAdminPassword, setAddAdminPassword] = useState('');
+  const [addAdminSubmitting, setAddAdminSubmitting] = useState(false);
+
   const modalRef = useRef<HTMLDivElement>(null);
+  const addAdminRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(modalRef, modalOpen);
+  useModalFocusTrap(addAdminRef, Boolean(addAdminTenant));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,6 +94,42 @@ export function AdminTenantsPage() {
     window.location.assign('/admin/dashboard');
   };
 
+  const openAddAdmin = (tenant: Tenant) => {
+    setAddAdminTenant(tenant);
+    setAddAdminName('');
+    setAddAdminEmail('');
+    setAddAdminPassword('');
+  };
+
+  const submitAddAdmin = async () => {
+    if (!addAdminTenant) return;
+    const email = addAdminEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error('Email is required');
+      return;
+    }
+    if (addAdminPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    setAddAdminSubmitting(true);
+    try {
+      await usersApi.createOrganizationUser({
+        name: addAdminName.trim() || undefined,
+        email,
+        password: addAdminPassword,
+        role: 'admin',
+        tenant_id: addAdminTenant.id,
+      });
+      toast.success(`Admin invited for ${addAdminTenant.name}`);
+      setAddAdminTenant(null);
+    } catch {
+      toast.error('Could not create admin');
+    } finally {
+      setAddAdminSubmitting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -121,7 +165,7 @@ export function AdminTenantsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead className="text-right w-[160px]">Actions</TableHead>
+                  <TableHead className="text-right w-[220px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -141,15 +185,25 @@ export function AdminTenantsPage() {
                       </TableCell>
                       <TableCell className="capitalize text-muted-foreground">{t.type}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant={isActive ? 'secondary' : 'outline'}
-                          size="sm"
-                          disabled={isActive}
-                          onClick={() => switchTo(t)}
-                        >
-                          {isActive ? 'Selected' : 'Switch here'}
-                        </Button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openAddAdmin(t)}
+                          >
+                            Add admin
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={isActive ? 'secondary' : 'outline'}
+                            size="sm"
+                            disabled={isActive}
+                            onClick={() => switchTo(t)}
+                          >
+                            {isActive ? 'Selected' : 'Switch here'}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -159,6 +213,86 @@ export function AdminTenantsPage() {
           )}
         </CardContent>
       </Card>
+
+      {addAdminTenant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !addAdminSubmitting) setAddAdminTenant(null);
+          }}
+        >
+          <div
+            ref={addAdminRef}
+            className={cn(
+              'w-full max-w-md rounded-xl border border-border bg-background shadow-lg',
+              'p-6 space-y-4'
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-admin-title"
+          >
+            <h2 id="add-admin-title" className="text-lg font-semibold">
+              Add admin — {addAdminTenant.name}
+            </h2>
+            <div className="space-y-2">
+              <label htmlFor="add-admin-name" className="text-sm font-medium">
+                Name
+              </label>
+              <Input
+                id="add-admin-name"
+                value={addAdminName}
+                onChange={(e) => setAddAdminName(e.target.value)}
+                placeholder="Full name"
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="add-admin-email" className="text-sm font-medium">
+                Email
+              </label>
+              <Input
+                id="add-admin-email"
+                type="email"
+                value={addAdminEmail}
+                onChange={(e) => setAddAdminEmail(e.target.value)}
+                placeholder="admin@clinic.example"
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="add-admin-password" className="text-sm font-medium">
+                Password
+              </label>
+              <Input
+                id="add-admin-password"
+                type="password"
+                value={addAdminPassword}
+                onChange={(e) => setAddAdminPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Role: admin (fixed)</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={addAdminSubmitting}
+                onClick={() => setAddAdminTenant(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submitAddAdmin()}
+                disabled={addAdminSubmitting}
+              >
+                {addAdminSubmitting ? 'Creating…' : 'Create admin'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div

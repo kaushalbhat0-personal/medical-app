@@ -86,10 +86,10 @@ def test_clinic_doctor_can_create_patient(db_session: Session) -> None:
     patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
 
 
-def test_hospital_doctor_sees_same_tenant_patient_without_personal_appointment(
+def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
     db_session: Session,
 ) -> None:
-    """All doctors in a tenant may access patients with the same tenant_id."""
+    """Doctors only see patients they created or those with an appointment to them."""
     tenant = _tenant(db_session, TenantType.hospital)
     doc_a_user = create_user(
         db_session,
@@ -135,14 +135,23 @@ def test_hospital_doctor_sees_same_tenant_patient_without_personal_appointment(
     )
     db_session.commit()
 
-    patient_service.authorize_patient_read(
-        db_session, patient, doc_a_user, tenant_id=tenant.id
-    )
+    with pytest.raises(ForbiddenError, match="Not allowed to modify this patient"):
+        patient_service.authorize_patient_read(
+            db_session, patient, doc_a_user, tenant_id=tenant.id
+        )
 
     listed = patient_service.get_patients(
         db_session, doc_a_user, tenant_id=tenant.id, limit=100
     )
-    assert patient.id in {p.id for p in listed}
+    assert patient.id not in {p.id for p in listed}
+
+    patient_service.authorize_patient_read(
+        db_session, patient, doc_b_user, tenant_id=tenant.id
+    )
+    listed_b = patient_service.get_patients(
+        db_session, doc_b_user, tenant_id=tenant.id, limit=100
+    )
+    assert patient.id in {p.id for p in listed_b}
 
 
 def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> None:

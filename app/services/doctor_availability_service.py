@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.slot_cache_invalidation import schedule_invalidate_doctor_slot_cache_on_commit
 from app.crud import crud_doctor_availability
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 from app.models.user import User
@@ -52,7 +53,7 @@ def create_availability_window(
     if _span_minutes(payload.start_time, payload.end_time) < float(payload.slot_duration):
         raise ValidationError("Window is too short to fit a slot of this duration")
     try:
-        return crud_doctor_availability.create_availability_window(
+        row = crud_doctor_availability.create_availability_window(
             db,
             doctor_id=doctor_id,
             day_of_week=payload.day_of_week,
@@ -63,6 +64,8 @@ def create_availability_window(
         )
     except ValueError as e:
         raise ValidationError(str(e)) from e
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
+    return row
 
 
 def update_availability_window(
@@ -87,7 +90,7 @@ def update_availability_window(
     if _span_minutes(eff_start, eff_end) < float(eff_slot):
         raise ValidationError("Window is too short to fit a slot of this duration")
     try:
-        return crud_doctor_availability.update_availability_window(
+        row = crud_doctor_availability.update_availability_window(
             db,
             window,
             day_of_week=data.get("day_of_week"),
@@ -97,6 +100,8 @@ def update_availability_window(
         )
     except ValueError as e:
         raise ValidationError(str(e)) from e
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
+    return row
 
 
 def delete_availability_window(
@@ -112,6 +117,7 @@ def delete_availability_window(
     if window is None or window.doctor_id != doctor_id:
         raise NotFoundError("Availability window not found")
     crud_doctor_availability.delete_availability_window(db, window)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
 
 
 def copy_availability_to_days(
@@ -146,6 +152,7 @@ def copy_availability_to_days(
             tenant_id=doctor.tenant_id,
             template_windows=source_rows,
         )
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
 
 
 def _assert_time_off_shape(start_t: time | None, end_t: time | None) -> None:
@@ -199,7 +206,7 @@ def create_time_off(
     _assert_time_off_shape(payload.start_time, payload.end_time)
     if _existing_time_off_for_date(db, doctor_id, payload.off_date) is not None:
         raise ValidationError("This date already has a time off entry")
-    return crud_doctor_availability.create_time_off(
+    row = crud_doctor_availability.create_time_off(
         db,
         doctor_id=doctor_id,
         off_date=payload.off_date,
@@ -207,6 +214,8 @@ def create_time_off(
         end_time=payload.end_time,
         tenant_id=doctor.tenant_id,
     )
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
+    return row
 
 
 def update_time_off(
@@ -233,7 +242,9 @@ def update_time_off(
         conflict = _existing_time_off_for_date(db, doctor_id, off_date, exclude_id=row.id)
         if conflict is not None:
             raise ValidationError("Another time off entry already exists for that date")
-    return crud_doctor_availability.update_time_off_row(db, row, off_date=off_date, start_time=st, end_time=et)
+    row = crud_doctor_availability.update_time_off_row(db, row, off_date=off_date, start_time=st, end_time=et)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)
+    return row
 
 
 def delete_time_off(
@@ -249,3 +260,4 @@ def delete_time_off(
     if row is None or row.doctor_id != doctor_id:
         raise NotFoundError("Time off entry not found")
     crud_doctor_availability.delete_time_off(db, row)
+    schedule_invalidate_doctor_slot_cache_on_commit(db, doctor_id)

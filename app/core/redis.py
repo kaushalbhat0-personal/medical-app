@@ -99,26 +99,34 @@ def _scan_cursor_done(cursor) -> bool:
 def redis_delete_pattern(pattern: str) -> None:
     if not _redis_ready():
         return
+    # Upstash REST: SCAN must be sent with MATCH/COUNT in the command body. A GET to
+    # /scan/{cursor} with query params does not reliably apply MATCH, so pattern deletes
+    # could miss ``slots:{doctor_id}:*`` keys and leave stale cache entries.
     base = _base_url()
-    cursor: str | int = "0"
+    cursor: str = "0"
+    post_headers = {**HEADERS, "Content-Type": "application/json"}
     while True:
         try:
-            res = requests.get(
-                f"{base}/scan/{cursor}",
-                headers=HEADERS,
-                params={"match": pattern, "count": 100},
+            res = requests.post(
+                base,
+                headers=post_headers,
+                json=["SCAN", cursor, "MATCH", pattern, "COUNT", 100],
                 timeout=_REQUEST_TIMEOUT,
             )
             res.raise_for_status()
             data = res.json()
-        except (requests.RequestException, ValueError) as e:
+        except (requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.warning("redis_delete_pattern scan failed: %s", e)
+            break
+        err = data.get("error")
+        if err:
+            logger.warning("redis_delete_pattern scan error: %s", err)
             break
         result = data.get("result")
         if not result or not isinstance(result, (list, tuple)) or len(result) < 2:
             break
-        cursor, keys = result[0], result[1] or []
-        print("Deleting keys:", keys)
+        next_cursor, keys = result[0], result[1] or []
+        cursor = str(next_cursor)
         for key in keys:
             try:
                 dres = requests.get(
@@ -129,5 +137,5 @@ def redis_delete_pattern(pattern: str) -> None:
                 dres.raise_for_status()
             except requests.RequestException as e:
                 logger.warning("redis_delete_pattern del failed: %s", e)
-        if _scan_cursor_done(cursor):
+        if _scan_cursor_done(next_cursor):
             break

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import {
   appointmentsApi,
   doctorsApi,
   invalidateDoctorSlotsClientCache,
+  publicDiscoveryApi,
   shouldSyncSlotsCrossTab,
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
@@ -27,7 +28,42 @@ import { useLinkedPatient, useModalFocusTrap } from '../../hooks';
 import type { Doctor } from '../../types';
 import { formatDoctorName } from '../../utils';
 import { ErrorState } from '../../components/common';
-import { PATIENT_BOOKING_PENDING_STORAGE_KEY } from '../../constants/patient';
+import {
+  PATIENT_BOOKING_PENDING_STORAGE_KEY,
+  PATIENT_CLINIC_BOOKING_SCOPE_KEY,
+} from '../../constants/patient';
+
+type PatientDoctorsLocationState = {
+  preselectDoctorId?: string;
+  tenantId?: string;
+  /** Set when opening the global doctors list from nav / "browse all" — clears clinic scope. */
+  browseAllDoctors?: boolean;
+};
+
+function readResolvedPatientBookingTenantId(loc: Location): string | undefined {
+  const s = (loc.state ?? null) as PatientDoctorsLocationState | null;
+  if (s?.browseAllDoctors) {
+    try {
+      sessionStorage.removeItem(PATIENT_CLINIC_BOOKING_SCOPE_KEY);
+    } catch {
+      /* ignore */
+    }
+    return undefined;
+  }
+  if (s?.tenantId != null && s.tenantId !== '') {
+    try {
+      sessionStorage.setItem(PATIENT_CLINIC_BOOKING_SCOPE_KEY, s.tenantId);
+    } catch {
+      /* ignore */
+    }
+    return s.tenantId;
+  }
+  try {
+    return sessionStorage.getItem(PATIENT_CLINIC_BOOKING_SCOPE_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function SlotsSkeleton() {
   return (
@@ -52,7 +88,11 @@ function DoctorsGridSkeleton() {
 export function PatientDoctors() {
   const navigate = useNavigate();
   const location = useLocation();
-  const preselectDoctorId = (location.state as { preselectDoctorId?: string } | null)?.preselectDoctorId;
+  const navState = (location.state ?? null) as PatientDoctorsLocationState | null;
+  const preselectDoctorId = navState?.preselectDoctorId;
+  const [resolvedTenantId, setResolvedTenantId] = useState<string | undefined>(() =>
+    readResolvedPatientBookingTenantId(location)
+  );
   const { patientId, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLinkedPatient();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +149,10 @@ export function PatientDoctors() {
   }, []);
 
   useEffect(() => {
+    setResolvedTenantId(readResolvedPatientBookingTenantId(location));
+  }, [location.key, location.state]);
+
+  useEffect(() => {
     if (!bookingDoctor || confirmOpen) return;
     const id = requestAnimationFrame(() => {
       document.getElementById('book-date')?.focus();
@@ -134,8 +178,18 @@ export function PatientDoctors() {
       setLoading(true);
       setError(null);
       try {
-        const list = await doctorsApi.getAll();
-        if (!cancelled) setDoctors(list);
+        if (resolvedTenantId) {
+          const briefs = await publicDiscoveryApi.listTenantDoctors(resolvedTenantId);
+          const list: Doctor[] = briefs.map((b) => ({
+            id: b.id,
+            name: b.name,
+            specialization: b.specialization,
+          }));
+          if (!cancelled) setDoctors(list);
+        } else {
+          const list = await doctorsApi.getAll();
+          if (!cancelled) setDoctors(list);
+        }
       } catch {
         if (!cancelled) setError('Unable to load doctors.');
       } finally {
@@ -145,7 +199,7 @@ export function PatientDoctors() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resolvedTenantId]);
 
   const fetchSlots = useCallback(
     async (mode: 'initial' | 'poll') => {
@@ -282,7 +336,16 @@ export function PatientDoctors() {
         /* doctor missing or network; stay on list */
       }
       if (!cancelled) {
-        navigate('/patient/doctors', { replace: true, state: {} });
+        let tid: string | undefined;
+        try {
+          tid = sessionStorage.getItem(PATIENT_CLINIC_BOOKING_SCOPE_KEY) || undefined;
+        } catch {
+          tid = undefined;
+        }
+        navigate('/patient/doctors', {
+          replace: true,
+          state: tid ? { tenantId: tid } : {},
+        });
       }
     })();
     return () => {
@@ -379,7 +442,9 @@ export function PatientDoctors() {
       {!bookingDoctor ? (
         <>
           <h1 className="text-xl font-semibold tracking-tight">Book a visit</h1>
-          <p className="text-xs text-muted-foreground">Step 1 — Doctor</p>
+          <p className="text-xs text-muted-foreground">
+            {resolvedTenantId ? 'Step 1 — Doctor at this organization' : 'Step 1 — Doctor'}
+          </p>
         </>
       ) : (
         <div className="flex items-center gap-2">
