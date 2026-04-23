@@ -28,17 +28,29 @@ def patient_is_in_doctor_cohort(
     patient: Patient,
     doctor_id: UUID,
 ) -> bool:
-    if crud_patient.patient_has_appointment_with_doctor(db, patient.id, doctor_id):
-        return True
-    doctor_row = db.get(Doctor, doctor_id)
-    if doctor_row is None or doctor_row.user_id is None:
-        return False
-    return patient.created_by == doctor_row.user_id
+    return crud_patient.patient_has_appointment_with_doctor(
+        db, patient.id, doctor_id
+    )
 
 
 def _validate_age(age: int | None) -> None:
     if age is not None and age < 0:
         raise ValidationError("Age must be greater than or equal to 0")
+
+
+def _resolve_patient_tenant_id_for_create(
+    current_user: User,
+    request_tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
+) -> UUID:
+    if request_tenant_id is not None:
+        return request_tenant_id
+    if acting_doctor is not None and acting_doctor.tenant_id is not None:
+        return acting_doctor.tenant_id
+    if current_user.tenant_id is not None:
+        return current_user.tenant_id
+    return DEFAULT_TENANT_ID
 
 
 def authorize_patient_create(
@@ -83,17 +95,20 @@ def create_patient(
     authorize_patient_create(
         db, current_user, tenant_id, acting_doctor=acting_doctor
     )
+    effective_tenant = _resolve_patient_tenant_id_for_create(
+        current_user, tenant_id, acting_doctor=acting_doctor
+    )
     patient_data = patient_in.model_dump()
     patient_data.pop("created_by", None)
     patient_data["created_by"] = current_user.id
-    patient_data["tenant_id"] = tenant_id or DEFAULT_TENANT_ID
+    patient_data["tenant_id"] = effective_tenant
     if tenant_id is not None:
         assert_authorized(
             "create",
             "patient",
             current_user,
             tenant_id,
-            resource_tenant_id=patient_data["tenant_id"],
+            resource_tenant_id=effective_tenant,
         )
     patient = crud_patient.create_patient(db, patient_data)
     log_audit_mutation(
@@ -141,7 +156,7 @@ def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patie
             "phone": "0000000000",
             "user_id": current_user.id,
             "created_by": current_user.id,
-            "tenant_id": None,
+            "tenant_id": current_user.tenant_id or DEFAULT_TENANT_ID,
         },
     )
 
@@ -236,31 +251,16 @@ def authorize_patient_access(
         doc = acting_doctor or doctor_service.require_doctor_profile(
             db, current_user
         )
-        in_same_tenant = (
-            patient.tenant_id is not None
-            and doc.tenant_id is not None
-            and patient.tenant_id == doc.tenant_id
-        )
-        linked_via_appt = crud_patient.patient_has_appointment_with_doctor(
+        if not crud_patient.patient_has_appointment_with_doctor(
             db, patient.id, doc.id
-        )
-        if not in_same_tenant and not (patient.tenant_id is None and linked_via_appt):
+        ):
             log_rbac_mutation_violation(
                 current_user,
                 "patient",
                 action=rbac_action,
             )
             raise ForbiddenError("Not allowed to modify this patient")
-        if patient.created_by == current_user.id:
-            return
-        if linked_via_appt:
-            return
-        log_rbac_mutation_violation(
-            current_user,
-            "patient",
-            action=rbac_action,
-        )
-        raise ForbiddenError("Not allowed to modify this patient")
+        return
 
     if current_user.role == UserRole.patient:
         if patient.user_id != current_user.id:
@@ -325,7 +325,6 @@ def get_patients(
         limit=limit,
         search=search,
         tenant_id=effective_tenant_id,
-        created_by=None,
         user_id=user_id,
         linked_doctor_id=linked_doctor_id,
     )

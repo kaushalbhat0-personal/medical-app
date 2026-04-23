@@ -1,4 +1,4 @@
-"""Doctor patient visibility is derived from created_by and appointments, not from shared tenant only."""
+"""Doctor patient visibility is derived from appointments (cohort), not from shared tenant alone."""
 
 from __future__ import annotations
 

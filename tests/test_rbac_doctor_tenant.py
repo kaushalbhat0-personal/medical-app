@@ -96,7 +96,7 @@ def test_clinic_doctor_can_create_patient(db_session: Session) -> None:
 def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
     db_session: Session,
 ) -> None:
-    """Doctors only see patients they created or those with an appointment to them."""
+    """Doctors only see patients with a non-deleted appointment to them."""
     tenant = _tenant(db_session, TenantType.hospital)
     doc_a_user = create_user(
         db_session,

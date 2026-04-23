@@ -33,7 +33,7 @@ class Patient(Base):
     )
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="SET NULL"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

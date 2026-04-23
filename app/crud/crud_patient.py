@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session
 
@@ -67,15 +67,17 @@ def get_patients(
     limit: int = 10,
     search: str | None = None,
     tenant_id: UUID | None = None,
-    created_by: UUID | None = None,
     user_id: UUID | None = None,
     linked_doctor_id: UUID | None = None,
+    *,
+    tenant_appointment_fallback: bool = True,
 ) -> list[Patient]:
     """
-    List patients. Tenant scope: filter by ``tenant_id`` only. Doctor scope:
-    pass ``linked_doctor_id`` — rows must have a non-deleted appointment with
-    that doctor (optionally also ``Patient.tenant_id``). Do not use
-    ``created_by`` for scoping; it is not reliable for cohort membership.
+    List patients. Tenant scope: filter by ``tenant_id`` on the patient, with an
+    optional read fallback: patients with ``tenant_id`` NULL but a non-deleted
+    appointment in that tenant. Doctor scope: only non-deleted appointments with
+    ``linked_doctor_id``; do not filter on ``Patient.tenant_id`` (cohort is
+    appointment-based only). ``created_by`` is not used for scoping.
     """
     stmt = select(Patient).order_by(Patient.created_at.desc())
     if search:
@@ -84,19 +86,24 @@ def get_patients(
         has_appt = exists().where(
             Appointment.patient_id == Patient.id,
             Appointment.doctor_id == linked_doctor_id,
-            Appointment.is_deleted == False,
+            Appointment.is_deleted == False,  # noqa: E712
         )
         stmt = stmt.where(has_appt)
-        if tenant_id is not None:
-            stmt = stmt.where(Patient.tenant_id == tenant_id)
     elif user_id is not None:
         stmt = stmt.where(Patient.user_id == user_id)
         if tenant_id is not None:
             stmt = stmt.where(Patient.tenant_id == tenant_id)
     elif tenant_id is not None:
-        stmt = stmt.where(Patient.tenant_id == tenant_id)
-    if created_by is not None:
-        stmt = stmt.where(Patient.created_by == created_by)
+        in_tenant = Patient.tenant_id == tenant_id
+        if tenant_appointment_fallback:
+            appt_tenant = exists().where(
+                Appointment.patient_id == Patient.id,
+                Appointment.tenant_id == tenant_id,
+                Appointment.is_deleted == False,  # noqa: E712
+            )
+            stmt = stmt.where(or_(in_tenant, and_(Patient.tenant_id.is_(None), appt_tenant)))
+        else:
+            stmt = stmt.where(in_tenant)
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 
