@@ -49,6 +49,16 @@ export function tenantIdFromToken(token: string | null): string | null | undefin
   return undefined;
 }
 
+/** Linked doctor row id when present on the access token. */
+export function doctorIdFromToken(token: string | null): string | null | undefined {
+  if (!token) return undefined;
+  const payload = decodeJwtPayload(token);
+  const d = payload?.doctor_id;
+  if (d === null) return null;
+  if (typeof d === 'string' && d.length > 0) return d;
+  return undefined;
+}
+
 export function isOwnerFromToken(token: string | null): boolean | undefined {
   if (!token) return undefined;
   const payload = decodeJwtPayload(token);

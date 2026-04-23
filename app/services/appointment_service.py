@@ -208,13 +208,9 @@ def create_appointment(
         doctor_id=appt_in.doctor_id,
     )
     doctor = doctor_service.get_doctor_or_404(db, appt_in.doctor_id)
-    doctor = doctor_service.ensure_tenant_for_individual_doctor(db, doctor)
+    doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
     patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
-    if patient_row.tenant_id is None:
-        patient_row.tenant_id = doctor.tenant_id
-        db.add(patient_row)
-        db.flush()
 
     logger.info(
         "[BOOKING_FLOW_V2] patient_id=%s patient_tenant=%s doctor_tenant=%s",

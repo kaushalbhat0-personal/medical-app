@@ -50,7 +50,6 @@ def _doctor_user_and_billing_for_tenant(
         email=f"{email_prefix}p_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     patient = create_patient_profile(
         db,
@@ -121,7 +120,6 @@ def test_hospital_doctor_does_not_see_peer_doctor_patient_without_relationship(
         email=f"hosp_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     patient = create_patient_profile(
         db_session,
@@ -185,7 +183,6 @@ def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> No
         email=f"cross_b_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant_b.id,
     )
     patient = create_patient_profile(
         db_session,
@@ -275,7 +272,6 @@ def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
         email=f"nodocbp_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     patient = create_patient_profile(
         db_session,
@@ -338,7 +334,6 @@ def test_doctor_create_bill_rejects_scheduled_appointment(
         email=f"schedp_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     patient = create_patient_profile(
         db_session,

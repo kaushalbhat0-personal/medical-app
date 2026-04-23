@@ -24,7 +24,7 @@ export function StaffRoute({ user, children }: StaffRouteProps) {
     return <Navigate to={patientHomePath()} replace />;
   }
   if (isDualModeUser && resolvedMode === 'practice') {
-    return <Navigate to="/doctor/appointments" replace />;
+    return <Navigate to="/doctor/dashboard" replace />;
   }
   if (isDoctorRole(eff) && !canAccessAdminUI(eff)) {
     return <Navigate to={doctorHomePath()} replace />;

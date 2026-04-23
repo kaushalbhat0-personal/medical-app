@@ -161,7 +161,7 @@ def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patie
             "phone": "0000000000",
             "user_id": current_user.id,
             "created_by": current_user.id,
-            "tenant_id": current_user.tenant_id,
+            "tenant_id": None,
         },
     )
 

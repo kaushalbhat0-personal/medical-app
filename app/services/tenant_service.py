@@ -318,3 +318,81 @@ def create_tenant(
         db, tenant_in, current_user, idempotency_key=idempotency_key
     )
     return tenant, email
+
+
+def upgrade_individual_to_organization(
+    db: Session,
+    current_user: User,
+    clinic_name: str | None,
+) -> tuple[Tenant, User]:
+    """
+    Convert the current user's ``individual`` tenant in-place to ``organization`` and promote
+    the practice owner to account ``admin`` (retaining linked doctor; effective roles
+    ``admin`` + ``doctor``). Does not create a new tenant or change ``tenant_id`` / ``doctor`` rows.
+    """
+    if current_user.role != UserRole.doctor:
+        raise ForbiddenError("Only individual doctors can upgrade to an organization")
+    if current_user.tenant_id is None:
+        raise ValidationError("User has no tenant to upgrade")
+
+    tenant = db.get(Tenant, current_user.tenant_id)
+    if tenant is None:
+        raise NotFoundError("Tenant not found")
+    if not tenant.is_active:
+        raise ValidationError("Tenant is not active")
+    if str(tenant.type) != TenantType.individual.value:
+        raise ValidationError("Tenant is not an individual practice")
+
+    new_name: str | None = None
+    if clinic_name is not None:
+        s = clinic_name.strip()
+        if s:
+            new_name = s
+
+    if new_name is not None and new_name.lower() != tenant.name.lower():
+        other = crud_tenant.get_by_name(db, new_name)
+        if other is not None and other.id != tenant.id:
+            raise ValidationError("Tenant with this name already exists")
+
+    crud_tenant.demote_tenant_admins_to_doctors(db, tenant.id)
+
+    try:
+        if new_name is not None:
+            tenant.name = new_name
+        tenant.type = TenantType.organization.value
+        current_user.role = UserRole.admin
+        current_user.is_owner = True
+        ut = crud_tenant.get_user_tenant_row(
+            db, user_id=current_user.id, tenant_id=tenant.id
+        )
+        if ut is not None:
+            ut.role = UserRole.admin.value
+        else:
+            crud_tenant.create_user_tenant_tx(
+                db,
+                user_id=current_user.id,
+                tenant_id=tenant.id,
+                role=UserRole.admin.value,
+                is_primary=True,
+            )
+        db.add(tenant)
+        db.add(current_user)
+        db.flush()
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        msg = str(getattr(e, "orig", e))
+        if "ux_tenants_name_lower" in msg or (
+            "UNIQUE" in msg.upper() and "tenant" in msg.lower() and "name" in msg.lower()
+        ):
+            raise ValidationError("Tenant with this name already exists") from e
+        raise
+
+    db.refresh(tenant)
+    db.refresh(current_user)
+    logger.info(
+        "[UPGRADE_FLOW] user_id=%s tenant_id=%s upgraded_to=organization",
+        current_user.id,
+        tenant.id,
+    )
+    return tenant, current_user

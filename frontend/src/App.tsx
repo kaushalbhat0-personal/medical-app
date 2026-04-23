@@ -41,8 +41,10 @@ import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
 import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
+import { Signup } from './pages/Signup';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
+import { SignupHospital } from './pages/SignupHospital';
 import { ResetPassword } from './pages/ResetPassword';
 import { ClinicOnboardingPage } from './pages/doctor/ClinicOnboardingPage';
 
@@ -109,6 +111,22 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/signup"
+          element={
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : isAuthenticated ? (
+              <Navigate to={loginRedirect} replace />
+            ) : (
+              <Signup />
+            )
+          }
+        />
+
+        <Route
           path="/signup/patient"
           element={
             isLoading ? (
@@ -136,6 +154,22 @@ function AnimatedRoutes() {
               <Navigate to={loginRedirect} replace />
             ) : (
               <SignupDoctor />
+            )
+          }
+        />
+
+        <Route
+          path="/signup/hospital"
+          element={
+            isLoading ? (
+              <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="spinner" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              </div>
+            ) : isAuthenticated ? (
+              <Navigate to={loginRedirect} replace />
+            ) : (
+              <SignupHospital />
             )
           }
         />
@@ -304,9 +338,10 @@ function AnimatedRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="home" replace />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="home" element={<Navigate to="/doctor/dashboard" replace />} />
           <Route
-            path="home"
+            path="dashboard"
             element={
               <AnimatedPage>
                 <DoctorHome />

@@ -59,7 +59,6 @@ def _seed_tenant_a_metrics(
         email=f"pat_{uuid.uuid4().hex[:10]}@test.local",
         password="PatPass9!",
         role=UserRole.patient,
-        tenant_id=tenant_a.id,
     )
     patient = create_patient_profile(
         db, tenant_id=tenant_a.id, user_id=pat_user.id, created_by=admin.id, name="P Metrics"
@@ -85,7 +84,6 @@ def _seed_tenant_a_metrics(
         email=f"bp_{uuid.uuid4().hex[:10]}@test.local",
         password="PatPass9!",
         role=UserRole.patient,
-        tenant_id=tenant_b.id,
     )
     b_patient = create_patient_profile(
         db, tenant_id=tenant_b.id, user_id=b_pat_user.id, created_by=b_admin.id, name="B"
@@ -457,7 +455,6 @@ def _seed_tenant_revenue_trend_minimal(
         email=f"rt_bpat_{uuid.uuid4().hex[:8]}@test.local",
         password="Pat9!",
         role=UserRole.patient,
-        tenant_id=tenant_b.id,
     )
     b_patient = create_patient_profile(
         db, tenant_id=tenant_b.id, user_id=b_pat.id, created_by=b_admin.id, name="RTB"
@@ -476,7 +473,6 @@ def _seed_tenant_revenue_trend_minimal(
         email=f"rt_apat_{uuid.uuid4().hex[:8]}@test.local",
         password="Pat9!",
         role=UserRole.patient,
-        tenant_id=tenant_a.id,
     )
     patient = create_patient_profile(
         db, tenant_id=tenant_a.id, user_id=a_pat.id, created_by=admin.id, name="RTA"
@@ -636,7 +632,6 @@ def _seed_doctor_performance_tenant(
         email=f"dperf_pa_{uuid.uuid4().hex[:8]}@test.local",
         password="Pat9!",
         role=UserRole.patient,
-        tenant_id=tenant_a.id,
     )
     patient = create_patient_profile(
         db, tenant_id=tenant_a.id, user_id=pat_a.id, created_by=admin.id, name="DP Patient"
@@ -646,7 +641,6 @@ def _seed_doctor_performance_tenant(
         email=f"dperf_pb_{uuid.uuid4().hex[:8]}@test.local",
         password="Pat9!",
         role=UserRole.patient,
-        tenant_id=tenant_b.id,
     )
     b_patient = create_patient_profile(
         db, tenant_id=tenant_b.id, user_id=b_pat.id, created_by=b_admin.id, name="B"

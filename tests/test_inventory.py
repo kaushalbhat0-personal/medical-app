@@ -222,7 +222,6 @@ async def test_inventory_patient_forbidden(
         email=pat_email,
         password="InvPass9!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     db.commit()
 

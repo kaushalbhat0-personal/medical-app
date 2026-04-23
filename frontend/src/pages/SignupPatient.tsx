@@ -35,6 +35,7 @@ export function SignupPatient() {
       email: data.email,
       password: data.password,
       role: 'patient',
+      signup_type: 'patient',
       patient_profile: {
         name: data.name,
         age: data.age,
@@ -54,8 +55,8 @@ export function SignupPatient() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card padding="lg" className="w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-text-primary">Create patient account</h1>
-          <p className="text-sm text-text-secondary mt-1">Same secure API as staff onboarding</p>
+          <h1 className="text-xl font-bold text-text-primary">Patient</h1>
+          <p className="text-sm text-text-secondary mt-1">Book appointments with doctors</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Input label="Email" type="email" error={errors.email?.message} disabled={isSubmitting} {...register('email')} />
@@ -79,8 +80,8 @@ export function SignupPatient() {
             Back to sign in
           </Link>
           {' · '}
-          <Link to="/signup/doctor" className="text-primary hover:underline">
-            I am a doctor
+          <Link to="/signup" className="text-primary hover:underline">
+            Other account types
           </Link>
         </p>
       </Card>

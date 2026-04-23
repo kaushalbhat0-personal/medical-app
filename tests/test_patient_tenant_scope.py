@@ -70,7 +70,6 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
         email=f"pat_tnull_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     p = create_patient_profile(
         db_session,
@@ -201,7 +200,6 @@ def test_admin_sees_patient_with_foreign_tenant_id_when_appointment_in_tenant(
         email=f"pat_xc_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant_home.id,
     )
     p = create_patient_profile(
         db_session,
@@ -264,7 +262,6 @@ def test_doctor_read_requires_appointment_not_created_by(
         email=f"pu_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     patient = create_patient_profile(
         db_session,
@@ -343,14 +340,12 @@ async def test_admin_sees_all_patients_in_tenant(
         email=f"p1_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p2_user = create_user(
         db_session,
         email=f"p2_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p1 = create_patient_profile(
         db_session,
@@ -373,7 +368,6 @@ async def test_admin_sees_all_patients_in_tenant(
         email=f"p_other_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t_other.id,
     )
     p_other = create_patient_profile(
         db_session,
@@ -461,14 +455,12 @@ async def test_doctor_sees_only_own_patients(
         email=f"dp1_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p2_user = create_user(
         db_session,
         email=f"dp2_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p1 = create_patient_profile(
         db_session,
@@ -547,7 +539,6 @@ def test_patient_visible_after_booking(db_session: Session) -> None:
         email=f"pat_pb_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     p = create_patient_profile(
         db_session,
@@ -614,14 +605,12 @@ def test_admin_sees_all_patients(db_session: Session) -> None:
         email=f"p_sa1_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p2u = create_user(
         db_session,
         email=f"p_sa2_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=t1.id,
     )
     p1 = create_patient_profile(
         db_session,

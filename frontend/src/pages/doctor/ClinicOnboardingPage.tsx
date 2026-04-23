@@ -13,7 +13,7 @@ export function ClinicOnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-50/50 via-background to-emerald-50/30 dark:from-sky-950/20 dark:via-background dark:to-emerald-950/20">
       <div className="mx-auto max-w-lg px-4 py-10">
         <Link
-          to="/doctor/home"
+          to="/doctor/dashboard"
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'sm' }),
             'mb-6 inline-flex gap-2 text-muted-foreground'

@@ -17,7 +17,14 @@ import type {
   RegisterResponse,
 } from '../types';
 import { authApi, formatLoginError, patientsApi } from '../services';
-import { isOwnerFromToken, roleFromToken, rolesFromToken, tenantIdFromToken, userIdFromAccessToken } from '../utils/jwtPayload';
+import {
+  doctorIdFromToken,
+  isOwnerFromToken,
+  roleFromToken,
+  rolesFromToken,
+  tenantIdFromToken,
+  userIdFromAccessToken,
+} from '../utils/jwtPayload';
 import { getEffectiveRoles, isDoctorRole, isPatientRole, mergeRoleSources } from '../utils/roles';
 import { resolveLinkedPatient } from '../utils/patientProfile';
 import { ACTIVE_TENANT_ID_ALIAS_KEY, setActiveTenantId } from '../utils/tenantIdForRequest';
@@ -85,6 +92,14 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     roleFromToken(response.access_token) ? [roleFromToken(response.access_token)!] : undefined
   );
   const tenantRaw = response.tenant_id ?? base?.tenant_id ?? tenantIdFromToken(response.access_token);
+  const fromBaseDoc =
+    base?.doctor_id != null && String(base.doctor_id).length > 0 ? String(base.doctor_id) : undefined;
+  const fromRespDoc =
+    response.doctor_id != null && String(response.doctor_id).length > 0
+      ? String(response.doctor_id)
+      : undefined;
+  const fromTokDoc = doctorIdFromToken(response.access_token);
+  const doctor_id = fromBaseDoc ?? fromRespDoc ?? (fromTokDoc !== undefined ? fromTokDoc : undefined);
   const isOwner =
     base?.is_owner ??
     response.is_owner ??
@@ -99,6 +114,7 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     roles: roles.length > 0 ? roles : ['admin'],
     is_owner: isOwner,
     ...(tenantRaw !== undefined ? { tenant_id: tenantRaw } : {}),
+    ...(doctor_id !== undefined ? { doctor_id } : {}),
     ...(response.force_password_reset !== undefined
       ? { force_password_reset: response.force_password_reset }
       : {}),
@@ -113,7 +129,14 @@ function buildUserFromRegister(response: RegisterResponse): User {
     rolesFromToken(response.access_token),
     roleFromToken(response.access_token) ? [roleFromToken(response.access_token)!] : undefined
   );
-  const tenantRaw = tenantIdFromToken(response.access_token);
+  const tenantRaw =
+    u.tenant_id != null && u.tenant_id !== ''
+      ? String(u.tenant_id)
+      : tenantIdFromToken(response.access_token);
+  const fromApiDoc =
+    u.doctor_id != null && String(u.doctor_id).length > 0 ? String(u.doctor_id) : undefined;
+  const fromTokDoc = doctorIdFromToken(response.access_token);
+  const doctor_id = fromApiDoc ?? (fromTokDoc !== undefined ? fromTokDoc : undefined);
   return {
     id: u.id as unknown as number,
     email: u.email,
@@ -121,7 +144,8 @@ function buildUserFromRegister(response: RegisterResponse): User {
     is_active: u.is_active ?? true,
     roles: roles.length > 0 ? roles : ['patient'],
     is_owner: u.is_owner ?? isOwnerFromToken(response.access_token) ?? false,
-    ...(tenantRaw !== undefined && tenantRaw !== null ? { tenant_id: tenantRaw } : {}),
+    ...(tenantRaw !== undefined && tenantRaw !== null ? { tenant_id: String(tenantRaw) } : {}),
+    ...(doctor_id !== undefined ? { doctor_id } : {}),
   };
 }
 
@@ -136,11 +160,16 @@ function mergeUserWithToken(user: User, token: string | null): User {
   );
   const roles = merged.length > 0 ? merged : user.roles;
   const tenant_id = user.tenant_id ?? tenantIdFromToken(token) ?? undefined;
+  const fromUserDoc =
+    user.doctor_id != null && String(user.doctor_id).length > 0 ? String(user.doctor_id) : undefined;
+  const fromTokDoc = doctorIdFromToken(token);
+  const doctor_id = fromUserDoc ?? (fromTokDoc !== undefined ? fromTokDoc : undefined);
   const ownerHint = isOwnerFromToken(token);
   return {
     ...user,
     roles: roles && roles.length > 0 ? roles : user.roles,
     ...(tenant_id !== undefined ? { tenant_id } : {}),
+    ...(doctor_id !== undefined ? { doctor_id } : {}),
     ...(ownerHint !== undefined && user.is_owner === undefined ? { is_owner: ownerHint } : {}),
   };
 }
@@ -179,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const single = roleFromToken(token);
         const roles = tr?.length ? tr : single ? [single] : [];
         if (roles.length > 0) {
+          const did = doctorIdFromToken(token);
           const minimal: User = {
             id: 0,
             email: '',
@@ -187,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             roles,
             is_owner: isOwnerFromToken(token) ?? false,
             tenant_id: tenantIdFromToken(token) ?? undefined,
+            ...(did !== undefined ? { doctor_id: did } : {}),
           };
           localStorage.setItem('user', JSON.stringify(minimal));
           setUser(minimal);

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { buttonVariants } from '@/components/ui/button';
 import type { User } from '../../types';
-import { getEffectiveRoles, normalizeRoles } from '../../utils/roles';
+import { getEffectiveRoles, isDoctorAndOrgAdminRoles } from '../../utils/roles';
 
 /**
  * Shown only for users with both `doctor` and org `admin` in effective roles.
@@ -16,15 +16,7 @@ export function ModeSwitcher({ user }: { user: User | null }) {
   const navigate = useNavigate();
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const r = normalizeRoles(getEffectiveRoles(user, token));
-  const isDoctor = r.includes('doctor');
-  const isAdmin = r.includes('admin');
-  const showToggle = isDoctor && isAdmin;
-
-  if (import.meta.env.DEV) {
-    console.log(user?.roles);
-    console.log({ roles: r, isDoctor, isAdmin, showToggle });
-  }
+  const showToggle = isDoctorAndOrgAdminRoles(getEffectiveRoles(user, token));
 
   if (!showToggle) {
     return null;
@@ -33,7 +25,7 @@ export function ModeSwitcher({ user }: { user: User | null }) {
   const go = (m: 'practice' | 'admin') => {
     setMode(m);
     if (m === 'practice') {
-      navigate('/doctor/appointments', { replace: true });
+      navigate('/doctor/dashboard', { replace: true });
     } else {
       navigate('/admin/dashboard', { replace: true });
     }

@@ -94,7 +94,6 @@ async def test_slots_update_after_availability_change(
         email=pat_email,
         password="PatPass9!",
         role=UserRole.patient,
-        tenant_id=doctor.tenant_id,
     )
     create_patient_profile(
         db_session,

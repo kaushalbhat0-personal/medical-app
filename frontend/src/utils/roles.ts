@@ -94,7 +94,7 @@ export function patientHomePath(): string {
 }
 
 export function doctorHomePath(): string {
-  return '/doctor/home';
+  return '/doctor/dashboard';
 }
 
 /** Default landing path after login or post-registration, by role. */
@@ -105,11 +105,12 @@ export function postLoginHomePath(roles: string | string[] | null | undefined): 
   const hasAdm = r.some((x) => x === 'admin' || x === 'super_admin');
   if (hasDoc && hasAdm) {
     const m: AppMode = readStoredAppMode() ?? 'practice';
-    return m === 'admin' ? '/admin/dashboard' : '/doctor/appointments';
+    return m === 'admin' ? '/admin/dashboard' : doctorHomePath();
   }
   if (r.includes('doctor')) return doctorHomePath();
   if (r.includes('super_admin')) {
     return getActiveTenantId() ? '/admin/dashboard' : '/admin/tenants';
   }
+  if (hasAdm) return '/admin/dashboard';
   return staffHomePath();
 }

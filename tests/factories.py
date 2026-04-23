@@ -76,8 +76,23 @@ def create_user(
         db.add(u)
         db.flush()
         return u
+    if role == UserRole.patient:
+        if tenant_id is not None:
+            raise ValueError("patient test users must not have tenant_id; omit the argument")
+        u = User(
+            email=email,
+            hashed_password=hash_password(password),
+            role=UserRole.patient,
+            is_active=True,
+            force_password_reset=force_password_reset,
+            is_owner=False,
+            tenant_id=None,
+        )
+        db.add(u)
+        db.flush()
+        return u
     if tenant_id is None:
-        raise ValueError("tenant_id is required for non-super_admin users")
+        raise ValueError("tenant_id is required for non-super_admin, non-patient users")
     u = User(
         email=email,
         hashed_password=hash_password(password),
@@ -202,7 +217,6 @@ def seed_bookable_doctor_and_patient(
         email=patient_email,
         password=patient_password,
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     pat = create_patient_profile(
         db,
@@ -254,7 +268,6 @@ def extend_playwright_e2e_seed(
         email="e2e-patient-b@local.test",
         password="TempPass9!",
         role=UserRole.patient,
-        tenant_id=tenant_id,
     )
     _patient_b = create_patient_profile(
         db,
@@ -288,7 +301,6 @@ def extend_playwright_e2e_seed(
         email="e2e-patient-only-b@local.test",
         password="TempPass9!",
         role=UserRole.patient,
-        tenant_id=tenant_id,
     )
     patient_only_b = create_patient_profile(
         db,

@@ -23,6 +23,9 @@ class TenantType(str, enum.Enum):
     hospital = "hospital"
     independent_doctor = "independent_doctor"
     clinic = "clinic"
+    # Self-service signup: solo practice vs org-owned tenant
+    individual = "individual"
+    organization = "organization"
 
 
 class Tenant(Base):

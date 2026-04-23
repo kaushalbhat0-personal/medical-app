@@ -80,7 +80,6 @@ async def test_slot_conflict_second_patient_same_slot_rejected(
         email=pat_b_email,
         password=pat_pw,
         role=UserRole.patient,
-        tenant_id=tenant_id,
     )
     patient_b = create_patient_profile(
         db_session,

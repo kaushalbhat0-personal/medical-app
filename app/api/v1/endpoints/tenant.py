@@ -8,9 +8,15 @@ from app.core.database import get_db
 from app.crud import crud_tenant
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
-from app.schemas.tenant import TenantCreate, TenantPublicRead
+from app.schemas.tenant import (
+    TenantCreate,
+    TenantPublicRead,
+    UpgradeToOrganizationRequest,
+    UpgradeToOrganizationResponse,
+)
 from app.services import tenant_service
 from app.services.exceptions import ForbiddenError, NotFoundError
+from app.services.user_roles_service import roles_and_doctor_id_for_user
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -30,6 +36,35 @@ def create_tenant(
         db, payload, current_user, idempotency_key=idempotency_key
     )
     return TenantPublicRead.model_validate(tenant).model_copy(update={"admin_email": admin_email})
+
+
+@router.post(
+    "/upgrade-to-organization",
+    response_model=UpgradeToOrganizationResponse,
+    status_code=status.HTTP_200_OK,
+)
+def upgrade_to_organization(
+    payload: UpgradeToOrganizationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> UpgradeToOrganizationResponse:
+    """
+    In-place upgrade: ``individual`` solo practice → ``organization``; caller becomes
+    org admin/owner. Same ``tenant_id``; patients/appointments/billing rows are not migrated.
+    """
+    tenant, user = tenant_service.upgrade_individual_to_organization(
+        db,
+        current_user,
+        payload.clinic_name,
+    )
+    admin_email = crud_tenant.get_primary_admin_email_for_tenant(db, tenant.id)
+    eff_roles, _ = roles_and_doctor_id_for_user(db, user)
+    return UpgradeToOrganizationResponse(
+        tenant=TenantPublicRead.model_validate(tenant).model_copy(
+            update={"admin_email": admin_email}
+        ),
+        roles=eff_roles,
+    )
 
 
 @router.get("", response_model=list[TenantPublicRead])

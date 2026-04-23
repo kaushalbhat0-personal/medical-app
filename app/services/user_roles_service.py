@@ -52,4 +52,5 @@ def user_read_with_roles(db: Session, user: User) -> UserRead:
 
 def user_response_with_roles(db: Session, user: User) -> UserResponse:
     base = UserResponse.model_validate(user)
-    return base.model_copy(update={"roles": compute_roles_for_user(db, user)})
+    roles, doctor_id = roles_and_doctor_id_for_user(db, user)
+    return base.model_copy(update={"roles": roles, "doctor_id": doctor_id})

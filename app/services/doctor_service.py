@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import uuid
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -42,49 +41,12 @@ from app.services.security_audit import (
 logger = logging.getLogger(__name__)
 
 
-def ensure_tenant_for_individual_doctor(db: Session, doctor: Doctor) -> Doctor:
-    """
-    If a doctor has no organization yet, create an ``independent_doctor`` tenant and attach it.
-
-    Ensures :attr:`Appointment.tenant_id` / :attr:`Patient.tenant_id` can follow the doctor.
-    """
-    if doctor.tenant_id is not None:
-        return doctor
-    if doctor.user_id is None:
+def require_doctor_tenant_for_scheduling(doctor: Doctor) -> None:
+    """Solo/organization signups must attach a tenant; we do not auto-create tenants at booking time."""
+    if doctor.tenant_id is None:
         raise ValidationError(
-            "Doctor must be linked to a user account before scheduling"
+            "This doctor is not associated with a practice; scheduling is unavailable"
         )
-    u = crud_user.get_user(db, doctor.user_id)
-    if u is None:
-        raise ValidationError("Doctor user not found")
-    label = (doctor.name or "Practice").strip() or "Practice"
-    tenant = crud_tenant.create_tenant_tx(
-        db,
-        name=f"{label} — Practice ({uuid.uuid4().hex[:8]})",
-        type=TenantType.independent_doctor,
-        is_active=True,
-    )
-    if crud_tenant.get_user_tenant_row(db, user_id=u.id, tenant_id=tenant.id) is None:
-        crud_tenant.create_user_tenant_tx(
-            db,
-            user_id=u.id,
-            tenant_id=tenant.id,
-            role="doctor",
-            is_primary=True,
-        )
-    u.is_owner = True
-    doctor.tenant_id = tenant.id
-    db.add(doctor)
-    db.add(u)
-    db.flush()
-    db.refresh(doctor)
-    logger.info(
-        "[TENANT_AUTO] individual tenant %s for doctor_id=%s user_id=%s",
-        tenant.id,
-        doctor.id,
-        u.id,
-    )
-    return doctor
 
 
 def _normalize_timezone_string(tz: str) -> str:
@@ -470,8 +432,7 @@ def create_independent_doctor(
     current_user: User | None = None,
 ) -> Doctor:
     """
-    Doctor self-signup: create a single-tenant org (clinic) and a doctor row linked to the user.
-    The tenant is named "{name} Clinic"; type is always ``clinic`` (same model as multi-doctor clinics).
+    Individual doctor self-signup: create a tenant of type ``individual`` and name ``"{name}'s Practice"``.
     """
     if current_user is not None:
         authorize_doctor_create(current_user)
@@ -487,10 +448,11 @@ def create_independent_doctor(
     else:
         doctor_data["timezone"] = _normalize_timezone_string(doctor_data["timezone"])
 
+    display_name = (doctor_in.name or "Doctor").strip() or "Doctor"
     tenant = crud_tenant.create_tenant_tx(
         db,
-        name=f"{doctor_in.name} Clinic",
-        type=TenantType.clinic,
+        name=f"{display_name}'s Practice",
+        type=TenantType.individual,
         is_active=True,
     )
     crud_tenant.create_user_tenant_tx(
@@ -507,7 +469,7 @@ def create_independent_doctor(
     doctor_data["user_id"] = user_id
     doctor = crud_doctor.create_doctor_tx(db, doctor_data)
     logger.info(
-        "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s (independent clinic tenant)",
+        "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s (individual practice tenant)",
         user_id,
         doctor.id,
         doctor.tenant_id,

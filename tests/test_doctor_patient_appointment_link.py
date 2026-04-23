@@ -59,7 +59,6 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
         email=f"patlink_{uuid.uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     db_session.commit()
     # No Patient row until booking ensures one
@@ -93,7 +92,9 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
 
     p = crud_patient.get_patient(db_session, appt.patient_id)
     assert p is not None
-    assert p.tenant_id == tenant.id
+    # Global patients have no org tenant; appointment carries doctor tenant.
+    assert p.tenant_id is None
+    assert appt.tenant_id == tenant.id
 
 
 def test_two_doctors_same_tenant_patient_list_isolated(
@@ -135,7 +136,6 @@ def test_two_doctors_same_tenant_patient_list_isolated(
         email=f"pat2_{uuid4().hex[:8]}@test.local",
         password="PatPass123!",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     db_session.commit()
 

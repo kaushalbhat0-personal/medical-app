@@ -1,19 +1,71 @@
+import enum
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.user import UserRole
 from app.schemas.doctor import DoctorCreate
 from app.schemas.patient import PatientCreate
 
 
+class SignupType(str, enum.Enum):
+    patient = "patient"
+    doctor = "doctor"
+    hospital = "hospital"
+
+
 class UserCreate(BaseModel):
     email: str
     password: str
     role: UserRole | None = None
+    """Required unless ``signup_type`` is ``hospital`` (backend uses ``admin``)."""
     doctor_profile: DoctorCreate | None = None
     patient_profile: PatientCreate | None = None
+    signup_type: SignupType | None = None
+    """Defaults from ``role`` for older clients. Use ``hospital`` for org signup."""
+    organization_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Clinic or hospital name; required for signup_type=hospital",
+    )
+
+    @model_validator(mode="after")
+    def validate_signup_payload(self) -> "UserCreate":
+        st = self.signup_type
+        if st is None:
+            if self.role is None:
+                raise ValueError("role or signup_type is required")
+            if self.role == UserRole.patient:
+                st = SignupType.patient
+            elif self.role == UserRole.doctor:
+                st = SignupType.doctor
+            else:
+                raise ValueError("signup_type is required (or use role patient|doctor for legacy)")
+
+        if st == SignupType.patient:
+            if self.patient_profile is None:
+                raise ValueError("patient_profile is required for patient signup")
+            return self.model_copy(update={"signup_type": st, "role": UserRole.patient})
+        if st == SignupType.doctor:
+            if self.doctor_profile is None:
+                raise ValueError("doctor_profile is required for individual doctor signup")
+            return self.model_copy(update={"signup_type": st, "role": UserRole.doctor})
+        if st == SignupType.hospital:
+            org = (self.organization_name or "").strip()
+            if not org:
+                raise ValueError("organization_name is required for hospital signup")
+            if self.doctor_profile is None:
+                raise ValueError("doctor_profile (owner) is required for hospital signup")
+            return self.model_copy(
+                update={
+                    "signup_type": st,
+                    "role": UserRole.admin,
+                    "organization_name": org,
+                }
+            )
+        raise ValueError("invalid signup_type")
 
 
 class OrganizationUserCreate(BaseModel):
@@ -93,6 +145,8 @@ class UserResponse(BaseModel):
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None
+    """Linked active doctor id when a doctor profile is attached to this user."""
+    doctor_id: UUID | None = None
     full_name: str = ""
 
     def __init__(self, **data):

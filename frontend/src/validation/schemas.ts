@@ -114,6 +114,24 @@ export const doctorSignupSchema = signupLoginSchema.merge(
   })
 );
 
+export const hospitalSignupSchema = signupLoginSchema.merge(
+  z.object({
+    organization_name: z
+      .string()
+      .min(2, 'Organization name must be at least 2 characters')
+      .max(255, 'Name must be less than 255 characters'),
+    name: z
+      .string()
+      .min(2, 'Your name must be at least 2 characters')
+      .max(255, 'Name must be less than 255 characters'),
+    specialization: z.string().min(1, 'Specialization is required'),
+    experience_years: z.coerce
+      .number({ message: 'Experience must be a valid number' })
+      .min(0, 'Experience must be 0 or greater')
+      .max(100, 'Experience must be 100 or less'),
+  })
+);
+
 export const resetPasswordSchema = z
   .object({
     old_password: z.string().min(1, 'Current password is required'),
@@ -139,4 +157,6 @@ export type PatientSignupFormData = z.infer<typeof patientSignupSchema>;
 export type PatientSignupFormInput = z.input<typeof patientSignupSchema>;
 export type DoctorSignupFormData = z.infer<typeof doctorSignupSchema>;
 export type DoctorSignupFormInput = z.input<typeof doctorSignupSchema>;
+export type HospitalSignupFormData = z.infer<typeof hospitalSignupSchema>;
+export type HospitalSignupFormInput = z.input<typeof hospitalSignupSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;

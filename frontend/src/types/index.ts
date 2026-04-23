@@ -194,6 +194,8 @@ export interface LoginResponse {
   role?: string;
   roles?: string[];
   tenant_id?: string | null;
+  /** Linked doctor profile id (same as JWT claim when present). */
+  doctor_id?: string | null;
   is_owner?: boolean;
   user?: User;
   force_password_reset?: boolean;
@@ -215,6 +217,8 @@ export interface RegisterResponseUser {
   is_active: boolean;
   is_owner?: boolean;
   full_name?: string;
+  tenant_id?: string | null;
+  doctor_id?: string | null;
 }
 
 export interface RegisterResponse {
@@ -241,12 +245,22 @@ export type RegisterPayload =
       email: string;
       password: string;
       role: 'patient';
+      signup_type: 'patient';
       patient_profile: PatientProfileSignup;
     }
   | {
       email: string;
       password: string;
       role: 'doctor';
+      signup_type: 'doctor';
+      doctor_profile: DoctorProfileSignup;
+    }
+  | {
+      email: string;
+      password: string;
+      role: 'admin';
+      signup_type: 'hospital';
+      organization_name: string;
       doctor_profile: DoctorProfileSignup;
     };
 

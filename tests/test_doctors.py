@@ -295,7 +295,6 @@ async def test_patient_cannot_create_doctor(
         email=patient_email,
         password="PatPass9!!",
         role=UserRole.patient,
-        tenant_id=hospital.id,
     )
     db.commit()
 

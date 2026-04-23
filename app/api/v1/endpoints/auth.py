@@ -11,7 +11,7 @@ from app.models.user import User, UserRole
 from app.schemas.auth import ResetPasswordRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services import auth_service
-from app.services.user_roles_service import compute_roles_for_user, user_response_with_roles
+from app.services.user_roles_service import roles_and_doctor_id_for_user, user_response_with_roles
 
 router = APIRouter(tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def _build_token_payload(user, db: Session) -> dict:
     ``super_admin`` has no fixed tenant (client sends ``X-Tenant-ID`` per request).
     Otherwise we prefer ``users.tenant_id``, then legacy ``user_tenant`` primary row.
     """
-    eff_roles = compute_roles_for_user(db, user)
+    eff_roles, linked_doctor_id = roles_and_doctor_id_for_user(db, user)
     payload = {
         "sub": str(user.id),
         "type": "access",
@@ -35,6 +35,7 @@ def _build_token_payload(user, db: Session) -> dict:
         "roles": eff_roles,
         "tenant_id": None,
         "is_owner": user.is_owner,
+        "doctor_id": str(linked_doctor_id) if linked_doctor_id is not None else None,
     }
     if user.role == UserRole.super_admin:
         return payload
@@ -81,6 +82,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "role": token_payload["role"],
         "roles": token_payload["roles"],
         "tenant_id": token_payload["tenant_id"],
+        "doctor_id": token_payload.get("doctor_id"),
         "is_owner": user.is_owner,
         "force_password_reset": user.force_password_reset,
     }

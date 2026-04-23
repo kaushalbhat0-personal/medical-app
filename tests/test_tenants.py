@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from uuid import UUID
 
@@ -10,9 +11,11 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.patient import Patient
 from app.models.tenant import Tenant, TenantType, UserTenant
 from app.models.user import User, UserRole
-from tests.factories import create_tenant, create_user
+from app.models.doctor import Doctor
+from tests.factories import create_doctor_profile, create_patient_profile, create_tenant, create_user
 
 
 @pytest.mark.asyncio
@@ -316,3 +319,90 @@ async def test_super_admin_post_users_creates_tenant_admin(
     assert u is not None
     assert u.tenant_id == org.id
     assert u.role == UserRole.admin
+
+
+@pytest.mark.asyncio
+async def test_upgrade_to_organization_preserves_data_and_enables_admin(
+    client: AsyncClient, db_session: Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Individual-in-place upgrade: same ids, data retained, admin + doctor effective roles."""
+    db = db_session
+    suffix = uuid.uuid4().hex[:8]
+    tenant = create_tenant(
+        db, name=f"Solo Practice {suffix}", tenant_type=TenantType.individual
+    )
+    doc_user = create_user(
+        db,
+        email=f"solo_{suffix}@example.com",
+        password="SoloDoc9!!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+        is_owner=True,
+    )
+    doc = create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id)
+    pat_user = create_user(
+        db,
+        email=f"pat_{suffix}@example.com",
+        password="PatPass9!!",
+        role=UserRole.patient,
+    )
+    patient = create_patient_profile(
+        db,
+        tenant_id=tenant.id,
+        user_id=pat_user.id,
+        created_by=doc_user.id,
+    )
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": f"solo_{suffix}@example.com", "password": "SoloDoc9!!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+    pre_tid = str(tenant.id)
+    pre_did = str(doc.id)
+    pre_pid = str(patient.id)
+
+    with caplog.at_level(logging.INFO, logger="app.services.tenant_service"):
+        r = await client.post(
+            "/api/v1/tenants/upgrade-to-organization",
+            json={"clinic_name": f"Clinic Org {suffix}"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["tenant"]["type"] == "organization"
+    assert data["tenant"]["name"] == f"Clinic Org {suffix}"
+    assert data["tenant"]["id"] == pre_tid
+    assert set(data["roles"]) == {"admin", "doctor"}
+    assert "[UPGRADE_FLOW]" in caplog.text
+    assert f"user_id={doc_user.id}" in caplog.text
+    assert f"tenant_id={tenant.id}" in caplog.text
+
+    db.expire_all()
+    t2 = db.get(Tenant, tenant.id)
+    assert t2 is not None and t2.type == TenantType.organization.value
+    u2 = db.get(User, doc_user.id)
+    assert u2 is not None and u2.role == UserRole.admin and u2.is_owner is True
+    ut = db.scalars(
+        select(UserTenant).where(
+            UserTenant.user_id == doc_user.id,
+            UserTenant.tenant_id == tenant.id,
+        )
+    ).one()
+    assert ut.role == "admin"
+    p2 = db.get(Patient, patient.id)
+    assert p2 is not None and p2.tenant_id == tenant.id
+    d2 = db.get(Doctor, doc.id)
+    assert d2 is not None
+    assert str(d2.id) == pre_did and d2.tenant_id == tenant.id
+    assert str(p2.id) == pre_pid
+
+    admin_headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Tenant-ID": pre_tid,
+    }
+    r_docs = await client.get("/api/v1/doctors", headers=admin_headers)
+    assert r_docs.status_code == 200, r_docs.text

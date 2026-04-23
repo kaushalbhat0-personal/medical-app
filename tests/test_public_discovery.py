@@ -66,7 +66,6 @@ async def test_patients_me_doctors_requires_patient_and_returns_booked(
         email="pat-me-doc@t.test",
         password="x",
         role=UserRole.patient,
-        tenant_id=tenant.id,
     )
     pat = create_patient_profile(
         db_session,

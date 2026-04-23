@@ -106,12 +106,8 @@ export function Login({ onLogin }: LoginPageProps) {
         <div className="mt-8 pt-6 border-t border-border text-center space-y-3">
           <p className="text-sm text-text-muted">
             New here?{' '}
-            <Link to="/signup/patient" className="text-primary font-medium hover:underline">
-              Patient signup
-            </Link>
-            {' · '}
-            <Link to="/signup/doctor" className="text-primary font-medium hover:underline">
-              Doctor signup
+            <Link to="/signup" className="text-primary font-medium hover:underline">
+              Create an account
             </Link>
           </p>
           <p className="text-sm text-text-muted mb-2">Demo credentials:</p>

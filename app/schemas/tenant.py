@@ -45,3 +45,22 @@ class TenantPublicRead(BaseModel):
     created_at: datetime
     admin_email: str | None = None
 
+
+class UpgradeToOrganizationRequest(BaseModel):
+    """Solo (individual) practice → organization; does not create a new tenant or change ids."""
+
+    clinic_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Optional new display name; omit to keep the current tenant name",
+    )
+
+
+class UpgradeToOrganizationResponse(BaseModel):
+    tenant: TenantPublicRead
+    roles: list[str] = Field(
+        default_factory=list,
+        description="Effective application roles (account + linked doctor) after upgrade.",
+    )
+
