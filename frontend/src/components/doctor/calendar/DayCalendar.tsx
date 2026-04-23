@@ -180,7 +180,7 @@ export interface DayCalendarProps {
   hasAvailabilityWindows?: boolean;
   /** @deprecated Ignored; UI always displays Asia/Kolkata (IST). */
   doctorTimeZone?: string;
-  onBooked?: () => void;
+  onBooked?: () => void | Promise<void>;
   className?: string;
 }
 
@@ -386,7 +386,7 @@ export function DayCalendar({
   );
 
   const onBookingSuccess = useCallback(
-    (bookedStart?: string) => {
+    async (bookedStart?: string) => {
       const canon = bookedStart ? slotKey(bookedStart) : null;
       if (canon) {
         setSlots((prev) =>
@@ -395,7 +395,7 @@ export function DayCalendar({
       }
       if (!doctorId) return;
       invalidateDoctorSlotsClientCache(doctorId, date);
-      onBooked?.();
+      await Promise.resolve(onBooked?.());
       void loadDaySchedule({ skipSlotsCache: true });
     },
     [doctorId, date, onBooked, loadDaySchedule]

@@ -9,6 +9,7 @@ import {
   SLOTS_CROSS_TAB_BROADCAST,
   type DoctorSlot,
 } from '../../services';
+import { runAfterBookingSuccess } from '../../utils/bookingDataRefresh';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import {
   calendarTodayYmdInZone,
@@ -254,6 +255,7 @@ export function usePatientDoctorBookingPanel(
         },
         { idempotencyKey: bookingIdempotencyKey, signal: ac.signal }
       );
+      await runAfterBookingSuccess();
       invalidateDoctorSlotsClientCache(String(bookingDoctor.id), bookDate);
       onBooked(created);
       toast.success(

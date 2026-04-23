@@ -11,6 +11,7 @@ import type { Appointment } from '../../types';
 import { formatAppointmentDoctorName } from '../../utils';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import { ErrorState } from '../../components/common';
+import { BOOKING_DATA_REFRESH_EVENT } from '../../constants/booking';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY } from '../../constants/patient';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 
@@ -121,6 +122,15 @@ export function PatientAppointments() {
   useEffect(() => {
     void loadFromServer();
   }, [location.pathname, location.key, loadFromServer]);
+
+  useEffect(() => {
+    const onBookingRefresh = () => {
+      console.log('[REFETCH_TRIGGERED] patientAppointments');
+      void loadFromServer();
+    };
+    window.addEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
+    return () => window.removeEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
+  }, [loadFromServer]);
 
   const { upcoming, past } = useMemo(() => {
     const now = dayjs.utc();

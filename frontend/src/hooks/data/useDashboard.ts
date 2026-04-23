@@ -20,7 +20,11 @@ const DEFAULT_STATS: DashboardStats = {
  * - Stats are only valid when error is null
  */
 export function useDashboard() {
-  const { data, loading, error, refetch } = useFetch(fetchDashboardStatsHandler);
+  const { data, loading, error, refetch } = useFetch(
+    fetchDashboardStatsHandler,
+    undefined,
+    'dashboard'
+  );
 
   // Only use defaults during loading - don't mask errors with fallback data
   const stats: DashboardStats = error ? DEFAULT_STATS : (data ?? DEFAULT_STATS);

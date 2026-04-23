@@ -16,7 +16,8 @@ export interface AppointmentFilters {
 export function useAppointments(filters?: AppointmentFilters) {
   const { data, loading, refetching, error, refetch } = useFetch(
     fetchAppointmentDataHandler,
-    filters
+    filters,
+    'appointments'
   );
 
   return {
@@ -33,7 +34,8 @@ export function useAppointments(filters?: AppointmentFilters) {
 export function useDoctorAppointmentsView(listTab: DoctorAppointmentsListTab) {
   const { data, loading, refetching, error, refetch } = useFetch(
     fetchDoctorAppointmentsViewHandler,
-    listTab
+    listTab,
+    'doctorAppointmentsView'
   );
 
   return {

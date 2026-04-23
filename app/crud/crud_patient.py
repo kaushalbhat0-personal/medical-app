@@ -70,8 +70,8 @@ def patient_has_active_appointment_in_tenant(
 
 def patient_member_of_tenant(tenant_id: UUID):
     """
-    Legacy helper — prefer ``apply_patient_scope`` (tenant = ``Patient.tenant_id``;
-    link doctor–patient is via ``Appointment`` only). Kept for narrow migration/debug.
+    Legacy helper — admin lists use :func:`apply_patient_scope` (tenant_id *or* appointment
+    in tenant). Kept for narrow migration/debug.
     """
     return Patient.tenant_id == tenant_id
 
@@ -79,8 +79,9 @@ def patient_member_of_tenant(tenant_id: UUID):
 def _primary_doctor_name_in_tenant_subquery(tenant_id: UUID):
     """
     For tenant-scoped lists: one deterministic doctor label per patient (min name among
-    in-tenant, non-deleted appointment doctors). NULL if the patient is tenant-scoped
-    only via patient.tenant_id and has no such appointment.
+    doctors for non-deleted appointments with ``Appointment.tenant_id`` in this tenant).
+    NULL if the patient is tenant-scoped only via patient.tenant_id and has no such
+    appointment row.
     """
     return (
         select(func.min(Doctor.name))
@@ -88,7 +89,7 @@ def _primary_doctor_name_in_tenant_subquery(tenant_id: UUID):
         .join(Doctor, Doctor.id == Appointment.doctor_id)
         .where(
             Appointment.patient_id == Patient.id,
-            Doctor.tenant_id == tenant_id,
+            Appointment.tenant_id == tenant_id,
             Appointment.is_deleted == False,  # noqa: E712
         )
         .correlate(Patient)
@@ -109,9 +110,9 @@ def get_patients(
     data_scope_kind: Literal["doctor", "tenant"] = "tenant",
 ) -> list[tuple[Patient, str | None]]:
     """
-    List patients using :func:`apply_patient_scope` (tenant=``Patient.tenant_id``;
-    doctor=appointment EXISTS). Returns ``(Patient, doctor_name)``; doctor_name is set
-    for tenant admin lists when derivable from appointments.
+    List patients using :func:`apply_patient_scope` (tenant=patient or appointment in
+    tenant; doctor=appointment EXISTS). Returns ``(Patient, doctor_name)``; doctor_name
+    is set for tenant admin lists when derivable from appointments in that tenant.
     """
     if user_id is not None:
         stmt = select(Patient).order_by(Patient.created_at.desc())

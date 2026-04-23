@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { BOOKING_DATA_REFRESH_EVENT } from '../../constants/booking';
 import { APP_MODE_CHANGE_EVENT } from '../../constants/appMode';
 import { TENANT_ID_STORAGE_EVENT } from '../../utils/tenantIdForRequest';
 
@@ -8,7 +9,9 @@ import { TENANT_ID_STORAGE_EVENT } from '../../utils/tenantIdForRequest';
  */
 export function useFetch<T>(
   handler: (...args: any[]) => Promise<T>,
-  params?: any
+  params?: any,
+  /** If set, logs when BOOKING_DATA_REFRESH_EVENT triggers a refetch (dev/debug). */
+  bookingRefreshLog?: string
 ) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +75,17 @@ export function useFetch<T>(
     window.addEventListener(APP_MODE_CHANGE_EVENT, onAppModeChange);
     return () => window.removeEventListener(APP_MODE_CHANGE_EVENT, onAppModeChange);
   }, [fetchData]);
+
+  useEffect(() => {
+    const onBookingRefresh = () => {
+      if (bookingRefreshLog) {
+        console.log(`[REFETCH_TRIGGERED] ${bookingRefreshLog}`);
+      }
+      void fetchData(true);
+    };
+    window.addEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
+    return () => window.removeEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
+  }, [fetchData, bookingRefreshLog]);
 
   return { data, loading, refetching, error, refetch: () => fetchData(true) };
 }

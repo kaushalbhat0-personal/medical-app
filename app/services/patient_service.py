@@ -150,8 +150,6 @@ def ensure_patient_profile_for_user_tx(db: Session, current_user: User) -> Patie
     existing = crud_patient.get_patient_by_user_id(db, current_user.id)
     if existing is not None:
         return existing
-    if current_user.tenant_id is None:
-        raise ValidationError("Tenant is required for patient profile")
     local = (current_user.email or "patient").split("@", 1)[0].strip() or "Patient"
     name = (local[:255]) if local else "Patient"
     return crud_patient.create_patient_tx(
@@ -340,6 +338,16 @@ def get_patients(
         data_scope_kind=scope_kind,
     )
 
+    if (
+        current_user.role in (UserRole.admin, UserRole.staff, UserRole.super_admin)
+        and data_scope.kind == DataScopeKind.tenant
+        and effective_tenant_id is not None
+    ):
+        logger.info(
+            "[PATIENT_SCOPE_ADMIN] tenant_id=%s count=%d source=appointment_based",
+            effective_tenant_id,
+            len(rows),
+        )
     logger.info(
         "[PATIENT_SCOPE] scope=%s doctor_id=%s tenant_id=%s user=%s returned=%d",
         scope_kind,

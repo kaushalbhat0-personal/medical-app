@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useModalFocusTrap } from '../../../hooks';
 import { appointmentsApi } from '../../../services';
+import { runAfterBookingSuccess } from '../../../utils/bookingDataRefresh';
 import type { Patient } from '../../../types';
 import { cn } from '@/lib/utils';
 import { PatientSearchSelect } from '../PatientSearchSelect';
@@ -20,7 +21,7 @@ export interface BookingModalProps {
   patients: Patient[];
   /** When set, the patient field defaults to this id if present in the list. */
   defaultPatientId?: string | null;
-  onSuccess: (bookedSlotStart?: string) => void;
+  onSuccess: (bookedSlotStart?: string) => void | Promise<void>;
   /** @deprecated Unused; subtitles always use Asia/Kolkata (IST). */
   timeZone: string;
   onSubmittingChange?: (submitting: boolean) => void;
@@ -96,10 +97,14 @@ export function BookingModal({
         },
         { idempotencyKey, signal: ac.signal }
       );
+      await runAfterBookingSuccess();
+      await new Promise((r) => setTimeout(r, 100));
+      await Promise.resolve(onSuccess(idempotentReplay ? undefined : slotStart));
       toast.success(
-        idempotentReplay ? 'Appointment already booked successfully.' : 'Appointment scheduled.'
+        idempotentReplay
+          ? 'Appointment already booked successfully.'
+          : 'Appointment booked successfully'
       );
-      onSuccess(idempotentReplay ? undefined : slotStart);
       close();
     } catch (err) {
       if (axios.isCancel(err)) return;

@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import exists, false
+from sqlalchemy import exists, false, or_
 from sqlalchemy.sql import Select
 
 from app.core.permissions import has_tenant_admin_privileges
@@ -90,8 +90,9 @@ def apply_patient_scope(
     """
     Single source of truth for patient list visibility.
 
-    - tenant scope: ``Patient.tenant_id == tenant_id`` (org admin / super_admin / staff / owner)
-    - doctor scope: EXISTS active appointment for ``doctor_id`` (including admin viewing a single doctor)
+    - tenant scope: patients with ``Patient.tenant_id == tenant_id`` (legacy) **or** a
+      non-deleted appointment with ``Appointment.tenant_id == tenant_id`` (cross-clinic).
+    - doctor scope: EXISTS active appointment for ``doctor_id`` (unchanged).
     """
     from app.models.appointment import Appointment
     from app.models.patient import Patient
@@ -107,8 +108,17 @@ def apply_patient_scope(
         return stmt.where(ex_appt)
     if tenant_id is None:
         return stmt.where(false())
+    has_appt_in_tenant = exists().where(
+        Appointment.patient_id == Patient.id,
+        Appointment.tenant_id == tenant_id,
+        Appointment.is_deleted == False,  # noqa: E712
+    )
+    tenant_scoped = or_(
+        Patient.tenant_id == tenant_id,
+        has_appt_in_tenant,
+    )
     if user.role in (UserRole.admin, UserRole.staff, UserRole.super_admin):
-        return stmt.where(Patient.tenant_id == tenant_id)
+        return stmt.where(tenant_scoped)
     if user.role == UserRole.doctor and user.is_owner:
-        return stmt.where(Patient.tenant_id == tenant_id)
+        return stmt.where(tenant_scoped)
     return stmt.where(false())

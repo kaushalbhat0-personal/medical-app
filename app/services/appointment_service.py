@@ -215,8 +215,13 @@ def create_appointment(
         patient_row.tenant_id = doctor.tenant_id
         db.add(patient_row)
         db.flush()
-    elif patient_row.tenant_id != doctor.tenant_id:
-        raise ValidationError("Patient is not in this organization")
+
+    logger.info(
+        "[BOOKING_FLOW_V2] patient_id=%s patient_tenant=%s doctor_tenant=%s",
+        patient_row.id,
+        patient_row.tenant_id,
+        doctor.tenant_id,
+    )
 
     doctor_slot_service.assert_appointment_time_matches_doctor_slots(
         db, doctor, appt_in.appointment_time

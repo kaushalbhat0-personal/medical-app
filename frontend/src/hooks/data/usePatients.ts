@@ -6,7 +6,8 @@ import type { Patient } from '../../types';
 export function usePatients(search?: string) {
   const { data, loading, error, refetch } = useFetch(
     fetchPatientsHandler,
-    search?.trim() || undefined
+    search?.trim() || undefined,
+    'patients'
   );
 
   return {

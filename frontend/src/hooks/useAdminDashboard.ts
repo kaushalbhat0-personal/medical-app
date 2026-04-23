@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BOOKING_DATA_REFRESH_EVENT } from '../constants/booking';
 import { APP_MODE_CHANGE_EVENT } from '../constants/appMode';
 import { dashboardApi } from '../services';
 import { TENANT_ID_STORAGE_EVENT } from '../utils/tenantIdForRequest';
@@ -76,6 +77,17 @@ export function useAdminDashboard(): UseAdminDashboardResult {
     return () => {
       window.removeEventListener(TENANT_ID_STORAGE_EVENT, onScopeChange);
       window.removeEventListener(APP_MODE_CHANGE_EVENT, onScopeChange);
+    };
+  }, [load]);
+
+  useEffect(() => {
+    const onBookingRefresh = () => {
+      console.log('[REFETCH_TRIGGERED] adminDashboard');
+      void load();
+    };
+    window.addEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
+    return () => {
+      window.removeEventListener(BOOKING_DATA_REFRESH_EVENT, onBookingRefresh);
     };
   }, [load]);
 

@@ -173,6 +173,67 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
     assert p.id not in peer
 
 
+def test_admin_sees_patient_with_foreign_tenant_id_when_appointment_in_tenant(
+    db_session: Session,
+) -> None:
+    """Cross-clinic: admin lists by appointment tenant even when patient.tenant_id is another org."""
+    tenant_home = create_tenant(db_session, tenant_type=TenantType.clinic)
+    tenant_visit = create_tenant(db_session, tenant_type=TenantType.clinic)
+    admin = create_user(
+        db_session,
+        email=f"adm_xc_{uuid.uuid4().hex[:8]}@test.local",
+        password="AdmPass123!",
+        role=UserRole.admin,
+        tenant_id=tenant_visit.id,
+    )
+    doc_user = create_user(
+        db_session,
+        email=f"doc_xc_{uuid.uuid4().hex[:8]}@test.local",
+        password="DocPass123!",
+        role=UserRole.doctor,
+        tenant_id=tenant_visit.id,
+    )
+    doc = create_doctor_profile(
+        db_session, tenant_id=tenant_visit.id, user_id=doc_user.id, timezone_name="UTC"
+    )
+    pat_user = create_user(
+        db_session,
+        email=f"pat_xc_{uuid.uuid4().hex[:8]}@test.local",
+        password="PatPass123!",
+        role=UserRole.patient,
+        tenant_id=tenant_home.id,
+    )
+    p = create_patient_profile(
+        db_session,
+        tenant_id=tenant_home.id,
+        user_id=pat_user.id,
+        created_by=doc_user.id,
+    )
+    db_session.commit()
+    add_appointment(
+        db_session,
+        {
+            "patient_id": p.id,
+            "doctor_id": doc.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(hours=2),
+            "status": AppointmentStatus.scheduled,
+            "created_by": doc_user.id,
+            "tenant_id": tenant_visit.id,
+        },
+    )
+    db_session.commit()
+    out = patient_service.get_patients(
+        db_session,
+        admin,
+        tenant_id=tenant_visit.id,
+        limit=100,
+        data_scope=_data_scope_tenant(db_session, admin),
+    )
+    assert p.id in {x.id for x in out}
+    row = next(x for x in out if x.id == p.id)
+    assert row.doctor_name == doc.name
+
+
 def test_doctor_read_requires_appointment_not_created_by(
     db_session: Session,
 ) -> None:

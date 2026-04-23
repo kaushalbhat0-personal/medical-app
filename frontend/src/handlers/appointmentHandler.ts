@@ -4,6 +4,7 @@
  */
 
 import { appointmentsApi, patientsApi, doctorsApi } from '../services';
+import { runAfterBookingSuccess } from '../utils/bookingDataRefresh';
 import { APPOINTMENT_DEFAULT_PARAMS } from '../constants';
 import { safeArray } from '../utils';
 import type { Appointment, Patient, Doctor } from '../types';
@@ -101,4 +102,5 @@ export const createAppointmentHandler = async (
   }
 
   await appointmentsApi.create(payload);
+  await runAfterBookingSuccess();
 };
