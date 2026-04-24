@@ -58,6 +58,12 @@ class Doctor(Base):
     )
     tenant = relationship("Tenant")
     user = relationship("User", foreign_keys=[user_id])
+    structured_profile = relationship(
+        "DoctorProfile",
+        back_populates="doctor",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class DoctorCreationIdempotency(Base):

@@ -109,10 +109,22 @@ class UserRead(BaseModel):
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None
-    """Primary doctor row for this user when one is linked (SSOT for X-Data-Scope doctor context)."""
-    doctor_id: UUID | None = None
-    tenant: UserMeTenantBrief | None = None
-    """Resolved from ``users.tenant_id``; ``type`` is ``individual`` or ``organization``."""
+    doctor_id: UUID | None = Field(
+        default=None,
+        description="Primary doctor row when one is linked (SSOT for X-Data-Scope doctor context).",
+    )
+    doctor_profile_complete: bool | None = Field(
+        default=None,
+        description="True when `doctor_profiles` has all mandatory fields; null if not a doctor login.",
+    )
+    doctor_verification_status: str | None = Field(
+        default=None,
+        description="pending | verified | rejected — trust badge for Phase 2 approval workflow.",
+    )
+    tenant: UserMeTenantBrief | None = Field(
+        default=None,
+        description="Resolved from `users.tenant_id`; `type` is individual vs organization.",
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -154,8 +166,12 @@ class UserResponse(BaseModel):
     is_active: bool
     is_owner: bool = False
     tenant_id: UUID | None = None
-    """Linked active doctor id when a doctor profile is attached to this user."""
-    doctor_id: UUID | None = None
+    doctor_id: UUID | None = Field(
+        default=None,
+        description="Linked active doctor id when a doctor roster row is attached to this user.",
+    )
+    doctor_profile_complete: bool | None = None
+    doctor_verification_status: str | None = None
     full_name: str = ""
 
     def __init__(self, **data):

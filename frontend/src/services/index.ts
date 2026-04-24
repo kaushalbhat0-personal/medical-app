@@ -1,6 +1,7 @@
 // Central exports for all API services
 export { api, retryRequest, isNetworkError, isColdStartError } from './api';
 export { authApi, formatLoginError } from './auth';
+export { doctorProfileApi, type DoctorStructuredProfileInput } from './doctorProfile';
 export { patientsApi, type CreatePatientData, type PatientUpdatePayload } from './patients';
 export { appointmentsApi, type CreateAppointmentData } from './appointments';
 export { billingApi, BillingApiError, type CreateBillData } from './billing';

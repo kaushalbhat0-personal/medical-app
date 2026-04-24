@@ -8,6 +8,7 @@ export {
   doctorSignupSchema,
   hospitalSignupSchema,
   resetPasswordSchema,
+  completeStructuredDoctorProfileSchema,
   type LoginFormData,
   type PatientFormData,
   type PatientFormInput,
@@ -24,4 +25,6 @@ export {
   type HospitalSignupFormData,
   type HospitalSignupFormInput,
   type ResetPasswordFormData,
+  type CompleteStructuredDoctorProfileFormData,
+  type CompleteStructuredDoctorProfileFormInput,
 } from './schemas';

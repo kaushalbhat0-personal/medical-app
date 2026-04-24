@@ -10,7 +10,7 @@ from app.core.security import create_access_token
 from app.models.user import User, UserRole
 from app.schemas.auth import ResetPasswordRequest, Token
 from app.schemas.user import UserCreate, UserResponse
-from app.services import auth_service
+from app.services import auth_service, doctor_profile_service
 from app.services.user_roles_service import roles_and_doctor_id_for_user, user_response_with_roles
 
 router = APIRouter(tags=["auth"])
@@ -28,6 +28,7 @@ def _build_token_payload(user, db: Session) -> dict:
     Otherwise we prefer ``users.tenant_id``, then legacy ``user_tenant`` primary row.
     """
     eff_roles, linked_doctor_id = roles_and_doctor_id_for_user(db, user)
+    dpc = doctor_profile_service.doctor_profile_complete_for_user(db, user_id=user.id)
     payload = {
         "sub": str(user.id),
         "type": "access",
@@ -37,6 +38,8 @@ def _build_token_payload(user, db: Session) -> dict:
         "is_owner": user.is_owner,
         "doctor_id": str(linked_doctor_id) if linked_doctor_id is not None else None,
     }
+    if dpc is not None:
+        payload["doctor_profile_complete"] = dpc
     if user.role == UserRole.super_admin:
         return payload
     if user.tenant_id is not None:
@@ -83,6 +86,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "roles": token_payload["roles"],
         "tenant_id": token_payload["tenant_id"],
         "doctor_id": token_payload.get("doctor_id"),
+        "doctor_profile_complete": token_payload.get("doctor_profile_complete"),
         "is_owner": user.is_owner,
         "force_password_reset": user.force_password_reset,
     }

@@ -17,6 +17,10 @@ export interface User {
   tenant_id?: string | null;
   /** Linked doctor row (GET /me); use for doctor-scoped UI and params. */
   doctor_id?: string | null;
+  /** False until mandatory `doctor_profiles` fields are saved; null if not a doctor login. */
+  doctor_profile_complete?: boolean | null;
+  /** From backend verification workflow (display-only badge). */
+  doctor_verification_status?: string | null;
   /** From GET /me after sync — use ``type`` for practice vs org mode (not roles/localStorage). */
   tenant?: MeTenantBrief | null;
   /** When true, client must complete password reset before using the app */
@@ -33,7 +37,31 @@ export interface MeUserResponse {
   is_owner: boolean;
   tenant_id: string | null;
   doctor_id: string | null;
+  doctor_profile_complete?: boolean | null;
+  doctor_verification_status?: string | null;
   tenant: MeTenantBrief | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET/PUT /doctor/profile */
+export interface DoctorStructuredProfile {
+  id: string;
+  doctor_id: string;
+  full_name: string;
+  specialization: string | null;
+  experience_years: number | null;
+  qualification: string | null;
+  registration_number: string | null;
+  registration_council: string | null;
+  clinic_name: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  profile_image: string | null;
+  is_profile_complete: boolean;
+  verification_status: string;
   created_at: string;
   updated_at: string;
 }
@@ -207,6 +235,7 @@ export interface LoginResponse {
   tenant_id?: string | null;
   /** Linked doctor profile id (same as JWT claim when present). */
   doctor_id?: string | null;
+  doctor_profile_complete?: boolean | null;
   is_owner?: boolean;
   user?: User;
   force_password_reset?: boolean;
@@ -218,6 +247,8 @@ export interface LoginResult {
   roles?: string[];
   is_owner?: boolean;
   forcePasswordReset?: boolean;
+  doctor_id?: string | null;
+  doctor_profile_complete?: boolean | null;
 }
 
 export interface RegisterResponseUser {
@@ -230,6 +261,8 @@ export interface RegisterResponseUser {
   full_name?: string;
   tenant_id?: string | null;
   doctor_id?: string | null;
+  doctor_profile_complete?: boolean | null;
+  doctor_verification_status?: string | null;
 }
 
 export interface RegisterResponse {

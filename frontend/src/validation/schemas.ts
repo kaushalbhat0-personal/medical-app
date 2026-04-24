@@ -132,6 +132,28 @@ export const hospitalSignupSchema = signupLoginSchema.merge(
   })
 );
 
+/** Mandatory fields aligned with backend `is_profile_complete` (name, spec, reg, phone). */
+export const completeStructuredDoctorProfileSchema = z.object({
+  full_name: z.string().min(1, 'Full name is required'),
+  phone: z
+    .string()
+    .min(1, 'Phone is required')
+    .refine(
+      (val) => val.replace(/\D/g, '').length >= 10,
+      'Enter a valid phone (at least 10 digits)'
+    ),
+  profile_image: z.string().max(2000).optional(),
+  specialization: z.string().min(1, 'Specialization is required'),
+  experience_years: z.coerce.number().int().min(0).max(80),
+  qualification: z.string().max(2000).optional(),
+  registration_number: z.string().min(1, 'Registration / license number is required'),
+  registration_council: z.string().min(1, 'Medical council is required'),
+  clinic_name: z.string().max(500).optional(),
+  address: z.string().max(2000).optional(),
+  city: z.string().max(200).optional(),
+  state: z.string().max(200).optional(),
+});
+
 export const resetPasswordSchema = z
   .object({
     old_password: z.string().min(1, 'Current password is required'),
@@ -160,3 +182,5 @@ export type DoctorSignupFormInput = z.input<typeof doctorSignupSchema>;
 export type HospitalSignupFormData = z.infer<typeof hospitalSignupSchema>;
 export type HospitalSignupFormInput = z.input<typeof hospitalSignupSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+export type CompleteStructuredDoctorProfileFormData = z.infer<typeof completeStructuredDoctorProfileSchema>;
+export type CompleteStructuredDoctorProfileFormInput = z.input<typeof completeStructuredDoctorProfileSchema>;

@@ -15,7 +15,7 @@ from app.core.security import decode_access_token
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
 from app.crud import crud_doctor, crud_user
 from app.models.doctor import Doctor
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services import doctor_service
 from app.services.exceptions import ForbiddenError, ValidationError
 from app.core.permissions import require_admin_or_owner
@@ -163,6 +163,27 @@ def get_current_doctor(
 ) -> Doctor:
     """Doctor profile for the current user; use on doctor-only routes."""
     return doctor_service.require_doctor_profile(db, current_user)
+
+
+def get_current_users_doctor_for_structured_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Doctor:
+    """
+    Linked `Doctor` row for structured profile (GET/PUT) without requiring ``is_profile_complete``.
+    """
+    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+    if doctor is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No doctor record linked to this account",
+        )
+    if doctor.tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Doctor tenant is not set",
+        )
+    return doctor
 
 
 def get_optional_scoped_tenant_id(

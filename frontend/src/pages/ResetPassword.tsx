@@ -30,9 +30,10 @@ export function ResetPassword() {
       await authApi.resetPassword(data.old_password, data.new_password);
       patchUser({ force_password_reset: false });
       toast.success('Password updated. You are all set.');
-      navigate(postLoginHomePath(getEffectiveRoles(user, localStorage.getItem('token'))), {
-        replace: true,
-      });
+      navigate(
+        postLoginHomePath(getEffectiveRoles(user, localStorage.getItem('token')), user),
+        { replace: true }
+      );
     } catch (err) {
       const msg = axios.isAxiosError(err)
         ? formatLoginError(err)

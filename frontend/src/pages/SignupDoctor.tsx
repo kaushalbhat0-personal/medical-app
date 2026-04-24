@@ -43,7 +43,12 @@ export function SignupDoctor() {
     });
     if (result.success) {
       toast.success('Account created');
-      navigate(postLoginHomePath(result.roles ?? ['doctor']));
+      navigate(
+        postLoginHomePath(result.roles ?? ['doctor'], {
+          doctor_id: result.doctor_id,
+          doctor_profile_complete: result.doctor_profile_complete,
+        })
+      );
     } else {
       toast.error(result.error || 'Signup failed');
     }

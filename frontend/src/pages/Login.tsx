@@ -44,7 +44,12 @@ export function Login({ onLogin }: LoginPageProps) {
             duration: 2000,
             icon: '👋',
           });
-          navigate(postLoginHomePath(result.roles ?? ['admin']));
+          navigate(
+            postLoginHomePath(result.roles ?? ['admin'], {
+              doctor_id: result.doctor_id,
+              doctor_profile_complete: result.doctor_profile_complete,
+            })
+          );
         }
       } else {
         const errorMessage = result.error || 'Login failed. Please check your credentials and try again.';

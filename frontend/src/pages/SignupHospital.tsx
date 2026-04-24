@@ -45,7 +45,12 @@ export function SignupHospital() {
     });
     if (result.success) {
       toast.success('Organization created');
-      navigate(postLoginHomePath(result.roles ?? ['admin', 'doctor']));
+      navigate(
+        postLoginHomePath(result.roles ?? ['admin', 'doctor'], {
+          doctor_id: result.doctor_id,
+          doctor_profile_complete: result.doctor_profile_complete,
+        })
+      );
     } else {
       toast.error(result.error || 'Signup failed');
     }

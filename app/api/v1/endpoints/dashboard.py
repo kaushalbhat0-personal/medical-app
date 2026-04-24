@@ -15,7 +15,7 @@ from app.schemas.dashboard import (
     DoctorPerformanceItem,
     RevenueTrendItem,
 )
-from app.services import dashboard_service
+from app.services import dashboard_service, doctor_service
 
 router = APIRouter()
 admin_router = APIRouter(tags=["admin", "dashboard"])
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @router.get("", response_model=DashboardResponse)
 def get_dashboard(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     tenant_id: UUID = Depends(get_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> DashboardResponse:
@@ -35,6 +36,8 @@ def get_dashboard(
     - Today's appointments count
     - Total revenue (sum of paid bills)
     """
+    if data_scope.kind == DataScopeKind.doctor and data_scope.doctor_id is not None:
+        doctor_service.require_doctor_profile(db, current_user)
     logger.info("Dashboard endpoint hit - fetching stats")
 
     doc_id = (

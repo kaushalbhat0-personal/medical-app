@@ -67,6 +67,16 @@ export function isOwnerFromToken(token: string | null): boolean | undefined {
   return undefined;
 }
 
+/** Present on access tokens when a doctor roster row is linked; omitted for non-doctor logins. */
+export function doctorProfileCompleteFromToken(token: string | null): boolean | null | undefined {
+  if (!token) return undefined;
+  const payload = decodeJwtPayload(token);
+  const v = payload?.doctor_profile_complete;
+  if (v === null) return null;
+  if (typeof v === 'boolean') return v;
+  return undefined;
+}
+
 /** JWT `sub` — same identifier as backend user id (UUID string). */
 export function userIdFromAccessToken(token: string | null): string | undefined {
   if (!token) return undefined;

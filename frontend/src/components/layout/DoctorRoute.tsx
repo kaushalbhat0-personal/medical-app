@@ -1,6 +1,13 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import type { User } from '../../types';
-import { getEffectiveRoles, isDoctorRole, isPatientRole, patientHomePath, staffHomePath } from '../../utils/roles';
+import {
+  getEffectiveRoles,
+  isDoctorRole,
+  isPatientRole,
+  needsStructuredDoctorProfile,
+  patientHomePath,
+  staffHomePath,
+} from '../../utils/roles';
 import { useAppMode } from '../../contexts/AppModeContext';
 
 interface DoctorRouteProps {
@@ -11,9 +18,13 @@ interface DoctorRouteProps {
 /** Clinician shell; patients and staff are redirected to their own areas. */
 export function DoctorRoute({ user, children }: DoctorRouteProps) {
   const { isDualModeUser, resolvedMode } = useAppMode();
+  const location = useLocation();
   const eff = getEffectiveRoles(user, localStorage.getItem('token'));
   if (isDualModeUser && resolvedMode === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
+  }
+  if (needsStructuredDoctorProfile(user) && location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" replace state={{ from: location }} />;
   }
   if (isDoctorRole(eff)) {
     return <>{children}</>;

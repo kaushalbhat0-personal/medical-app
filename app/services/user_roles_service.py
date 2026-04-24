@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.crud import crud_doctor_profile
 from app.models.doctor import Doctor
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
@@ -45,20 +47,46 @@ def roles_and_doctor_id_for_user(db: Session, user: User) -> tuple[list[str], uu
     return out, did
 
 
+def _doctor_profile_flags(
+    db: Session, doctor_id: UUID | None
+) -> tuple[bool | None, str | None]:
+    if doctor_id is None:
+        return None, None
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor_id)
+    if prof is None:
+        return False, None
+    return bool(prof.is_profile_complete), str(prof.verification_status)
+
+
 def user_read_with_roles(db: Session, user: User) -> UserRead:
     base = UserRead.model_validate(user)
     roles, doctor_id = roles_and_doctor_id_for_user(db, user)
+    dcomp, vstat = _doctor_profile_flags(db, doctor_id)
     tenant_brief: UserMeTenantBrief | None = None
     if user.tenant_id is not None:
         row = db.get(Tenant, user.tenant_id)
         if row is not None:
             tenant_brief = UserMeTenantBrief(id=row.id, type=str(row.type))
     return base.model_copy(
-        update={"roles": roles, "doctor_id": doctor_id, "tenant": tenant_brief}
+        update={
+            "roles": roles,
+            "doctor_id": doctor_id,
+            "doctor_profile_complete": dcomp,
+            "doctor_verification_status": vstat,
+            "tenant": tenant_brief,
+        }
     )
 
 
 def user_response_with_roles(db: Session, user: User) -> UserResponse:
     base = UserResponse.model_validate(user)
     roles, doctor_id = roles_and_doctor_id_for_user(db, user)
-    return base.model_copy(update={"roles": roles, "doctor_id": doctor_id})
+    dcomp, vstat = _doctor_profile_flags(db, doctor_id)
+    return base.model_copy(
+        update={
+            "roles": roles,
+            "doctor_id": doctor_id,
+            "doctor_profile_complete": dcomp,
+            "doctor_verification_status": vstat,
+        }
+    )

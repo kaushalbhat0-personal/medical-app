@@ -66,6 +66,22 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
                 {user.full_name || 'Doctor'}
               </p>
               <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+              {user.doctor_id && user.doctor_verification_status && (
+                <p
+                  className="mt-1 text-[10px] font-medium uppercase tracking-wide"
+                  title="Verification (Phase 2: admin review)"
+                >
+                  {user.doctor_verification_status === 'verified' && (
+                    <span className="text-emerald-600">Verified doctor</span>
+                  )}
+                  {user.doctor_verification_status === 'pending' && (
+                    <span className="text-amber-600">Pending verification</span>
+                  )}
+                  {user.doctor_verification_status === 'rejected' && (
+                    <span className="text-red-600">Verification rejected</span>
+                  )}
+                </p>
+              )}
             </div>
           </div>
         </div>

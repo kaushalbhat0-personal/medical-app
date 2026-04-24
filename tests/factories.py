@@ -125,7 +125,20 @@ def create_doctor_profile(
     )
     db.add(d)
     db.flush()
+    _ensure_structured_doctor_profile_complete(db, d)
     return d
+
+
+def _ensure_structured_doctor_profile_complete(db: Session, d: Doctor) -> None:
+    """Seed `doctor_profiles` with mandatory fields so doctor-scoped APIs pass RBAC in tests."""
+    from app.services import doctor_profile_service
+
+    p = doctor_profile_service.ensure_profile_for_doctor(db, d)
+    p.registration_number = p.registration_number or "TEST-REG-NUM"
+    p.phone = p.phone or "555-0100"
+    doctor_profile_service.recompute_is_complete(p)
+    db.add(p)
+    db.flush()
 
 
 def add_weekly_availability(

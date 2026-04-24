@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.organization_display import organization_label_from_active_doctor_count
 from app.core.security import hash_password
-from app.crud import crud_doctor, crud_doctor_availability, crud_tenant, crud_user
+from app.crud import crud_doctor, crud_doctor_availability, crud_doctor_profile, crud_tenant, crud_user
 
 from app.models.doctor import Doctor
 
@@ -26,6 +26,7 @@ from app.schemas.doctor import DoctorCreate, DoctorUpdate
 
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 
+from app.services import doctor_profile_service
 from app.services.security_audit import (
 
     assert_authorized,
@@ -181,6 +182,7 @@ def create_hospital_doctor_with_login(
         )
         doctor_data["user_id"] = new_user.id
         doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+        doctor_profile_service.ensure_profile_for_doctor(db, doctor)
         if idempotency_key:
             try:
                 crud_doctor.record_doctor_idempotency(
@@ -300,6 +302,9 @@ def authorize_doctor_read(
 
         return
 
+    if current_user.role == UserRole.doctor:
+        require_doctor_profile(db, current_user)
+
     if tenant_id is not None:
 
         assert_authorized(
@@ -355,11 +360,11 @@ def authorize_doctor_update(
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
-
+        require_doctor_profile(db, current_user)
         return
 
     if current_user.role == UserRole.doctor and doctor.user_id == current_user.id:
-
+        require_doctor_profile(db, current_user)
         return
 
     log_rbac_mutation_violation(current_user, "doctor")
@@ -468,6 +473,7 @@ def create_independent_doctor(
     doctor_data["tenant_id"] = tenant.id
     doctor_data["user_id"] = user_id
     doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+    doctor_profile_service.ensure_profile_for_doctor(db, doctor)
     logger.info(
         "[DOCTOR CREATED] user_id=%s doctor_id=%s tenant_id=%s (individual practice tenant)",
         user_id,
@@ -560,6 +566,7 @@ def create_doctor(
         doctor_data["user_id"] = resolved_user_id
 
     doctor = crud_doctor.create_doctor_tx(db, doctor_data)
+    doctor_profile_service.ensure_profile_for_doctor(db, doctor)
 
     if doctor.user_id is None:
         logger.warning(
@@ -692,20 +699,28 @@ def get_doctor_or_404_with_tenant(db: Session, doctor_id: UUID) -> Doctor:
 
 
 def require_doctor_profile(db: Session, current_user: User) -> Doctor:
-    """Doctor row for this user with tenant loaded; RBAC-style denials."""
+    """Linked `Doctor` row for this user; requires structured profile completion for doctor-role access."""
     doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
     if doctor is None:
         raise ForbiddenError("Doctor profile not found for this user")
     if doctor.tenant is None:
         raise ForbiddenError("Doctor tenant is not set")
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
+    if prof is None or not prof.is_profile_complete:
+        raise ForbiddenError("Doctor profile incomplete")
     return doctor
 
 
 def get_acting_doctor_or_none(db: Session, current_user: User) -> Doctor | None:
-    """Single doctor-profile lookup per request for doctor-role users; avoids repeated joins elsewhere."""
+    """Doctor roster row for this login (no structured-profile completion check — used for scope headers)."""
     if current_user.role != UserRole.doctor:
         return None
-    return require_doctor_profile(db, current_user)
+    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+    if doctor is None:
+        return None
+    if doctor.tenant is None:
+        raise ForbiddenError("Doctor tenant is not set")
+    return doctor
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:

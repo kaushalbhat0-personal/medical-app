@@ -47,6 +47,7 @@ import { SignupDoctor } from './pages/SignupDoctor';
 import { SignupHospital } from './pages/SignupHospital';
 import { ResetPassword } from './pages/ResetPassword';
 import { ClinicOnboardingPage } from './pages/doctor/ClinicOnboardingPage';
+import { CompleteProfilePage } from './pages/doctor/CompleteProfilePage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -80,7 +81,7 @@ function AnimatedRoutes() {
   const needsPasswordReset = user?.force_password_reset === true;
   const loginRedirect = needsPasswordReset
     ? '/reset-password'
-    : postLoginHomePath(effectiveRoles);
+    : postLoginHomePath(effectiveRoles, user);
 
   if (
     !isLoading &&
@@ -179,10 +180,19 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               {isAuthenticated && !needsPasswordReset ? (
-                <Navigate to={postLoginHomePath(effectiveRoles)} replace />
+                <Navigate to={postLoginHomePath(effectiveRoles, user)} replace />
               ) : (
                 <ResetPassword />
               )}
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <CompleteProfilePage />
             </ProtectedRoute>
           }
         />

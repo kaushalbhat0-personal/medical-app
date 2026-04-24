@@ -98,11 +98,25 @@ export function doctorHomePath(): string {
 }
 
 /** Default landing path after login or post-registration, by role. */
-export function postLoginHomePath(roles: string | string[] | null | undefined): string {
+export function needsStructuredDoctorProfile(
+  user: { doctor_id?: string | null; doctor_profile_complete?: boolean | null } | null
+): boolean {
+  if (!user?.doctor_id || String(user.doctor_id).length === 0) return false;
+  return user.doctor_profile_complete === false;
+}
+
+/** Where to go after sign-in. Pass `user` (or an object with `doctor_id` + `doctor_profile_complete`) so incomplete doctor profiles are gated. */
+export function postLoginHomePath(
+  roles: string | string[] | null | undefined,
+  userOrHints?: { doctor_id?: string | null; doctor_profile_complete?: boolean | null } | null
+): string {
   const r = normalizeRoles(roles);
   if (r.includes('patient')) return patientHomePath();
   const hasDoc = r.includes('doctor');
   const hasAdm = r.some((x) => x === 'admin' || x === 'super_admin');
+  if (userOrHints && needsStructuredDoctorProfile(userOrHints)) {
+    return '/complete-profile';
+  }
   if (hasDoc && hasAdm) {
     const m: AppMode = readStoredAppMode() ?? 'practice';
     return m === 'admin' ? '/admin/dashboard' : doctorHomePath();

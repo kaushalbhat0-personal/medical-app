@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     billing,
     dashboard,
     doctor,
+    doctor_profile,
     health,
     inventory,
     patient,
@@ -22,6 +23,7 @@ api_router.include_router(public_discovery.router)
 api_router.include_router(patient.router)
 api_router.include_router(tenant.router)
 api_router.include_router(doctor.router)
+api_router.include_router(doctor_profile.router)
 api_router.include_router(appointment.router)
 api_router.include_router(billing.router)
 api_router.include_router(inventory.router)

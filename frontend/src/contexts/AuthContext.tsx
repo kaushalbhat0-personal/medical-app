@@ -19,6 +19,7 @@ import type {
 import { authApi, formatLoginError, patientsApi } from '../services';
 import {
   doctorIdFromToken,
+  doctorProfileCompleteFromToken,
   isOwnerFromToken,
   roleFromToken,
   rolesFromToken,
@@ -106,6 +107,11 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     isOwnerFromToken(response.access_token) ??
     false;
 
+  const dpcRaw =
+    response.doctor_profile_complete ??
+    (base as { doctor_profile_complete?: boolean | null } | undefined)?.doctor_profile_complete ??
+    doctorProfileCompleteFromToken(response.access_token);
+
   return {
     id: base?.id ?? 0,
     email: base?.email ?? credentials.email,
@@ -115,6 +121,7 @@ function buildUserFromLogin(credentials: LoginCredentials, response: LoginRespon
     is_owner: isOwner,
     ...(tenantRaw !== undefined ? { tenant_id: tenantRaw } : {}),
     ...(doctor_id !== undefined ? { doctor_id } : {}),
+    ...(dpcRaw !== undefined ? { doctor_profile_complete: dpcRaw } : {}),
     ...(response.force_password_reset !== undefined
       ? { force_password_reset: response.force_password_reset }
       : {}),
@@ -137,6 +144,7 @@ function buildUserFromRegister(response: RegisterResponse): User {
     u.doctor_id != null && String(u.doctor_id).length > 0 ? String(u.doctor_id) : undefined;
   const fromTokDoc = doctorIdFromToken(response.access_token);
   const doctor_id = fromApiDoc ?? (fromTokDoc !== undefined ? fromTokDoc : undefined);
+  const dpc = u.doctor_profile_complete ?? doctorProfileCompleteFromToken(response.access_token);
   return {
     id: u.id as unknown as number,
     email: u.email,
@@ -146,6 +154,10 @@ function buildUserFromRegister(response: RegisterResponse): User {
     is_owner: u.is_owner ?? isOwnerFromToken(response.access_token) ?? false,
     ...(tenantRaw !== undefined && tenantRaw !== null ? { tenant_id: String(tenantRaw) } : {}),
     ...(doctor_id !== undefined ? { doctor_id } : {}),
+    ...(dpc !== undefined ? { doctor_profile_complete: dpc } : {}),
+    ...(u.doctor_verification_status != null
+      ? { doctor_verification_status: u.doctor_verification_status }
+      : {}),
   };
 }
 
@@ -165,11 +177,15 @@ function mergeUserWithToken(user: User, token: string | null): User {
   const fromTokDoc = doctorIdFromToken(token);
   const doctor_id = fromUserDoc ?? (fromTokDoc !== undefined ? fromTokDoc : undefined);
   const ownerHint = isOwnerFromToken(token);
+  const dpc = doctorProfileCompleteFromToken(token);
   return {
     ...user,
     roles: roles && roles.length > 0 ? roles : user.roles,
     ...(tenant_id !== undefined ? { tenant_id } : {}),
     ...(doctor_id !== undefined ? { doctor_id } : {}),
+    ...(dpc !== undefined && user.doctor_profile_complete === undefined
+      ? { doctor_profile_complete: dpc }
+      : {}),
     ...(ownerHint !== undefined && user.is_owner === undefined ? { is_owner: ownerHint } : {}),
   };
 }
@@ -310,12 +326,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPatientProfileError(null);
         setPatientProfileLoading(false);
       }
-      return {
-        success: true,
-        roles: userData.roles,
-        is_owner: userData.is_owner,
-        forcePasswordReset: false,
-      };
+        return {
+          success: true,
+          roles: userData.roles,
+          is_owner: userData.is_owner,
+          forcePasswordReset: false,
+          doctor_id: userData.doctor_id != null ? String(userData.doctor_id) : null,
+          doctor_profile_complete: userData.doctor_profile_complete,
+        };
     } catch (error) {
       const errorMessage = formatLoginError(error);
       return { success: false, error: errorMessage };
@@ -367,6 +385,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           roles: userData.roles,
           is_owner: userData.is_owner,
           forcePasswordReset: response.force_password_reset === true,
+          doctor_id: userData.doctor_id != null ? String(userData.doctor_id) : null,
+          doctor_profile_complete: userData.doctor_profile_complete,
         };
       }
       return { success: false, error: 'No access token received' };
@@ -427,6 +447,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           is_owner: me.is_owner,
           tenant_id: me.tenant_id ?? undefined,
           doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
+          doctor_profile_complete: me.doctor_profile_complete,
+          doctor_verification_status: me.doctor_verification_status,
           ...(me.tenant != null ? { tenant: me.tenant } : { tenant: undefined }),
         };
         if (prev?.force_password_reset !== undefined) {
