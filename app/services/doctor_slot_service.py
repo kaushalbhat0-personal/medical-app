@@ -412,3 +412,28 @@ def assert_appointment_time_matches_doctor_slots(
     at = _slot_compare_key(appointment_time_utc)
     if at not in allowed:
         raise ValidationError("Appointment time is not within an available slot for this doctor")
+
+
+def compute_doctor_availability_status_for_list(db: Session, doctor: Doctor) -> str:
+    """
+    Lightweight booking hint for list cards (no auth — caller must only use for already-visible doctors).
+
+    Returns:
+        available_today — at least one bookable slot later today (doctor-local calendar).
+        next_available_tomorrow — no slot today; next bookable slot falls on tomorrow (local).
+        none — otherwise (no windows, fully booked horizon, or next opening after tomorrow).
+    """
+    doctor_tz = _doctor_zoneinfo(doctor)
+    today_local = datetime.now(doctor_tz).date()
+    now_utc = datetime.now(timezone.utc)
+    slots = _get_cached_slots_for_doctor_date(db, doctor, today_local)
+    if any(s.available and _utc_naive(s.start) > now_utc for s in slots):
+        return "available_today"
+    tomorrow_local = today_local + timedelta(days=1)
+    next_s = _next_available_from_doctor(db, doctor, today_local, horizon_days=14)
+    if next_s is None:
+        return "none"
+    next_local_date = _utc_naive(next_s.start).astimezone(doctor_tz).date()
+    if next_local_date == tomorrow_local:
+        return "next_available_tomorrow"
+    return "none"

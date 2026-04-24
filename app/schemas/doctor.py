@@ -60,6 +60,10 @@ class DoctorRead(BaseModel):
         default=None,
         description="Role of the linked login user (e.g. admin, doctor) for UI badges",
     )
+    availability_status: str | None = Field(
+        default=None,
+        description="When requested: available_today | next_available_tomorrow | none",
+    )
 
 
 class DoctorUpdate(BaseModel):

@@ -12,6 +12,7 @@ import { DoctorRowCard } from '../../components/patient/DoctorRowCard';
 import { PatientSearchCombobox } from '../../components/patient/PatientSearchCombobox';
 import { PATIENT_CLINIC_BOOKING_SCOPE_KEY } from '../../constants/patient';
 import { mockRatingFromId, mockReviewCountFromId } from '@/lib/patient/mockDoctorPresentation';
+import { doctorAvailabilityPresentation } from '@/lib/patient/doctorAvailabilityPresentation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type PatientDoctorsLocationState = {
@@ -113,7 +114,7 @@ export function PatientDoctors() {
           }));
           if (!cancelled) setDoctors(list);
         } else {
-          const list = await doctorsApi.getAll();
+          const list = await doctorsApi.getAll({ limit: 100, include_availability_hint: true });
           if (!cancelled) {
             setDoctors(list);
             setAllDoctorsForSearch((prev) => (prev.length > 0 ? prev : list));
@@ -186,6 +187,7 @@ export function PatientDoctors() {
               const spec = d.specialization || d.specialty || 'Specialist';
               const noAvailability = d.has_availability_windows === false;
               const blocked = !patientId || noAvailability;
+              const { label: availLabel, tone: availTone } = doctorAvailabilityPresentation(d);
               return (
                 <DoctorRowCard
                   key={String(d.id)}
@@ -193,7 +195,8 @@ export function PatientDoctors() {
                   subtitle={spec}
                   rating={mockRatingFromId(String(d.id))}
                   reviewCount={mockReviewCountFromId(String(d.id))}
-                  availabilityLabel={noAvailability ? 'Call clinic' : 'Available today'}
+                  availabilityLabel={availLabel}
+                  availabilityTone={availTone}
                   primaryLabel="Book Appointment"
                   onPrimary={blocked ? undefined : () => navigate(`/patient/doctor/${d.id}`)}
                   onCardClick={blocked ? undefined : () => navigate(`/patient/doctor/${d.id}`)}

@@ -1,27 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowUpRight, Building2, ChevronRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Sparkles, Stethoscope } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { patientsApi, publicDiscoveryApi, doctorsApi } from '../../services';
-import type { Doctor, PatientMyDoctor, PublicTenantDiscovery } from '../../types';
+import { doctorsApi, publicDiscoveryApi } from '../../services';
+import type { Doctor, PublicTenantDiscovery } from '../../types';
 import { ErrorState } from '../../components/common';
 import { PATIENT_CLINIC_BOOKING_SCOPE_KEY } from '../../constants/patient';
+import { COMMON_DISEASES, DISEASE_SPECIALIZATION_MAP } from '../../constants/diseaseMap';
 import { DoctorRowCard } from '../../components/patient/DoctorRowCard';
 import { PageSection } from '@/components/ui/page-section';
 import { PatientSearchCombobox } from '../../components/patient/PatientSearchCombobox';
-import { POPULAR_SPECIALIZATIONS } from '../../constants/patient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { mockRatingFromId, mockReviewCountFromId } from '@/lib/patient/mockDoctorPresentation';
 
-function typeLabel(t: PublicTenantDiscovery): string {
-  if (t.organization_label) return t.organization_label;
-  if (t.type === 'individual') return 'Individual practice';
-  if (t.type === 'organization') return 'Organization';
-  return t.type;
-}
-
-function HomeDoctorsRowSkeleton() {
+function HomeRailSkeleton() {
   return (
     <div className="flex gap-3 overflow-x-auto pb-1">
       {Array.from({ length: 3 }).map((_, i) => (
@@ -31,22 +24,15 @@ function HomeDoctorsRowSkeleton() {
   );
 }
 
-function ClinicsGridSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-24 rounded-2xl" />
-      ))}
-    </div>
-  );
-}
-
 export function PatientHome() {
   const navigate = useNavigate();
   const [tenants, setTenants] = useState<PublicTenantDiscovery[]>([]);
-  const [myDoctors, setMyDoctors] = useState<PatientMyDoctor[]>([]);
   const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
+  const [familyDoctor, setFamilyDoctor] = useState<Doctor | null>(null);
+  const [nearbyAvailable, setNearbyAvailable] = useState<Doctor[]>([]);
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,20 +44,40 @@ export function PatientHome() {
   }, []);
 
   useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setGeo(null),
+      { maximumAge: 120_000, timeout: 12_000 }
+    );
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const [tList, md, docs] = await Promise.all([
+        const [tList, indexDocs, gp, near] = await Promise.all([
           publicDiscoveryApi.listTenants(),
-          patientsApi.getMyDoctors(),
-          doctorsApi.getAll(),
+          doctorsApi.getAll({ limit: 80 }),
+          doctorsApi.getAll({
+            specialization: DISEASE_SPECIALIZATION_MAP.fever,
+            available_today: true,
+            limit: 1,
+            include_availability_hint: true,
+          }),
+          doctorsApi.getAll({
+            available_today: true,
+            limit: 12,
+            include_availability_hint: true,
+          }),
         ]);
         if (!cancelled) {
           setTenants(tList);
-          setMyDoctors(md);
-          setAllDoctors(docs);
+          setAllDoctors(indexDocs);
+          setFamilyDoctor(gp[0] ?? null);
+          setNearbyAvailable(near);
         }
       } catch {
         if (!cancelled) setError('Could not load discovery data. Try again shortly.');
@@ -84,11 +90,47 @@ export function PatientHome() {
     };
   }, []);
 
-  const { clinics, individuals } = useMemo(() => {
-    const c = tenants.filter((t) => t.doctor_count > 1);
-    const ind = tenants.filter((t) => t.doctor_count === 1);
-    return { clinics: c, individuals: ind };
-  }, [tenants]);
+  useEffect(() => {
+    if (!geo) return;
+    let cancelled = false;
+    (async () => {
+      setNearbyLoading(true);
+      try {
+        const near = await doctorsApi.getAll({
+          available_today: true,
+          limit: 12,
+          include_availability_hint: true,
+          lat: geo.lat,
+          lng: geo.lng,
+          radius: '5km',
+        });
+        if (!cancelled) setNearbyAvailable(near);
+      } catch {
+        if (!cancelled) {
+          /* keep prior nearby list */
+        }
+      } finally {
+        if (!cancelled) setNearbyLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [geo?.lat, geo?.lng]);
+
+  const nearYouSubtitle = useMemo(
+    () =>
+      geo
+        ? 'Practices with a map pin within about 5 km, still only if they have open slots today'
+        : 'Turn on location for distance-aware results — we still show everyone available today',
+    [geo]
+  );
+
+  const nearbyRailDoctors = useMemo(() => {
+    if (!familyDoctor) return nearbyAvailable;
+    const fid = String(familyDoctor.id);
+    return nearbyAvailable.filter((d) => String(d.id) !== fid);
+  }, [nearbyAvailable, familyDoctor]);
 
   if (error) {
     return <ErrorState title="Something went wrong" description={error} />;
@@ -96,9 +138,7 @@ export function PatientHome() {
 
   return (
     <div className="space-y-8">
-      <div
-        className="sticky top-0 z-20 -mx-4 mb-2 border-b border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md transition-shadow duration-200 sm:mx-0 sm:mb-3 sm:rounded-2xl sm:border sm:shadow-sm"
-      >
+      <div className="sticky top-0 z-20 -mx-4 mb-2 border-b border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md transition-shadow duration-200 sm:mx-0 sm:mb-3 sm:rounded-2xl sm:border sm:shadow-sm">
         <PatientSearchCombobox tenants={tenants} allDoctors={allDoctors} className="w-full" />
       </div>
 
@@ -108,26 +148,82 @@ export function PatientHome() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Find care, fast</h1>
         </div>
         <p className="text-sm text-muted-foreground sm:text-base">
-          Book trusted doctors and clinics. Two taps: pick a time, confirm.
+          Book trusted doctors in two taps — shortcuts below are available today only.
         </p>
       </div>
 
       {loading ? (
-        <PageSection title="My doctors" description="From your care history" className="animate-in fade-in">
-          <HomeDoctorsRowSkeleton />
+        <PageSection title="Family doctor" description="General physician available today" className="animate-in fade-in">
+          <Skeleton className="h-40 w-full rounded-2xl" />
         </PageSection>
       ) : (
         <PageSection
-          title="My doctors"
-          description="From your past and upcoming visits"
+          title="Family doctor"
+          description="A general physician you can book today"
           className="animate-in fade-in duration-300"
           action={
             <Link
               to="/patient/doctors"
-              className={cn(
-                buttonVariants({ variant: 'ghost', size: 'sm' }),
-                'gap-1 text-primary'
-              )}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1 text-primary')}
+              state={{
+                browseAllDoctors: true,
+                initialSearch: DISEASE_SPECIALIZATION_MAP.fever,
+              }}
+            >
+              More GPs
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          }
+        >
+          {familyDoctor ? (
+            <button
+              type="button"
+              onClick={() => navigate(`/patient/doctor/${familyDoctor.id}`)}
+              className="group relative w-full overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/15 via-primary/5 to-background p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 ring-1 ring-primary/20">
+                  <Stethoscope className="h-7 w-7 text-primary" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">Featured GP</p>
+                  <h2 className="mt-1 truncate text-lg font-bold text-foreground">{familyDoctor.name}</h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{familyDoctor.specialization}</p>
+                  <span className="mt-3 inline-flex rounded-full bg-[#22c55e]/12 px-2.5 py-1 text-[11px] font-semibold text-[#15803d] ring-1 ring-[#22c55e]/20">
+                    Available today
+                  </span>
+                </div>
+                <ArrowUpRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+              </div>
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center" role="status">
+              <p className="text-sm text-muted-foreground">No general physicians with open slots today.</p>
+              <Link
+                to="/patient/doctors"
+                state={{ browseAllDoctors: true }}
+                className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+              >
+                Explore all doctors
+              </Link>
+            </div>
+          )}
+        </PageSection>
+      )}
+
+      {loading ? (
+        <PageSection title="Available near you today" description={nearYouSubtitle} className="animate-in fade-in">
+          <HomeRailSkeleton />
+        </PageSection>
+      ) : (
+        <PageSection
+          title="Available near you today"
+          description={nearbyLoading ? 'Updating for your location…' : nearYouSubtitle}
+          className="animate-in fade-in duration-300"
+          action={
+            <Link
+              to="/patient/doctors"
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1 text-primary')}
               state={{ browseAllDoctors: true }}
             >
               See all
@@ -135,31 +231,26 @@ export function PatientHome() {
             </Link>
           }
         >
-          {myDoctors.length === 0 ? (
-            <div
-              className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center transition-colors"
-              role="status"
-            >
-              <p className="text-sm text-muted-foreground">When you book visits, your doctors will appear here.</p>
-              <Link
-                to="/patient/doctors"
-                state={{ browseAllDoctors: true }}
-                className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
-              >
-                Browse all doctors
-              </Link>
+          {nearbyRailDoctors.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center" role="status">
+              <p className="text-sm text-muted-foreground">
+                {geo
+                  ? 'No doctors with a location pin and open slots in range. Try widening search on the Doctors tab.'
+                  : 'No open slots surfaced for today yet — check the Doctors tab for the full directory.'}
+              </p>
             </div>
           ) : (
             <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar [scrollbar-width:none] sm:mx-0 sm:px-0">
-              {myDoctors.map((d) => (
-                <div key={d.id} className="w-[min(92vw,300px)] shrink-0 snap-start sm:w-[280px]">
+              {nearbyRailDoctors.map((d) => (
+                <div key={String(d.id)} className="w-[min(92vw,300px)] shrink-0 snap-start sm:w-[280px]">
                   <DoctorRowCard
                     compact
-                    name={d.name}
-                    subtitle={d.specialization}
-                    rating={mockRatingFromId(d.id)}
-                    reviewCount={mockReviewCountFromId(d.id)}
+                    name={d.name ?? 'Doctor'}
+                    subtitle={d.specialization ?? 'Specialist'}
+                    rating={mockRatingFromId(String(d.id))}
+                    reviewCount={mockReviewCountFromId(String(d.id))}
                     availabilityLabel="Available today"
+                    availabilityTone="today"
                     primaryLabel="Book Appointment"
                     onPrimary={() => navigate(`/patient/doctor/${d.id}`)}
                     onCardClick={() => navigate(`/patient/doctor/${d.id}`)}
@@ -171,74 +262,25 @@ export function PatientHome() {
         </PageSection>
       )}
 
-      {loading ? (
-        <PageSection title="Clinics & hospitals" description="More than one doctor on site" className="animate-in fade-in">
-          <ClinicsGridSkeleton />
-        </PageSection>
-      ) : (
-        <PageSection title="Clinics & hospitals" description="Organizations with more than one doctor" className="animate-in fade-in duration-300">
-          {clinics.length === 0 ? (
-            <div
-              className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center"
-              role="status"
-            >
-              <p className="text-sm text-muted-foreground">No multi-doctor locations listed yet. Check back soon.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {clinics.map((t) => (
-                <Link
-                  key={t.id}
-                  to={`/patient/clinic/${t.id}`}
-                  state={{ tenantName: t.name }}
-                  className="group block rounded-2xl border border-border/80 bg-white p-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                          <Building2 className="h-4 w-4 text-primary" aria-hidden />
-                        </div>
-                        <span className="font-semibold text-foreground transition-colors group-hover:text-primary">
-                          {t.name}
-                        </span>
-                      </div>
-                      <p className="mt-2 pl-11 text-sm text-muted-foreground">
-                        {t.doctor_count} doctors · {typeLabel(t)}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </PageSection>
-      )}
-
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-48" />
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-24 rounded-full" />
-            ))}
-          </div>
-        </div>
-      ) : (
+      {!loading && (
         <PageSection
-          title="Popular specializations"
-          description="Jump straight to a specialty"
+          title="Common diseases"
+          description="Maps to the right specialist on the doctors directory"
           className="animate-in fade-in duration-300"
         >
           <div className="flex flex-wrap gap-2">
-            {POPULAR_SPECIALIZATIONS.map((label) => (
+            {COMMON_DISEASES.map(({ key, label }) => (
               <button
-                key={label}
+                key={key}
                 type="button"
                 className="min-h-10 touch-manipulation rounded-full border border-border/80 bg-white px-4 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary/5"
                 onClick={() =>
-                  navigate('/patient/doctors', { state: { initialSearch: label, browseAllDoctors: true } })
+                  navigate('/patient/doctors', {
+                    state: {
+                      initialSearch: DISEASE_SPECIALIZATION_MAP[key],
+                      browseAllDoctors: true,
+                    },
+                  })
                 }
               >
                 {label}
@@ -249,43 +291,16 @@ export function PatientHome() {
       )}
 
       {!loading && (
-        <PageSection title="Solo practices" description="Individual doctors on the network" className="animate-in fade-in duration-300">
-          {individuals.length === 0 ? (
-            <p className="text-sm text-muted-foreground" role="status">
-              No solo practices listed yet.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {individuals.map((t) => {
-                const d = t.sole_doctor;
-                return (
-                  <li key={t.id}>
-                    <DoctorRowCard
-                      name={d?.name ?? t.name}
-                      subtitle={`${d?.specialization ?? 'Specialist'} · ${typeLabel(t)}`}
-                      rating={d ? mockRatingFromId(d.id) : 4.6}
-                      reviewCount={d ? mockReviewCountFromId(d.id) : 120}
-                      availabilityLabel={d ? 'Available today' : undefined}
-                      primaryLabel="Book Appointment"
-                      onPrimary={d ? () => navigate(`/patient/doctor/${d.id}`) : undefined}
-                      onCardClick={d ? () => navigate(`/patient/doctor/${d.id}`) : undefined}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </PageSection>
-      )}
-
-      {!loading && (
         <div className="flex justify-center pt-2">
           <Link
             to="/patient/doctors"
             state={{ browseAllDoctors: true }}
-            className={cn(buttonVariants({ variant: 'outline' }), 'rounded-2xl border-primary/20 px-6 transition hover:bg-primary/5')}
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'rounded-2xl border-primary/20 px-6 transition hover:bg-primary/5'
+            )}
           >
-            Browse all booking options
+            Browse all doctors & filters
           </Link>
         </div>
       )}

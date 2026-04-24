@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -40,6 +41,25 @@ from app.services.security_audit import (
 
 
 logger = logging.getLogger(__name__)
+
+_EARTH_RADIUS_KM = 6371.0
+
+
+def _haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:
+    """Great-circle distance in kilometers (WGS84 sphere approximation)."""
+    rlat1 = math.radians(lat_a)
+    rlat2 = math.radians(lat_b)
+    dlat = math.radians(lat_b - lat_a)
+    dlon = math.radians(lon_b - lon_a)
+    h = math.sin(dlat / 2) ** 2 + math.cos(rlat1) * math.cos(rlat2) * math.sin(dlon / 2) ** 2
+    return 2 * _EARTH_RADIUS_KM * math.asin(min(1.0, math.sqrt(h)))
+
+
+def _tenant_within_radius_km(doctor: Doctor, lat: float, lon: float, radius_km: float) -> bool:
+    tenant = getattr(doctor, "tenant", None)
+    if tenant is None or tenant.latitude is None or tenant.longitude is None:
+        return False
+    return _haversine_km(lat, lon, float(tenant.latitude), float(tenant.longitude)) <= radius_km
 
 
 def require_doctor_tenant_for_scheduling(doctor: Doctor) -> None:
@@ -735,34 +755,27 @@ def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:
 
 
 def get_doctors(
-
     db: Session,
-
     current_user: User | None,
-
     skip: int = 0,
-
     limit: int = 10,
-
     search: str | None = None,
-
     tenant_id: UUID | None = None,
-
+    *,
+    available_today: bool = False,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
+    specialization: str | None = None,
+    include_availability_hint: bool = False,
 ) -> list[Doctor]:
-
     if current_user is None:
-
         logger.info("[RBAC] role=None, user=None")
-
     else:
-
         logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
 
     user_id_filter: UUID | None = None
-
     eff_tenant_id = tenant_id
-
-
 
     if current_user is not None and current_user.role == UserRole.doctor:
         self_doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
@@ -777,26 +790,48 @@ def get_doctors(
         user_id_filter = None
 
     elif current_user is not None and current_user.role == UserRole.patient:
-
         eff_tenant_id = None
 
+    from app.services import doctor_slot_service
+
+    geo_active = latitude is not None and longitude is not None and radius_km is not None
+    post_filter = available_today or geo_active
+    fetch_limit = limit + skip
+    if post_filter:
+        fetch_limit = min(500, max(fetch_limit * 8, 120))
+
     doctors = crud_doctor.get_doctors(
-
         db,
-
-        skip=skip,
-
-        limit=limit,
-
+        skip=0,
+        limit=fetch_limit,
         search=search,
-
         tenant_id=eff_tenant_id,
-
         user_id=user_id_filter,
-
+        specialization=specialization,
     )
 
     hydrate_doctor_availability_flags(db, doctors)
+
+    if geo_active:
+        doctors = [d for d in doctors if _tenant_within_radius_km(d, latitude, longitude, radius_km)]
+        doctors.sort(
+            key=lambda d: _haversine_km(
+                latitude,
+                longitude,
+                float(getattr(getattr(d, "tenant", None), "latitude", 0) or 0),
+                float(getattr(getattr(d, "tenant", None), "longitude", 0) or 0),
+            )
+        )
+
+    if available_today:
+        doctors = [
+            d
+            for d in doctors
+            if getattr(d, "has_availability_windows", False)
+            and doctor_slot_service.compute_doctor_availability_status_for_list(db, d) == "available_today"
+        ]
+
+    doctors = doctors[skip : skip + limit]
 
     tenant_ids = {d.tenant_id for d in doctors if d.tenant_id is not None}
     org_counts = (
@@ -804,11 +839,9 @@ def get_doctors(
     )
 
     for d in doctors:
-
         tenant = getattr(d, "tenant", None)
 
         if tenant is not None:
-
             setattr(d, "tenant_name", tenant.name)
 
             setattr(d, "tenant_type", tenant.type)
@@ -822,6 +855,17 @@ def get_doctors(
             "linked_user_role",
             (u.role.value if u is not None and u.role is not None else None),
         )
+        if include_availability_hint:
+            if available_today:
+                setattr(d, "availability_status", "available_today")
+            elif not getattr(d, "has_availability_windows", False):
+                setattr(d, "availability_status", "none")
+            else:
+                setattr(
+                    d,
+                    "availability_status",
+                    doctor_slot_service.compute_doctor_availability_status_for_list(db, d),
+                )
 
     return doctors
 

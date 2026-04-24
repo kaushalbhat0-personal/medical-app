@@ -218,7 +218,17 @@ export const doctorsApi = {
   },
 
   getAll: async (
-    params?: { search?: string; skip?: number; limit?: number },
+    params?: {
+      search?: string;
+      skip?: number;
+      limit?: number;
+      available_today?: boolean;
+      lat?: number;
+      lng?: number;
+      radius?: string;
+      specialization?: string;
+      include_availability_hint?: boolean;
+    },
     options?: { tenantScopeId?: string }
   ): Promise<Doctor[]> => {
     try {

@@ -185,6 +185,8 @@ export interface Doctor {
   tenant_organization_label?: string | null;
   tenant_name?: string | null;
   tenant_id?: string | null;
+  /** From GET /doctors when include_availability_hint=true */
+  availability_status?: 'available_today' | 'next_available_tomorrow' | 'none' | string | null;
 }
 
 export interface Appointment {

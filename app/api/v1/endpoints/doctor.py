@@ -34,9 +34,24 @@ from app.schemas.doctor import (
     DoctorUpdate,
 )
 from app.services import doctor_availability_service, doctor_service, doctor_slot_service
+from app.services.exceptions import ValidationError
 from app.services.user_roles_service import user_read_with_roles
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
+
+
+def _radius_km_from_query(radius: str | None, *, has_coords: bool) -> float | None:
+    default: float | None = 5.0 if has_coords else None
+    if radius is None or radius.strip() == "":
+        return default
+    s = radius.strip().lower().replace(" ", "")
+    if s.endswith("km"):
+        s = s[:-2]
+    try:
+        v = float(s)
+        return v if v > 0 else default
+    except ValueError:
+        return default
 
 
 @router.post("", response_model=DoctorRead, status_code=201)
@@ -66,6 +81,31 @@ def read_doctors(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     search: str | None = Query(default=None, min_length=1),
+    available_today: bool = Query(
+        default=False,
+        description="Only doctors with at least one bookable slot later today (local to each doctor)",
+    ),
+    lat: float | None = Query(
+        default=None,
+        description="Patient latitude (WGS84); use with lng and optional radius for nearby filtering",
+    ),
+    lng: float | None = Query(
+        default=None,
+        description="Patient longitude (WGS84); use with lat and optional radius for nearby filtering",
+    ),
+    radius: str | None = Query(
+        default=None,
+        description='Search radius, e.g. "5" or "5km"; defaults to 5 km when lat/lng are set',
+    ),
+    specialization: str | None = Query(
+        default=None,
+        min_length=1,
+        description="Filter by substring match on doctor.specialization (case-insensitive)",
+    ),
+    include_availability_hint: bool = Query(
+        default=False,
+        description="Populate availability_status on each doctor (extra slot computation per row)",
+    ),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
     x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
@@ -76,6 +116,10 @@ def read_doctors(
         tenant_id = None
     else:
         tenant_id = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+    has_coords = lat is not None and lng is not None
+    if (lat is None) ^ (lng is None):
+        raise ValidationError("lat and lng must be provided together")
+    radius_km = _radius_km_from_query(radius, has_coords=has_coords)
     return doctor_service.get_doctors(
         db,
         current_user,
@@ -83,6 +127,12 @@ def read_doctors(
         limit=limit,
         search=search,
         tenant_id=tenant_id,
+        available_today=available_today,
+        latitude=lat,
+        longitude=lng,
+        radius_km=radius_km,
+        specialization=specialization,
+        include_availability_hint=include_availability_hint,
     )
 
 

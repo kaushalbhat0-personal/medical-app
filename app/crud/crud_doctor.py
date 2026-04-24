@@ -98,6 +98,7 @@ def get_doctors(
     search: str | None = None,
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
+    specialization: str | None = None,
 ) -> list[Doctor]:
     stmt = (
         select(Doctor)
@@ -110,6 +111,8 @@ def get_doctors(
     )
     if search:
         stmt = stmt.where(Doctor.name.ilike(f"%{search}%"))
+    if specialization:
+        stmt = stmt.where(Doctor.specialization.ilike(f"%{specialization}%"))
     if user_id is not None:
         stmt = stmt.where(Doctor.user_id == user_id)
     if tenant_id is not None:

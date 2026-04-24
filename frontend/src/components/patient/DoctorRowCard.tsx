@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { initialsFromName } from '@/lib/patient/mockDoctorPresentation';
 
+export type DoctorAvailabilityBadgeTone = 'today' | 'tomorrow' | 'muted';
+
 export interface DoctorRowCardProps {
   name: string;
   subtitle: string;
@@ -16,6 +18,8 @@ export interface DoctorRowCardProps {
   reviewCount?: number;
   /** e.g. "Available today" */
   availabilityLabel?: string;
+  /** Visual weight for availability chip (green / red / neutral). */
+  availabilityTone?: DoctorAvailabilityBadgeTone;
   /** Shorter width for horizontal rail */
   compact?: boolean;
   /** When false, CTA is hidden and card is non-interactive where applicable. */
@@ -35,6 +39,7 @@ export function DoctorRowCard({
   rating,
   reviewCount,
   availabilityLabel,
+  availabilityTone = 'today',
   compact,
   disabled,
 }: DoctorRowCardProps) {
@@ -91,9 +96,11 @@ export function DoctorRowCard({
             <span
               className={cn(
                 'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                disabled
+                disabled || availabilityTone === 'muted'
                   ? 'bg-muted text-muted-foreground'
-                  : 'bg-[#22c55e]/12 text-[#15803d] ring-1 ring-[#22c55e]/20'
+                  : availabilityTone === 'tomorrow'
+                    ? 'bg-destructive/10 text-destructive ring-1 ring-destructive/20'
+                    : 'bg-[#22c55e]/12 text-[#15803d] ring-1 ring-[#22c55e]/20'
               )}
             >
               {availabilityLabel}
