@@ -71,6 +71,19 @@ export function setActiveTenantId(tenantId: string): void {
   window.dispatchEvent(new Event(TENANT_ID_STORAGE_EVENT));
 }
 
+/** Clear super-admin org selection (no `X-Tenant-ID` until another org is chosen). */
+export function clearActiveTenantId(): void {
+  localStorage.removeItem(ACTIVE_TENANT_ID_STORAGE_KEY);
+  try {
+    localStorage.removeItem(ACTIVE_TENANT_ID_ALIAS_KEY);
+  } catch {
+    // ignore
+  }
+  localStorage.removeItem(TENANT_ID_LEGACY_STORAGE_KEY);
+  localStorage.removeItem(ADMIN_SELECTED_TENANT_STORAGE_KEY);
+  window.dispatchEvent(new Event(TENANT_ID_STORAGE_EVENT));
+}
+
 function isSuperAdminFromStoredUser(userStr: string | null, token: string | null): boolean {
   if (userStr) {
     try {

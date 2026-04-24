@@ -28,6 +28,7 @@ def list_public_tenants_for_discovery(db: Session) -> list[PublicTenantDiscovery
         .join(Doctor, Doctor.tenant_id == Tenant.id)
         .where(
             Tenant.is_active == True,  # noqa: E712
+            Tenant.is_deleted == False,  # noqa: E712
             Doctor.is_active == True,  # noqa: E712
             Doctor.is_deleted == False,  # noqa: E712
         )
@@ -75,7 +76,7 @@ def list_public_tenants_for_discovery(db: Session) -> list[PublicTenantDiscovery
 
 def list_public_doctors_for_tenant(db: Session, tenant_id: UUID) -> list[PublicTenantDoctorBrief]:
     tenant = db.get(Tenant, tenant_id)
-    if tenant is None or not tenant.is_active:
+    if tenant is None or not tenant.is_active or tenant.is_deleted:
         raise NotFoundError("Tenant not found")
 
     stmt = (

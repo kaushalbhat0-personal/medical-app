@@ -16,7 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { doctorsApi, tenantsApi, usersApi } from '../services';
 import type { Doctor, Tenant } from '../types';
-import { getActiveTenantId, setActiveTenantId } from '../utils/tenantIdForRequest';
+import {
+  clearActiveTenantId,
+  getActiveTenantId,
+  setActiveTenantId,
+} from '../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -43,15 +47,21 @@ export function AdminTenantsPage() {
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
 
+  const [deactivateTargetId, setDeactivateTargetId] = useState<string | null>(null);
+  const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+
   const modalRef = useRef<HTMLDivElement>(null);
   const addAdminRef = useRef<HTMLDivElement>(null);
+  const deactivateModalRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(modalRef, modalOpen);
   useModalFocusTrap(addAdminRef, Boolean(addAdminTenant));
+  useModalFocusTrap(deactivateModalRef, Boolean(deactivateTargetId));
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await tenantsApi.getAll();
+      const list = await tenantsApi.getAll({ include_deactivated: true });
       setTenants(list);
     } catch {
       toast.error('Could not load tenants');
@@ -63,7 +73,7 @@ export function AdminTenantsPage() {
 
   const refetchTenants = useCallback(async () => {
     try {
-      const list = await tenantsApi.getAll();
+      const list = await tenantsApi.getAll({ include_deactivated: true });
       setTenants(list);
     } catch {
       toast.error('Could not refresh organizations');
@@ -106,6 +116,55 @@ export function AdminTenantsPage() {
     setActiveId(tenant.id);
     toast.success(`Active organization: ${tenant.name}`);
     window.location.assign('/admin/dashboard');
+  };
+
+  const deactivateTarget = deactivateTargetId
+    ? tenants.find((x) => x.id === deactivateTargetId) ?? null
+    : null;
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTargetId) return;
+    setDeactivateSubmitting(true);
+    try {
+      await tenantsApi.deactivate(deactivateTargetId);
+      const list = await tenantsApi.getAll({ include_deactivated: true });
+      setTenants(list);
+      setDeactivateTargetId(null);
+      toast.success('Organization deactivated');
+
+      const currentActive = getActiveTenantId();
+      if (currentActive === deactivateTargetId) {
+        const next = list.find((t) => !t.is_deleted);
+        if (next) {
+          setActiveTenantId(next.id);
+          setActiveId(next.id);
+          toast.success(`Switched active organization to ${next.name}`);
+        } else {
+          clearActiveTenantId();
+          setActiveId(null);
+          toast('No active organization selected. Choose one from the header or this list.', {
+            icon: 'ℹ️',
+          });
+        }
+      }
+    } catch {
+      toast.error('Could not deactivate organization');
+    } finally {
+      setDeactivateSubmitting(false);
+    }
+  };
+
+  const reactivateTenant = async (t: Tenant) => {
+    setReactivatingId(t.id);
+    try {
+      await tenantsApi.reactivate(t.id);
+      await refetchTenants();
+      toast.success(`${t.name} is active again`);
+    } catch {
+      toast.error('Could not reactivate organization');
+    } finally {
+      setReactivatingId(null);
+    }
   };
 
   const openAddAdmin = (tenant: Tenant) => {
@@ -240,15 +299,25 @@ export function AdminTenantsPage() {
               </TableHeader>
               <TableBody>
                 {tenants.map((t) => {
-                  const isActive = activeId === t.id;
+                  const isSelected = activeId === t.id;
+                  const isDeactivated = Boolean(t.is_deleted);
                   return (
                     <TableRow key={t.id}>
                       <TableCell className="font-medium">
-                        <span className="inline-flex items-center gap-2">
+                        <span className="inline-flex flex-wrap items-center gap-2">
                           {t.name}
-                          {isActive && (
+                          {isDeactivated ? (
+                            <Badge variant="destructive" className="text-xs">
+                              Deactivated
+                            </Badge>
+                          ) : (
                             <Badge variant="secondary" className="text-xs">
                               Active
+                            </Badge>
+                          )}
+                          {isSelected && (
+                            <Badge variant="outline" className="text-xs">
+                              Current
                             </Badge>
                           )}
                         </span>
@@ -260,19 +329,42 @@ export function AdminTenantsPage() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            disabled={isDeactivated}
                             onClick={() => openAddAdmin(t)}
                           >
                             Add admin
                           </Button>
                           <Button
                             type="button"
-                            variant={isActive ? 'secondary' : 'outline'}
+                            variant={isSelected ? 'secondary' : 'outline'}
                             size="sm"
-                            disabled={isActive}
+                            disabled={isSelected || isDeactivated}
                             onClick={() => switchTo(t)}
                           >
-                            {isActive ? 'Selected' : 'Switch here'}
+                            {isSelected ? 'Selected' : 'Switch here'}
                           </Button>
+                          {isDeactivated ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                              disabled={reactivatingId === t.id}
+                              onClick={() => void reactivateTenant(t)}
+                            >
+                              {reactivatingId === t.id ? '…' : 'Reactivate'}
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeactivateTargetId(t.id)}
+                            >
+                              Deactivate
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -283,6 +375,58 @@ export function AdminTenantsPage() {
           )}
         </CardContent>
       </Card>
+
+      {deactivateTargetId && deactivateTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deactivateSubmitting) {
+              setDeactivateTargetId(null);
+            }
+          }}
+        >
+          <div
+            ref={deactivateModalRef}
+            className={cn(
+              'w-full max-w-md rounded-xl border border-border bg-background shadow-lg',
+              'p-6 space-y-4'
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deactivate-org-title"
+          >
+            <h2 id="deactivate-org-title" className="text-lg font-semibold">
+              Deactivate organization?
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This will disable the clinic or hospital and remove access for all doctors and staff.
+              This action can be reversed later.
+            </p>
+            <p className="text-sm font-medium text-foreground">
+              {deactivateTarget.name}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={deactivateSubmitting}
+                onClick={() => setDeactivateTargetId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deactivateSubmitting}
+                onClick={() => void confirmDeactivate()}
+              >
+                {deactivateSubmitting ? 'Working…' : 'Deactivate organization'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {addAdminTenant && (
         <div

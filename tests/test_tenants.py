@@ -279,6 +279,129 @@ async def test_get_tenant_by_id_super_admin(
 
 
 @pytest.mark.asyncio
+async def test_super_admin_deactivate_tenant_soft_delete(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_del_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    t = create_tenant(db, name=f"Deactivate Me {uuid.uuid4().hex[:8]}")
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+
+    r_del = await client.delete(
+        f"/api/v1/tenants/{t.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_del.status_code == 204, r_del.text
+
+    db.expire_all()
+    row = db.get(Tenant, t.id)
+    assert row is not None and row.is_deleted is True
+
+    r_list = await client.get(
+        "/api/v1/tenants",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_list.status_code == 200
+    ids = {row["id"] for row in r_list.json()}
+    assert str(t.id) not in ids
+
+    r_inc = await client.get(
+        "/api/v1/tenants",
+        params={"include_deactivated": "true"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_inc.status_code == 200
+    found = next((x for x in r_inc.json() if x["id"] == str(t.id)), None)
+    assert found is not None
+    assert found.get("is_deleted") is True
+
+    r_re = await client.post(
+        f"/api/v1/tenants/{t.id}/reactivate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_re.status_code == 200, r_re.text
+    assert r_re.json()["is_deleted"] is False
+    db.expire_all()
+    row2 = db.get(Tenant, t.id)
+    assert row2 is not None and row2.is_deleted is False
+
+
+@pytest.mark.asyncio
+async def test_deactivate_tenant_forbidden_for_org_admin(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    t = create_tenant(db, name=f"Protected {uuid.uuid4().hex[:8]}")
+    admin = create_user(
+        db,
+        email=f"adm_{uuid.uuid4().hex[:8]}@example.com",
+        password="AdminPass9!",
+        role=UserRole.admin,
+        tenant_id=t.id,
+    )
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": admin.email, "password": "AdminPass9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    r = await client.delete(
+        f"/api/v1/tenants/{t.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_super_admin_scoped_api_rejects_deactivated_tenant(
+    client: AsyncClient, db_session: Session
+) -> None:
+    db = db_session
+    super_email = f"sa_scope_{uuid.uuid4().hex[:8]}@example.com"
+    create_user(
+        db,
+        email=super_email,
+        password="SuperAdmin9!",
+        role=UserRole.super_admin,
+    )
+    t = create_tenant(db, name=f"Offboarded {uuid.uuid4().hex[:8]}")
+    t.is_deleted = True
+    db.add(t)
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": super_email, "password": "SuperAdmin9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = login.json()["access_token"]
+    r = await client.get(
+        "/api/v1/doctors",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant-ID": str(t.id),
+        },
+    )
+    assert r.status_code == 400
+    assert "deactivated" in r.json().get("detail", "").lower()
+
+
+@pytest.mark.asyncio
 async def test_super_admin_post_users_creates_tenant_admin(
     client: AsyncClient, db_session: Session
 ) -> None:

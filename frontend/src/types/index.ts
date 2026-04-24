@@ -71,6 +71,8 @@ export interface Tenant {
   slug?: string | null;
   type: string;
   is_active: boolean;
+  /** Super-admin soft-delete; deactivated orgs are hidden from lists and API scope by default */
+  is_deleted?: boolean;
   /** Shown for tenants that have contact info (may be null for legacy rows) */
   address?: string | null;
   phone?: string | null;

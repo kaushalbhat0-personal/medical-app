@@ -121,6 +121,7 @@ def list_tenants(
     type: str | None = None,
     type_in: tuple[str, ...] | None = None,
     is_active: bool | None = True,
+    exclude_deleted: bool = True,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Tenant]:
@@ -131,6 +132,8 @@ def list_tenants(
         stmt = stmt.where(Tenant.type == type)
     if is_active is not None:
         stmt = stmt.where(Tenant.is_active == is_active)
+    if exclude_deleted:
+        stmt = stmt.where(Tenant.is_deleted == False)  # noqa: E712
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 

@@ -34,6 +34,7 @@ class TenantPublicRead(BaseModel):
     slug: str | None = None
     type: str
     is_active: bool
+    is_deleted: bool = False
     address: str | None = None
     phone: str | None = None
     created_at: datetime

@@ -84,6 +84,8 @@ def resolve_tenant_id_for_scoped_request(
         row = db.get(Tenant, x_tenant_id)
         if row is None:
             raise ValidationError("Tenant not found")
+        if row.is_deleted:
+            raise ValidationError("Organization is deactivated")
         if not row.is_active:
             raise ValidationError("Tenant is not active")
         return x_tenant_id
@@ -95,4 +97,9 @@ def resolve_tenant_id_for_scoped_request(
     chosen = x_tenant_id if x_tenant_id is not None else home
     if chosen != home:
         raise ForbiddenError("X-Tenant-ID does not match your organization")
+    scope_row = db.get(Tenant, chosen)
+    if scope_row is None:
+        raise ValidationError("Tenant not found")
+    if scope_row.is_deleted:
+        raise ValidationError("Organization is deactivated")
     return chosen

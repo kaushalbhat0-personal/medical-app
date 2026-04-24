@@ -4,6 +4,7 @@ import { tenantsApi } from '../../services';
 import type { Tenant, User } from '../../types';
 import { getEffectiveRoles, isSuperAdminRole } from '../../utils/roles';
 import {
+  clearActiveTenantId,
   getActiveTenantId,
   TENANT_ID_STORAGE_EVENT,
   setActiveTenantId,
@@ -33,7 +34,16 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
     if (!showSwitcher) return;
     try {
       const list = await tenantsApi.getAll();
-      setTenants(list);
+      const activeOnly = list.filter((t) => !t.is_deleted);
+      setTenants(activeOnly);
+      const selected = getActiveTenantId();
+      if (selected && !activeOnly.some((t) => t.id === selected)) {
+        if (activeOnly[0]) {
+          setActiveTenantId(activeOnly[0].id);
+        } else {
+          clearActiveTenantId();
+        }
+      }
     } catch {
       setTenants([]);
     }

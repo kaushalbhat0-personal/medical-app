@@ -30,6 +30,7 @@ class Tenant(Base):
     __tablename__ = "tenants"
     __table_args__ = (
         Index("ix_tenants_type", "type"),
+        Index("ix_tenants_is_deleted", "is_deleted"),
         Index("ux_tenants_name_lower", text("lower(name)"), unique=True),
         Index("ux_tenants_slug", "slug", unique=True),
         CheckConstraint(
@@ -55,6 +56,9 @@ class Tenant(Base):
         default=TenantType.organization,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
