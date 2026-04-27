@@ -255,6 +255,8 @@ type AvailabilitySummaryProps = {
   tomorrowSlots: DoctorSlot[];
   selectedStart: string | null;
   onPickSlot: (isoStart: string, dateYmd: string) => void;
+  /** Scroll to full booking / slot picker (e.g. section below). */
+  onScrollToBooking?: () => void;
 };
 
 function futureAvailableSlots(slots: DoctorSlot[]): DoctorSlot[] {
@@ -290,9 +292,12 @@ export function DoctorProfileAvailabilitySummary({
   tomorrowSlots,
   selectedStart,
   onPickSlot,
+  onScrollToBooking,
 }: AvailabilitySummaryProps) {
   const t = futureAvailableSlots(todaySlots);
   const m = futureAvailableSlots(tomorrowSlots);
+  const previewToday = t.slice(0, 4);
+  const showViewAllToday = t.length > previewToday.length;
 
   return (
     <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
@@ -345,7 +350,7 @@ export function DoctorProfileAvailabilitySummary({
                     </span>
                   )
                 ) : (
-                  t.map((s) => (
+                  previewToday.map((s) => (
                     <button
                       key={s.start}
                       type="button"
@@ -362,6 +367,15 @@ export function DoctorProfileAvailabilitySummary({
                   ))
                 )}
               </div>
+              {showViewAllToday && onScrollToBooking ? (
+                <button
+                  type="button"
+                  onClick={onScrollToBooking}
+                  className="mt-2 text-sm font-medium text-primary hover:underline"
+                >
+                  View all slots →
+                </button>
+              ) : null}
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tomorrow</p>

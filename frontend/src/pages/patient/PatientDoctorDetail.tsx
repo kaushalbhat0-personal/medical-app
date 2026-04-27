@@ -378,6 +378,11 @@ export function PatientDoctorDetail() {
           booking.setBookDate(ymd);
           booking.setSelectedSlotStart(iso);
         }}
+        onScrollToBooking={
+          blocked
+            ? undefined
+            : () => bookingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
       />
 
       {blocked && (
