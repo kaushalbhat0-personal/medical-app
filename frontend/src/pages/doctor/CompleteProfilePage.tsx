@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
-import { doctorProfileApi } from '../../services/doctorProfile';
+import { doctorProfileApi, retryRequest } from '../../services';
 import { Button, Card, Input } from '../../components/common';
 import {
   completeStructuredDoctorProfileSchema,
@@ -135,7 +135,7 @@ export function CompleteProfilePage() {
 
   const onSubmit = async (data: CompleteStructuredDoctorProfileFormData) => {
     try {
-      await doctorProfileApi.put({
+      const payload = {
         full_name: data.full_name,
         phone: data.phone,
         profile_image: data.profile_image || null,
@@ -148,13 +148,27 @@ export function CompleteProfilePage() {
         address: data.address || null,
         city: data.city || null,
         state: data.state || null,
-      });
+      };
+      await retryRequest(() => doctorProfileApi.put(payload), 2, 2000);
       await refreshUser();
       toast.success('Profile saved');
       navigate(doctorHomePath(), { replace: true });
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error('Failed to save profile');
+      const err = e as {
+        code?: string;
+        __coldStart?: boolean;
+        originalError?: { code?: string };
+      };
+      if (
+        err?.__coldStart === true ||
+        err?.code === 'ECONNABORTED' ||
+        err?.originalError?.code === 'ECONNABORTED'
+      ) {
+        toast('Server is starting… please wait ⏳');
+      } else {
+        toast.error('Failed to save profile');
+      }
     }
   };
 
@@ -356,7 +370,11 @@ export function CompleteProfilePage() {
             className="w-full"
             isLoading={isSubmitting}
           >
-            {rejected ? 'Save changes' : 'Save and continue'}
+            {isSubmitting
+              ? 'Saving...'
+              : rejected
+                ? 'Save changes'
+                : 'Save and continue'}
           </Button>
         </div>
       </div>

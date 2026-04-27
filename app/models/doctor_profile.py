@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,9 @@ class DoctorProfile(Base):
     """Structured identity + verification data for a doctor (separate from auth `User` and roster `Doctor`)."""
 
     __tablename__ = "doctor_profiles"
+    __table_args__ = (
+        Index("idx_doctor_profiles_verification_status", "verification_status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

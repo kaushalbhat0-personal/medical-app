@@ -85,6 +85,24 @@ export function isSuperAdminRole(roles: string | string[] | null | undefined): b
   return normalizeRoles(roles).includes('super_admin');
 }
 
+/**
+ * Who may review marketplace doctor verification (align with backend `can_verify_doctor_profile`):
+ * super_admin, or organization-tenant org admins (admin/staff) / practice owner.
+ * Solo individual-practice doctors never get approval UI (tenant.type must be `organization`).
+ */
+export function canVerifyDoctorsInTenant(
+  user: { tenant?: { type?: string } | null; is_owner?: boolean } | null | undefined,
+  token: string | null
+): boolean {
+  const eff = getEffectiveRoles(user, token);
+  if (isSuperAdminRole(eff)) return true;
+  if (user?.tenant?.type !== 'organization') return false;
+  const r = normalizeRoles(eff);
+  if (r.includes('admin') || r.includes('staff')) return true;
+  if (r.includes('doctor') && user?.is_owner) return true;
+  return false;
+}
+
 export function staffHomePath(): string {
   return '/dashboard';
 }

@@ -11,11 +11,19 @@ import {
   Receipt,
   Package,
   Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
-import { canAccessAdminUI, getEffectiveRoles, isPatientRole, isSuperAdminRole, normalizeRoles } from '../../utils/roles';
+import {
+  canAccessAdminUI,
+  canVerifyDoctorsInTenant,
+  getEffectiveRoles,
+  isPatientRole,
+  isSuperAdminRole,
+  normalizeRoles,
+} from '../../utils/roles';
 import { doctorNavItemHint, isDoctorNavItemVisible } from '../../utils/doctorVerification';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { NavItem } from './NavItem';
@@ -53,9 +61,16 @@ const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/billing', label: 'Billing', icon: CreditCard },
 ];
 
+const verificationsNavItem = {
+  path: '/admin/doctor-verifications',
+  label: 'Verifications',
+  icon: ShieldCheck,
+};
+
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { resolvedMode } = useAppMode();
-  const effRoles = getEffectiveRoles(user, localStorage.getItem('token'));
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const effRoles = getEffectiveRoles(user, token);
   const roles = normalizeRoles(effRoles);
   const isDoctorOnly =
     roles.includes('doctor') && !roles.includes('admin') && !roles.includes('super_admin');
@@ -64,6 +79,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
     resolvedMode === 'admin' &&
     !isPatientRole(effRoles) &&
     !isDoctorOnly;
+  const showVerifyNav = canVerifyDoctorsInTenant(user, token);
 
   const staffNavItems = useMemo(() => {
     if (!canAccessAdminUI(effRoles)) return staffNavBase;
@@ -71,20 +87,26 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
     const mid = isSuperAdminRole(effRoles)
-      ? [adminItem, tenantsItem, inventoryItem]
-      : [adminItem, inventoryItem];
+      ? [adminItem, tenantsItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem]
+      : [adminItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem];
     return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
-  }, [effRoles]);
+  }, [effRoles, showVerifyNav]);
 
   const adminModeItems = useMemo(() => {
     if (!isSuperAdminRole(effRoles)) {
+      if (showVerifyNav) {
+        return [adminModeNavBase[0], verificationsNavItem, ...adminModeNavBase.slice(1)];
+      }
       return adminModeNavBase;
     }
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
-    return [adminModeNavBase[0], tenantsItem, ...adminModeNavBase.slice(1)];
-  }, [effRoles]);
-
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+    return [
+      adminModeNavBase[0],
+      tenantsItem,
+      ...(showVerifyNav ? [verificationsNavItem] : []),
+      ...adminModeNavBase.slice(1),
+    ];
+  }, [effRoles, showVerifyNav]);
   const doctorNavFiltered = useMemo(
     () => DOCTOR_PRACTICE_NAV.filter((item) => isDoctorNavItemVisible(user, token, item.path)),
     [user, token]

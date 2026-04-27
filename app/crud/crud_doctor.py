@@ -134,6 +134,70 @@ def get_doctors(
     return list(db.scalars(stmt).unique().all())
 
 
+def list_doctors_with_verification_status(
+    db: Session,
+    *,
+    tenant_id: UUID | None,
+    verification_status: str | None,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[Doctor]:
+    """
+    Doctors with a ``doctor_profiles`` row, optionally filtered by marketplace verification status.
+
+    ``tenant_id`` None = all tenants (super-admin global view); else scope to one organization.
+    """
+    stmt = (
+        select(Doctor)
+        .order_by(Doctor.created_at.desc())
+        .options(
+            joinedload(Doctor.tenant),
+            joinedload(Doctor.user),
+            joinedload(Doctor.structured_profile),
+        )
+        .join(DoctorProfile, DoctorProfile.doctor_id == Doctor.id)
+        .join(Doctor.tenant)
+        .where(
+            Doctor.is_active == True,  # noqa: E712
+            Doctor.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(Doctor.tenant_id == tenant_id)
+    if verification_status is not None and verification_status.strip() != "":
+        v = verification_status.strip().lower()
+        stmt = stmt.where(DoctorProfile.verification_status == v)
+    stmt = stmt.offset(skip).limit(limit)
+    return list(db.scalars(stmt).unique().all())
+
+
+def count_doctors_with_verification_status(
+    db: Session,
+    *,
+    tenant_id: UUID | None,
+    verification_status: str | None,
+) -> int:
+    """Row count for the same filters as :func:`list_doctors_with_verification_status`."""
+    stmt = (
+        select(func.count())
+        .select_from(Doctor)
+        .join(DoctorProfile, DoctorProfile.doctor_id == Doctor.id)
+        .join(Doctor.tenant)
+        .where(
+            Doctor.is_active == True,  # noqa: E712
+            Doctor.is_deleted == False,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(Doctor.tenant_id == tenant_id)
+    if verification_status is not None and verification_status.strip() != "":
+        v = verification_status.strip().lower()
+        stmt = stmt.where(DoctorProfile.verification_status == v)
+    return int(db.scalar(stmt) or 0)
+
+
 def update_doctor(
     db: Session,
     doctor: Doctor,

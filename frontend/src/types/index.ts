@@ -193,6 +193,8 @@ export interface Doctor {
   availability_status?: 'available_today' | 'next_available_tomorrow' | 'none' | string | null;
   /** Marketplace verification on structured profile (patient trust / discovery). */
   verification_status?: string | null;
+  /** From GET /doctors when structured profile is approved. */
+  verified?: boolean;
 }
 
 export interface Appointment {

@@ -863,6 +863,11 @@ def get_doctors(
             "verification_status",
             prof.verification_status if prof is not None else None,
         )
+        setattr(
+            d,
+            "verified",
+            bool(prof is not None and prof.verification_status == "approved"),
+        )
         if include_availability_hint:
             if available_today:
                 setattr(d, "availability_status", "available_today")

@@ -45,6 +45,27 @@ class DoctorProfileWrite(BaseModel):
     state: str | None = None
 
 
+class DoctorVerificationQueueItem(BaseModel):
+    """One row for admin / super-admin review queues (GET /admin/doctor-profiles)."""
+
+    doctor_id: UUID
+    doctor_name: str
+    tenant_id: UUID
+    tenant_name: str
+    tenant_type: str
+    verification_status: str
+    verification_rejection_reason: str | None = None
+
+
+class DoctorVerificationQueuePage(BaseModel):
+    """Paginated queue for GET /admin/doctor-profiles."""
+
+    items: list[DoctorVerificationQueueItem]
+    total: int
+    skip: int
+    limit: int
+
+
 class DoctorProfileVerificationReview(BaseModel):
     """Admin/org: set marketplace verification on a doctor's structured profile."""
 

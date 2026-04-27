@@ -41,6 +41,7 @@ import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
 import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
+import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
 import { Signup } from './pages/Signup';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
@@ -273,6 +274,21 @@ function AnimatedRoutes() {
                     </AnimatedPage>
                   </AppLayout>
                 </SuperAdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/doctor-verifications"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <AppLayout user={user} onLogout={logout}>
+                  <AnimatedPage>
+                    <AdminDoctorVerificationsPage />
+                  </AnimatedPage>
+                </AppLayout>
               </StaffRoute>
             </ProtectedRoute>
           }

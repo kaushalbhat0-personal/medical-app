@@ -11,7 +11,10 @@ from app.core.database import Base
 class Doctor(Base):
     __tablename__ = "doctors"
 
-    __table_args__ = (UniqueConstraint("user_id", name="uq_doctors_user_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_doctors_user_id"),
+        Index("idx_doctors_tenant_active_listing", "tenant_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

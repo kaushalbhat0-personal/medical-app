@@ -68,6 +68,10 @@ class DoctorRead(BaseModel):
         default=None,
         description="Marketplace verification on structured profile: draft | pending | approved | rejected",
     )
+    verified: bool = Field(
+        default=False,
+        description="True when marketplace verification status is approved (badge-friendly).",
+    )
 
 
 class DoctorUpdate(BaseModel):

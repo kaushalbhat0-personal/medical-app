@@ -32,3 +32,10 @@ class AuthenticationError(ServiceError):
 class ForbiddenError(ServiceError):
     status_code = 403
     detail = "Forbidden"
+
+
+class StaleStateError(ServiceError):
+    """Optimistic-lock style conflict (e.g. verification already processed by another reviewer)."""
+
+    status_code = 409
+    detail = "Resource state changed; refresh and retry"

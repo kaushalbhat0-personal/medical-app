@@ -21,7 +21,7 @@ export function SuperAdminTenantGate({ user, children }: SuperAdminTenantGatePro
     return <>{children}</>;
   }
 
-  if (pathname === '/admin/tenants') {
+  if (pathname === '/admin/tenants' || pathname === '/admin/doctor-verifications') {
     return <>{children}</>;
   }
 

@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useDoctors } from '../hooks';
-import { doctorsApi } from '../services';
+import { useAuth } from '../hooks/useAuth';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { doctorsApi, doctorVerificationAdminApi } from '../services';
+import { getEffectiveRoles, canVerifyDoctorsInTenant, isSuperAdminRole } from '../utils/roles';
 import { formatDoctorName, formatDoctorInitials } from '../utils';
 import { ErrorState, EmptyState, Button, Card as CommonCard } from '../components/common';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +15,8 @@ import { SkeletonCard } from '../components/common/skeletons';
 import { FormWrapper, FormInput } from '../components/common';
 import { doctorSchema, type DoctorFormData, type DoctorFormInput } from '../validation';
 import { EMPTY_DOCTOR } from '../constants';
+import { cn } from '@/lib/utils';
+import type { Doctor } from '../types';
 
 function formatDoctorCreateError(err: unknown): string {
   const e = err as { detail?: string | { msg?: string }[]; message?: string };
@@ -39,9 +44,71 @@ function formatDoctorCreateError(err: unknown): string {
 
 export function Doctors() {
   const location = useLocation();
+  const { user } = useAuth();
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const canVerify = canVerifyDoctorsInTenant(user, token);
+  const superAdmin = isSuperAdminRole(getEffectiveRoles(user, token));
 
   // Data fetching via hook
   const { doctors, loading, error, refetch } = useDoctors();
+
+  const [rejectDoctor, setRejectDoctor] = useState<Doctor | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [verificationSubmitting, setVerificationSubmitting] = useState(false);
+  const rejectModalRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(rejectModalRef, Boolean(rejectDoctor));
+
+  const showVerifyActions = (d: Doctor) => {
+    if (!canVerify || (d.verification_status ?? '') !== 'pending') return false;
+    if (d.tenant_type === 'individual' && !superAdmin) return false;
+    return true;
+  };
+
+  const approveDoctor = async (d: Doctor) => {
+    const id = String(d.id);
+    setVerificationSubmitting(true);
+    try {
+      await doctorVerificationAdminApi.setVerification(id, { status: 'approved' });
+      toast.success('Doctor approved');
+      await refetch();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'detail' in err
+          ? String((err as { detail?: unknown }).detail)
+          : 'Approve failed';
+      toast.error(msg);
+    } finally {
+      setVerificationSubmitting(false);
+    }
+  };
+
+  const submitReject = async () => {
+    if (!rejectDoctor) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast.error('Enter a reason for rejection');
+      return;
+    }
+    setVerificationSubmitting(true);
+    try {
+      await doctorVerificationAdminApi.setVerification(String(rejectDoctor.id), {
+        status: 'rejected',
+        reason,
+      });
+      toast.success('Doctor rejected');
+      setRejectDoctor(null);
+      setRejectReason('');
+      await refetch();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'detail' in err
+          ? String((err as { detail?: unknown }).detail)
+          : 'Reject failed';
+      toast.error(msg);
+    } finally {
+      setVerificationSubmitting(false);
+    }
+  };
 
   // Form state - auto-show if navigated from Quick Actions
   const [showForm, setShowForm] = useState(() => (location.state as { showForm?: boolean })?.showForm ?? false);
@@ -239,6 +306,51 @@ export function Doctors() {
                   <p className="text-sm text-muted-foreground truncate">
                     {doctor.linked_user_email || doctor.user?.email || ''}
                   </p>
+                  {canVerify && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Marketplace:{' '}
+                      <span
+                        className={cn(
+                          'font-medium',
+                          doctor.verification_status === 'approved' && 'text-emerald-700',
+                          doctor.verification_status === 'pending' && 'text-amber-800',
+                          doctor.verification_status === 'rejected' && 'text-red-700'
+                        )}
+                      >
+                        {doctor.verification_status ?? '—'}
+                        {doctor.verified === true && (
+                          <span className="ml-1.5 text-emerald-700" title="Verified">
+                            ✓
+                          </span>
+                        )}
+                      </span>
+                    </p>
+                  )}
+                  {showVerifyActions(doctor) && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        disabled={verificationSubmitting}
+                        onClick={() => void approveDoctor(doctor)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        disabled={verificationSubmitting}
+                        onClick={() => {
+                          setRejectReason('');
+                          setRejectDoctor(doctor);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="danger"
@@ -251,6 +363,61 @@ export function Doctors() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {rejectDoctor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setRejectDoctor(null);
+          }}
+        >
+          <div
+            ref={rejectModalRef}
+            className={cn(
+              'w-full max-w-md rounded-xl border border-border bg-background shadow-lg',
+              'p-6 space-y-4'
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-doc-title"
+          >
+            <h2 id="reject-doc-title" className="text-lg font-semibold">
+              Reject verification
+            </h2>
+            <p className="text-sm text-muted-foreground">A reason is required before rejecting.</p>
+            <div className="space-y-2">
+              <label htmlFor="doc-reject-reason" className="text-sm font-medium">
+                Reason for rejection
+              </label>
+              <textarea
+                id="doc-reject-reason"
+                className={cn(
+                  'flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+                  'ring-offset-background placeholder:text-muted-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                )}
+                placeholder="Reason for rejection"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setRejectDoctor(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => void submitReject()}
+                disabled={verificationSubmitting || !rejectReason.trim()}
+              >
+                {verificationSubmitting ? 'Submitting…' : 'Reject'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

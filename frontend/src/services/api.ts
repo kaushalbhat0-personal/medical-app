@@ -26,7 +26,7 @@ if (import.meta.env.DEV) {
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000, // 60s — PaaS cold starts often exceed 15s
   headers: {
     'Content-Type': 'application/json',
   },
@@ -206,7 +206,7 @@ api.interceptors.response.use(
 // Keep retry rules conservative: we should not retry validation/auth errors.
 export const retryRequest = async <T>(
   fn: () => Promise<T>,
-  retries = 3,
+  retries = 2,
   delay = 2000
 ): Promise<T> => {
   try {

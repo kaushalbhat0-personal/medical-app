@@ -16,7 +16,7 @@ import type {
   RegisterPayload,
   RegisterResponse,
 } from '../types';
-import { authApi, formatLoginError, patientsApi } from '../services';
+import { api, authApi, formatLoginError, patientsApi } from '../services';
 import {
   doctorIdFromToken,
   doctorProfileCompleteFromToken,
@@ -322,6 +322,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         skipPatientProfileEffectRef.current = true;
       }
       setUser(userData);
+      try {
+        await api.get('/health');
+      } catch {
+        /* cold start — session is valid; subsequent calls retry */
+      }
       if (isPatientRole(userData.roles)) {
         await loadPatientProfile(userData);
       } else {
@@ -374,6 +379,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           skipPatientProfileEffectRef.current = true;
         }
         setUser(userData);
+
+        try {
+          await api.get('/health');
+        } catch {
+          /* cold start — wake worker before heavier routes */
+        }
 
         if (isPatientRole(userData.roles)) {
           await loadPatientProfile(userData);

@@ -19,6 +19,11 @@ export {
 } from './doctors';
 export type { DoctorAvailabilityWindow } from '../types';
 export { dashboardApi } from './dashboard';
+export {
+  doctorVerificationAdminApi,
+  type DoctorVerificationQueueItem,
+  type DoctorVerificationQueuePage,
+} from './doctorVerificationAdmin';
 export { tenantsApi } from './tenants';
 export { publicDiscoveryApi } from './publicDiscovery';
 export { usersApi, type OrganizationUserCreatePayload } from './users';

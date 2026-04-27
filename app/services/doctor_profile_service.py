@@ -3,14 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.crud import crud_doctor_profile
+from app.core.permissions import is_admin_or_owner
 from app.models.doctor import Doctor
 from app.models.doctor_profile import DoctorProfile
+from app.models.tenant import TenantType
+from app.models.user import User, UserRole
 from app.models.doctor_verification_log import DoctorVerificationLog
 from app.schemas.doctor_profile import DoctorProfileUpdate, DoctorProfileWrite
-from app.services.exceptions import ValidationError
+from app.services.exceptions import ForbiddenError, StaleStateError, ValidationError
 
 # Values stored in `doctor_profiles.verification_status` (String column).
 VERIFICATION_DRAFT = "draft"
@@ -28,18 +32,47 @@ def _append_verification_log(
     db: Session,
     *,
     doctor_id: UUID,
-    status: str,
+    from_status: str | None,
+    to_status: str,
     reason: str | None,
     reviewed_by_user_id: UUID | None,
+    tenant_id: UUID | None,
 ) -> None:
     db.add(
         DoctorVerificationLog(
             doctor_id=doctor_id,
-            status=status.strip().lower(),
+            from_status=from_status,
+            to_status=to_status.strip().lower(),
             reason=reason,
             reviewed_by_user_id=reviewed_by_user_id,
+            tenant_id=tenant_id,
         )
     )
+
+
+def _assert_admin_review_transition(
+    cur: str,
+    new: str,
+    *,
+    is_super_admin: bool,
+) -> None:
+    if cur == new:
+        return
+    allowed = {
+        VERIFICATION_DRAFT: {VERIFICATION_PENDING},
+        VERIFICATION_PENDING: {VERIFICATION_APPROVED, VERIFICATION_REJECTED},
+        VERIFICATION_REJECTED: {VERIFICATION_PENDING},
+        VERIFICATION_APPROVED: set(),
+    }
+    if new in allowed.get(cur, set()):
+        return
+    if is_super_admin and cur == VERIFICATION_APPROVED and new in (
+        VERIFICATION_PENDING,
+        VERIFICATION_REJECTED,
+        VERIFICATION_DRAFT,
+    ):
+        return
+    raise ForbiddenError(f"Invalid transition {cur} -> {new}")
 
 
 def _blank_to_none(s: str | None) -> str | None:
@@ -191,9 +224,10 @@ def submit_profile_for_verification(db: Session, doctor: Doctor) -> DoctorProfil
     recompute_is_complete(row)
     if not row.is_profile_complete:
         raise ValidationError("Complete your profile before submitting for verification")
-    if row.verification_status == VERIFICATION_PENDING:
+    cur = row.verification_status
+    if cur == VERIFICATION_PENDING:
         return row
-    if row.verification_status not in (VERIFICATION_DRAFT, VERIFICATION_REJECTED):
+    if cur not in (VERIFICATION_DRAFT, VERIFICATION_REJECTED):
         raise ValidationError("Profile cannot be submitted in its current state")
     row.verification_status = VERIFICATION_PENDING
     row.verification_rejection_reason = None
@@ -203,9 +237,11 @@ def submit_profile_for_verification(db: Session, doctor: Doctor) -> DoctorProfil
     _append_verification_log(
         db,
         doctor_id=doctor.id,
-        status=VERIFICATION_PENDING,
+        from_status=cur,
+        to_status=VERIFICATION_PENDING,
         reason=None,
         reviewed_by_user_id=None,
+        tenant_id=doctor.tenant_id,
     )
     db.flush()
     db.refresh(row)
@@ -219,35 +255,120 @@ def set_verification_status_admin(
     status: str,
     reason: str | None = None,
     reviewed_by_user_id: UUID | None = None,
+    is_super_admin: bool = False,
 ) -> DoctorProfile:
-    """Internal/admin: approve, reject, or re-open a profile for review."""
+    """Approve, reject, or re-open marketplace verification (atomic when moving from a known prior state)."""
     from app.services.doctor_service import get_doctor_or_404_with_tenant
 
     doctor = get_doctor_or_404_with_tenant(db, doctor_id)
     prof = ensure_profile_for_doctor(db, doctor)
+
     st = status.strip().lower()
-    if st == VERIFICATION_APPROVED:
-        prof.verification_status = VERIFICATION_APPROVED
-        prof.verification_rejection_reason = None
-    elif st == VERIFICATION_REJECTED:
-        prof.verification_status = VERIFICATION_REJECTED
-        prof.verification_rejection_reason = (reason or "").strip() or "No reason provided"
-    elif st == VERIFICATION_PENDING:
-        prof.verification_status = VERIFICATION_PENDING
-        prof.verification_rejection_reason = None
-    else:
+    if st not in (
+        VERIFICATION_APPROVED,
+        VERIFICATION_REJECTED,
+        VERIFICATION_PENDING,
+        VERIFICATION_DRAFT,
+    ):
         raise ValidationError("Invalid verification status")
-    prof.updated_at = datetime.now(timezone.utc)
-    db.add(prof)
+
+    cur = prof.verification_status
+    if cur == st:
+        return prof
+
+    _assert_admin_review_transition(cur, st, is_super_admin=is_super_admin)
+
+    if st == VERIFICATION_REJECTED:
+        if not (reason or "").strip():
+            raise ValidationError("Rejection reason required")
+        final_rej = (reason or "").strip() or "No reason provided"
+    else:
+        final_rej = None
+
+    now = datetime.now(timezone.utc)
+    tenant_for_log = doctor.tenant_id
+
+    upd = (
+        update(DoctorProfile)
+        .where(
+            DoctorProfile.doctor_id == doctor.id,
+            DoctorProfile.verification_status == cur,
+        )
+        .values(
+            verification_status=st,
+            verification_rejection_reason=final_rej if st == VERIFICATION_REJECTED else None,
+            updated_at=now,
+        )
+    )
+    res = db.execute(upd)
     db.flush()
-    log_reason = prof.verification_rejection_reason if st == VERIFICATION_REJECTED else None
+
+    if (res.rowcount or 0) == 0:
+        db.refresh(prof)
+        if prof.verification_status == st:
+            return prof
+        raise StaleStateError(
+            "Verification was updated by another reviewer; refresh and try again."
+        )
+
+    db.refresh(prof)
+    log_reason = final_rej if st == VERIFICATION_REJECTED else None
     _append_verification_log(
         db,
         doctor_id=doctor.id,
-        status=st,
+        from_status=cur,
+        to_status=st,
         reason=log_reason,
         reviewed_by_user_id=reviewed_by_user_id,
+        tenant_id=tenant_for_log,
     )
     db.flush()
     db.refresh(prof)
     return prof
+
+
+def can_verify_doctor_profile(
+    db: Session,
+    current_user: User,
+    doctor: Doctor,
+) -> bool:
+    """
+    True when this principal may set marketplace verification on ``doctor`` (single source of truth).
+
+    - ``individual`` tenant: only ``super_admin``.
+    - ``organization`` tenant: ``super_admin``, or an org admin/owner/staff member for that
+      same tenant (no cross-tenant verification).
+    """
+    try:
+        req: UUID | None = doctor.tenant_id if current_user.role != UserRole.super_admin else None
+        assert_user_can_verify_doctor(db, current_user, doctor, request_tenant_id=req)
+    except ForbiddenError:
+        return False
+    return True
+
+
+def assert_user_can_verify_doctor(
+    db: Session,
+    current_user: User,
+    doctor: Doctor,
+    *,
+    request_tenant_id: UUID | None = None,
+) -> None:
+    """Raise :class:`ForbiddenError` with a client-safe message when review is not allowed."""
+    t = doctor.tenant
+    if t is None or doctor.tenant_id is None:
+        raise ForbiddenError("Doctor has no tenant; cannot verify")
+    ttype = (t.type or "").strip().lower()
+    if ttype == TenantType.individual.value:
+        if current_user.role != UserRole.super_admin:
+            raise ForbiddenError("Only super admin can verify individual doctors")
+        return
+    if ttype == TenantType.organization.value:
+        if current_user.role == UserRole.super_admin:
+            return
+        if request_tenant_id is None or request_tenant_id != doctor.tenant_id:
+            raise ForbiddenError("Not allowed to verify this doctor")
+        if not is_admin_or_owner(db, current_user, doctor.tenant_id):
+            raise ForbiddenError("Not allowed to verify this doctor")
+        return
+    raise ForbiddenError("Not allowed to verify this doctor")
