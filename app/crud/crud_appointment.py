@@ -112,6 +112,7 @@ def get_appointments(
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
     list_type: str | None = None,
+    appt_status: AppointmentStatus | None = None,
 ) -> list[Appointment]:
     order_by: tuple = (Appointment.created_at.desc(),)
     if list_type == "past":
@@ -146,6 +147,8 @@ def get_appointments(
         stmt = stmt.join(Appointment.patient).where(Patient.user_id == user_id)
     if tenant_id is not None:
         stmt = stmt.where(Appointment.tenant_id == tenant_id)
+    if appt_status is not None:
+        stmt = stmt.where(Appointment.status == appt_status)
 
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).unique().all())

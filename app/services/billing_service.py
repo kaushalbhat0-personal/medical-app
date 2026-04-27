@@ -173,6 +173,14 @@ def create_bill(
         appointment = appointment_service.get_appointment_or_404(
             db, billing_in.appointment_id
         )
+        if appointment.patient_id is None:
+            raise ValidationError("Missing patient for this visit")
+        if (
+            tenant_id is not None
+            and appointment.tenant_id is not None
+            and appointment.tenant_id != tenant_id
+        ):
+            raise ForbiddenError("Invalid tenant access")
         _validate_appointment_not_cancelled(db, billing_in.appointment_id)
         _validate_no_duplicate_bill(db, billing_in.appointment_id)
         _validate_patient_matches_appointment(

@@ -26,7 +26,9 @@ function billCoversAppointment(bills: Bill[], appt: Appointment): boolean {
 export function DoctorBillsPage() {
   const { isIndependent, selfDoctor, isReadOnly } = useDoctorWorkspace();
   const { bills, patients: billingPatients, loading, error, refetch } = useBilling();
-  const { appointments, patients, loading: aptLoading, refetch: refetchApt } = useAppointments();
+  const { appointments, patients, loading: aptLoading, refetch: refetchApt } = useAppointments({
+    status: 'completed',
+  });
   const location = useLocation();
   const navigate = useNavigate();
 

@@ -17,6 +17,7 @@ from app.api.deps import (
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
+from app.models.appointment import AppointmentStatus
 from app.models.doctor import Doctor
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
@@ -65,6 +66,7 @@ def read_appointments(
     doctor_id: UUID | None = None,
     patient_id: UUID | None = None,
     appt_type: AppointmentListType | None = Query(default=None, alias="type"),
+    status: AppointmentStatus | None = Query(default=None, description="Filter by exact status"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
@@ -81,6 +83,7 @@ def read_appointments(
         tenant_id=tenant_id,
         acting_doctor=acting_doctor,
         list_type=appt_type.value if appt_type is not None else None,
+        appt_status=status,
         data_scope=data_scope,
     )
 

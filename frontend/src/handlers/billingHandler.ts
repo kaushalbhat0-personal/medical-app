@@ -72,6 +72,11 @@ export const payBillHandler = async (billId: string): Promise<void> => {
  * Fetch appointments for a specific patient
  */
 export const fetchPatientAppointmentsHandler = async (patientId: string): Promise<Appointment[]> => {
-  const appointments = await appointmentsApi.getAll({ patient_id: patientId });
+  const appointments = await appointmentsApi.getAll({
+    patient_id: patientId,
+    status: 'completed',
+    skip: 0,
+    limit: 100,
+  });
   return safeArray<Appointment>(appointments);
 };

@@ -92,8 +92,8 @@ def test_patient_books_appointment_appears_in_that_doctor_list(
 
     p = crud_patient.get_patient(db_session, appt.patient_id)
     assert p is not None
-    # Global patients have no org tenant; appointment carries doctor tenant.
-    assert p.tenant_id is None
+    # First booking with an org-scoped doctor aligns patient and visit to that tenant.
+    assert p.tenant_id == tenant.id
     assert appt.tenant_id == tenant.id
 
 

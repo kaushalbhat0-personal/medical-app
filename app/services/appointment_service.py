@@ -253,7 +253,13 @@ def create_appointment(
     _validate_appointment_time_in_future(appt_in.appointment_time)
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
-    appointment_data["tenant_id"] = doctor.tenant_id
+    # Prefer request org scope, then the patient's org; doctor tenant is fallback only.
+    if tenant_id is not None:
+        appointment_data["tenant_id"] = tenant_id
+    else:
+        appointment_data["tenant_id"] = (
+            patient_row.tenant_id or doctor.tenant_id
+        )
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
 
@@ -366,6 +372,7 @@ def get_appointments(
     *,
     acting_doctor: Doctor | None = None,
     list_type: str | None = None,
+    appt_status: AppointmentStatus | None = None,
     data_scope: ResolvedDataScope,
 ) -> list[Appointment]:
     _ensure_can_list_appointments(current_user)
@@ -406,6 +413,7 @@ def get_appointments(
         patient_id=eff_patient_id,
         tenant_id=eff_tenant_id,
         list_type=list_type,
+        appt_status=appt_status,
     )
     logger.info(
         "[APPOINTMENT_SCOPE] scope=%s eff_doctor_id=%s eff_tenant_id=%s user=%s returned=%d",
