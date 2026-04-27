@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 
 import pytest
 from httpx import AsyncClient
@@ -12,7 +12,9 @@ from app.crud.crud_appointment import add_appointment
 from app.models.appointment import AppointmentStatus
 from app.models.tenant import TenantType
 from app.models.user import UserRole
+from app.services import doctor_profile_service
 from tests.factories import (
+    add_weekly_availability,
     create_doctor_profile,
     create_patient_profile,
     create_tenant,
@@ -110,3 +112,66 @@ async def test_patients_me_doctors_requires_patient_and_returns_booked(
         headers={"Authorization": f"Bearer {tok_staff}"},
     )
     assert r2.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_public_doctor_profile_approved_and_draft_404(
+    client: AsyncClient, db_session: Session
+) -> None:
+    tenant = create_tenant(db_session, name="Clinic A", tenant_type=TenantType.organization)
+    doc_ok = create_doctor_profile(db_session, tenant_id=tenant.id)
+    doc_draft = create_doctor_profile(db_session, tenant_id=tenant.id)
+    from app.crud import crud_doctor_profile
+
+    prof = crud_doctor_profile.get_by_doctor_id(db_session, doc_draft.id)
+    assert prof is not None
+    prof.verification_status = doctor_profile_service.VERIFICATION_DRAFT
+    db_session.commit()
+
+    r_ok = await client.get(f"/api/v1/public/doctors/{doc_ok.id}")
+    assert r_ok.status_code == 200
+    body = r_ok.json()
+    assert body["id"] == str(doc_ok.id)
+    assert body["verified"] is True
+    assert body["verification_status"] == "approved"
+    assert "full_name" in body
+
+    r_404 = await client.get(f"/api/v1/public/doctors/{doc_draft.id}")
+    assert r_404.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_doctor_slots_unauthenticated_approved_only(
+    client: AsyncClient, db_session: Session
+) -> None:
+    from datetime import date
+
+    from zoneinfo import ZoneInfo
+
+    tenant = create_tenant(db_session, name="Clinic B", tenant_type=TenantType.organization)
+    doc = create_doctor_profile(db_session, tenant_id=tenant.id, timezone_name="Asia/Kolkata")
+    add_weekly_availability(
+        db_session,
+        doctor_id=doc.id,
+        tenant_id=tenant.id,
+        day_of_week=date.today().weekday(),
+        start=time(9, 0),
+        end=time(12, 0),
+        slot_duration=15,
+    )
+    db_session.commit()
+
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
+    r = await client.get(f"/api/v1/doctors/{doc.id}/slots", params={"date": today})
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+    from app.crud import crud_doctor_profile
+
+    prof = crud_doctor_profile.get_by_doctor_id(db_session, doc.id)
+    assert prof is not None
+    prof.verification_status = doctor_profile_service.VERIFICATION_DRAFT
+    db_session.commit()
+
+    r2 = await client.get(f"/api/v1/doctors/{doc.id}/slots", params={"date": today})
+    assert r2.status_code == 404

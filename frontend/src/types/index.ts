@@ -88,6 +88,23 @@ export interface PublicTenantDoctorBrief {
   specialization: string;
 }
 
+/** GET /public/doctors/{id} — approved marketplace profile only (404 otherwise) */
+export interface PublicDoctorProfile {
+  id: string;
+  full_name: string;
+  specialization: string;
+  experience: number;
+  qualification: string | null;
+  clinic_name: string | null;
+  address: string | null;
+  city: string | null;
+  profile_image: string | null;
+  verified: boolean;
+  verification_status: string;
+  timezone: string;
+  has_availability_windows: boolean;
+}
+
 /** GET /patients/me/doctors */
 export interface PatientMyDoctor {
   id: string;

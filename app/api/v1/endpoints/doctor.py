@@ -10,6 +10,7 @@ from app.api.deps import (
     get_current_user_optional,
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
+    get_optional_scoped_tenant_id_optional_user,
     get_scoped_tenant_id,
     get_scoped_tenant_id_active,
     require_current_user_admin_or_owner,
@@ -168,8 +169,8 @@ def read_doctor_slots(
         description="Calendar day (YYYY-MM-DD) in the doctor's configured timezone (IANA)",
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    current_user: User | None = Depends(get_current_user_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_optional_user),
 ) -> list[DoctorSlotRead]:
     return doctor_slot_service.get_doctor_slots_for_date(db, doctor_id, on_date, current_user, tenant_id)
 
@@ -194,8 +195,8 @@ def read_doctor_schedule_day(
         description="Maximum number of calendar days to scan for next available",
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    current_user: User | None = Depends(get_current_user_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_optional_user),
 ) -> DoctorScheduleDayRead:
     slots, full_off, next_s = doctor_slot_service.get_doctor_schedule_day(
         db,
@@ -235,8 +236,8 @@ def read_doctor_day_meta(
         description="Calendar day (YYYY-MM-DD) in the doctor's configured timezone (IANA)",
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    current_user: User | None = Depends(get_current_user_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_optional_user),
 ) -> DoctorDayMeta:
     full_day = doctor_slot_service.get_doctor_day_meta(db, doctor_id, on_date, current_user, tenant_id)
     return DoctorDayMeta(full_day_time_off=full_day)
@@ -257,8 +258,8 @@ def read_doctor_next_available_slot(
         description="Maximum number of calendar days to scan from the effective start date",
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
+    current_user: User | None = Depends(get_current_user_optional),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_optional_user),
 ) -> DoctorSlotRead | None:
     return doctor_slot_service.get_next_available_slot_for_doctor(
         db, doctor_id, from_date, current_user, tenant_id, horizon_days=horizon_days

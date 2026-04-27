@@ -492,6 +492,14 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="doctors/:doctorId"
+            element={
+              <AnimatedPage>
+                <PatientDoctorDetail />
+              </AnimatedPage>
+            }
+          />
+          <Route
             path="appointments"
             element={
               <AnimatedPage>

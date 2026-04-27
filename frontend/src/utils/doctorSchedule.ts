@@ -31,6 +31,30 @@ export function calendarTodayYmdInZone(_iana: string): string {
   }
 }
 
+/** Today's YYYY-MM-DD in a specific IANA zone (e.g. doctor schedule). */
+export function ymdNowInIana(iana: string | undefined | null): string {
+  const tz = (iana && iana.trim()) || DISPLAY_TIMEZONE;
+  try {
+    return dayjs.utc().tz(tz).format('YYYY-MM-DD');
+  } catch {
+    return calendarTodayYmdInZone('');
+  }
+}
+
+/** Add calendar days in *iana* (anchor at local noon to avoid DST edge issues). */
+export function ymdAddDaysInIana(ymd: string, iana: string | undefined | null, deltaDays: number): string {
+  const tz = (iana && iana.trim()) || DISPLAY_TIMEZONE;
+  try {
+    const anchor = dayjs.tz(`${ymd}T12:00:00`, tz);
+    if (!anchor.isValid()) {
+      return addDaysYmd(ymd, DISPLAY_TIMEZONE, deltaDays);
+    }
+    return anchor.add(deltaDays, 'day').format('YYYY-MM-DD');
+  } catch {
+    return addDaysYmd(ymd, DISPLAY_TIMEZONE, deltaDays);
+  }
+}
+
 export function addDaysYmd(ymd: string, _iana: string, deltaDays: number): string {
   const tz = DISPLAY_TIMEZONE;
   const anchor = dayjs.tz(`${ymd} 12:00:00`, tz);

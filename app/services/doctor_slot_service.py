@@ -274,11 +274,11 @@ def get_doctor_slots_for_date(
     db: Session,
     doctor_id: UUID,
     target_date: date,
-    current_user: User,
+    current_user: User | None,
     tenant_id: UUID | None,
 ) -> list[DoctorSlotRead]:
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
-    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    doctor_service.authorize_doctor_read_for_slots(db, doctor, current_user, tenant_id)
     return _get_cached_slots_for_doctor_date(db, doctor, target_date)
 
 
@@ -286,12 +286,12 @@ def get_doctor_day_meta(
     db: Session,
     doctor_id: UUID,
     target_date: date,
-    current_user: User,
+    current_user: User | None,
     tenant_id: UUID | None,
 ) -> bool:
     """True if the doctor has whole-day time off on target_date (no slots for that reason)."""
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
-    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    doctor_service.authorize_doctor_read_for_slots(db, doctor, current_user, tenant_id)
     time_off_rows = crud_doctor_availability.list_time_off_for_doctor_on_date(db, doctor.id, target_date)
     return _time_off_blocks_full_day(time_off_rows)
 
@@ -325,14 +325,14 @@ def get_next_available_slot_for_doctor(
     db: Session,
     doctor_id: UUID,
     from_date: date,
-    current_user: User,
+    current_user: User | None,
     tenant_id: UUID | None,
     *,
     horizon_days: int = 14,
 ) -> DoctorSlotRead | None:
     """First available future slot from from_date (inclusive), within horizon_days, in doctor local calendar."""
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
-    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    doctor_service.authorize_doctor_read_for_slots(db, doctor, current_user, tenant_id)
     return _next_available_from_doctor(
         db, doctor, from_date, horizon_days=horizon_days
     )
@@ -342,7 +342,7 @@ def get_doctor_schedule_day(
     db: Session,
     doctor_id: UUID,
     target_date: date,
-    current_user: User,
+    current_user: User | None,
     tenant_id: UUID | None,
     *,
     next_from: date | None = None,
@@ -353,7 +353,7 @@ def get_doctor_schedule_day(
     (or today in the doctor's timezone when *next_from* is None).
     """
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
-    doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
+    doctor_service.authorize_doctor_read_for_slots(db, doctor, current_user, tenant_id)
     slots = _get_cached_slots_for_doctor_date(db, doctor, target_date)
     time_off_rows = crud_doctor_availability.list_time_off_for_doctor_on_date(
         db, doctor.id, target_date

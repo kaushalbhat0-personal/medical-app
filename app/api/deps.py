@@ -234,6 +234,17 @@ def get_optional_scoped_tenant_id(
     return resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
 
 
+def get_optional_scoped_tenant_id_optional_user(
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> UUID | None:
+    """Like ``get_optional_scoped_tenant_id`` but when there is no Bearer token (public slot reads)."""
+    if current_user is None:
+        return None
+    return resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
+
+
 def get_optional_scoped_tenant_id_active(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),

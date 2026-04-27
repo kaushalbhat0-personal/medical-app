@@ -11,11 +11,7 @@ import {
 } from '../../services';
 import { runAfterBookingSuccess } from '../../utils/bookingDataRefresh';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
-import {
-  calendarTodayYmdInZone,
-  dedupeDoctorSlots,
-  isSlotInstantInTheFuture,
-} from '../../utils/doctorSchedule';
+import { dedupeDoctorSlots, isSlotInstantInTheFuture, ymdNowInIana } from '../../utils/doctorSchedule';
 import { useModalFocusTrap } from '../useModalFocusTrap';
 import type { Appointment, Doctor } from '../../types';
 import { findNextAvailableSlotKey } from '../../utils/slotTimeGroups';
@@ -24,7 +20,9 @@ export function usePatientDoctorBookingPanel(
   patientId: string | null,
   bookingDoctor: Doctor | null,
   onExit: () => void,
-  onBooked: (a: Appointment) => void
+  onBooked: (a: Appointment) => void,
+  /** Doctor IANA zone for "today" / default date (defaults to India display zone). */
+  scheduleTimeZone?: string | null
 ) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [bookDate, setBookDate] = useState('');
@@ -40,7 +38,8 @@ export function usePatientDoctorBookingPanel(
   const slotsRequestIdRef = useRef(0);
   const slotsFetchAbortRef = useRef<AbortController | null>(null);
 
-  const doctorTodayYmd = calendarTodayYmdInZone(DISPLAY_TIMEZONE);
+  const scheduleTz = (scheduleTimeZone && scheduleTimeZone.trim()) || DISPLAY_TIMEZONE;
+  const doctorTodayYmd = ymdNowInIana(scheduleTz);
   const nextAvailableKey = findNextAvailableSlotKey(slots, bookDate, doctorTodayYmd);
 
   useModalFocusTrap(dialogRef, confirmOpen && Boolean(bookingDoctor));
@@ -92,12 +91,12 @@ export function usePatientDoctorBookingPanel(
       return;
     }
     setBookingIdempotencyKey(crypto.randomUUID());
-    setBookDate(calendarTodayYmdInZone(DISPLAY_TIMEZONE));
+    setBookDate(ymdNowInIana(scheduleTz));
     setSlots([]);
     setSlotsError(null);
     setSelectedSlotStart(null);
     setConfirmOpen(false);
-  }, [bookingDoctor?.id]);
+  }, [bookingDoctor?.id, scheduleTz]);
 
   useEffect(() => {
     if (!confirmOpen) return;
@@ -123,7 +122,6 @@ export function usePatientDoctorBookingPanel(
         signal = ac.signal;
         setSlotsLoading(true);
         setSlotsError(null);
-        setSelectedSlotStart(null);
       }
       try {
         const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, {
@@ -131,7 +129,12 @@ export function usePatientDoctorBookingPanel(
           skipCache: true,
         });
         if (reqId !== slotsRequestIdRef.current) return;
-        setSlots(dedupeDoctorSlots(list));
+        const deduped = dedupeDoctorSlots(list);
+        setSlots(deduped);
+        setSelectedSlotStart((cur) => {
+          if (cur && deduped.some((s) => s.start === cur && s.available)) return cur;
+          return null;
+        });
         if (mode === 'poll') setSlotsError(null);
       } catch (e) {
         if (axios.isCancel(e)) return;

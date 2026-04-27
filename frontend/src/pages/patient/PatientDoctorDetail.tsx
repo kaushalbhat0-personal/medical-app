@@ -1,36 +1,83 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, Building2, Loader2, Star } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { doctorsApi } from '../../services';
-import type { Doctor } from '../../types';
+import { doctorsApi, publicDiscoveryApi, type DoctorScheduleDay, type DoctorSlot } from '../../services';
+import type { Doctor, PublicDoctorProfile } from '../../types';
 import { useLinkedPatient } from '../../hooks';
 import { usePatientDoctorBookingPanel } from '../../hooks/patient/usePatientDoctorBookingPanel';
 import { ErrorState } from '../../components/common';
 import { formatDoctorName } from '../../utils';
 import { DoctorSlotPicker } from '../../components/patient/DoctorSlotPicker';
+import {
+  DoctorProfileAbout,
+  DoctorProfileAvailabilitySummary,
+  DoctorProfileClinic,
+  DoctorProfileHero,
+} from '../../components/patient/DoctorPublicProfileBlocks';
 import { formatSlotTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
+import { ymdAddDaysInIana, ymdNowInIana } from '../../utils/doctorSchedule';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY, PATIENT_CLINIC_BOOKING_SCOPE_KEY } from '../../constants/patient';
 import { Button } from '@/components/ui/button';
-import { mockRatingFromId, mockReviewCountFromId } from '@/lib/patient/mockDoctorPresentation';
+
+function publicToBookingDoctor(p: PublicDoctorProfile): Doctor {
+  return {
+    id: p.id,
+    name: p.full_name,
+    specialization: p.specialization,
+    experience_years: p.experience,
+    verification_status: p.verification_status,
+    verified: p.verified,
+    has_availability_windows: p.has_availability_windows,
+    timezone: p.timezone,
+  };
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="space-y-4 pb-28">
+      <div className="flex gap-4">
+        <div className="h-24 w-24 shrink-0 animate-pulse rounded-2xl bg-muted" />
+        <div className="flex-1 space-y-2">
+          <div className="h-6 w-48 animate-pulse rounded-md bg-muted" />
+          <div className="h-4 w-36 animate-pulse rounded-md bg-muted" />
+        </div>
+      </div>
+      <div className="h-32 animate-pulse rounded-2xl bg-muted" />
+      <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+    </div>
+  );
+}
 
 export function PatientDoctorDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id, doctorId } = useParams<{ id?: string; doctorId?: string }>();
+  const rawParam = doctorId ?? id;
   const navigate = useNavigate();
   const { state: routeState } = useLocation();
   const tenantFromRoute = (routeState as { tenantId?: string } | null)?.tenantId;
   const { patientId, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLinkedPatient();
-  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [publicDoctor, setPublicDoctor] = useState<PublicDoctorProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [avLoading, setAvLoading] = useState(false);
+  const [avError, setAvError] = useState<string | null>(null);
+  const [todayYmd, setTodayYmd] = useState('');
+  const [tomorrowYmd, setTomorrowYmd] = useState('');
+  const [summaryDay, setSummaryDay] = useState<DoctorScheduleDay | null>(null);
+  const [tomorrowSlots, setTomorrowSlots] = useState<DoctorSlot[]>([]);
+
+  const bookingDoctor = useMemo(
+    () => (publicDoctor ? publicToBookingDoctor(publicDoctor) : null),
+    [publicDoctor]
+  );
 
   const booking = usePatientDoctorBookingPanel(
     patientId,
-    doctor,
+    bookingDoctor,
     () => {},
     (created) => {
       try {
@@ -39,7 +86,8 @@ export function PatientDoctorDetail() {
         /* */
       }
       navigate('/patient/appointments', { state: { seedAppointment: created } });
-    }
+    },
+    publicDoctor?.timezone ?? null
   );
 
   useEffect(() => {
@@ -53,19 +101,25 @@ export function PatientDoctorDetail() {
   }, [tenantFromRoute]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!rawParam) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setLoadError(null);
+      setPublicDoctor(null);
       try {
-        const d = await doctorsApi.getOne(id);
-        if (!cancelled) setDoctor(d);
+        const p = await publicDiscoveryApi.getDoctor(rawParam);
+        if (!cancelled) setPublicDoctor(p);
       } catch (e) {
         if (axios.isCancel(e)) return;
-        if (!cancelled) {
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          if (!cancelled) {
+            setLoadError('This doctor is not available for booking.');
+            setPublicDoctor(null);
+          }
+        } else if (!cancelled) {
           setLoadError('Could not load this doctor.');
-          setDoctor(null);
+          setPublicDoctor(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -74,36 +128,59 @@ export function PatientDoctorDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [rawParam]);
 
-  if (!id) {
+  useEffect(() => {
+    if (!publicDoctor) return;
+    const tz = publicDoctor.timezone;
+    const t0 = ymdNowInIana(tz);
+    const t1 = ymdAddDaysInIana(t0, tz, 1);
+    setTodayYmd(t0);
+    setTomorrowYmd(t1);
+    let cancelled = false;
+    (async () => {
+      setAvLoading(true);
+      setAvError(null);
+      setSummaryDay(null);
+      setTomorrowSlots([]);
+      try {
+        const [day, tom] = await Promise.all([
+          doctorsApi.getScheduleDay(publicDoctor.id, t0, { fromYmd: t0, skipSlotsCache: true }),
+          doctorsApi.getSlots(publicDoctor.id, t1, { skipCache: true }),
+        ]);
+        if (cancelled) return;
+        setSummaryDay(day);
+        setTomorrowSlots(tom);
+      } catch {
+        if (!cancelled) setAvError('Could not load availability.');
+      } finally {
+        if (!cancelled) setAvLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicDoctor?.id, publicDoctor?.timezone]);
+
+  if (!rawParam) {
     return <ErrorState title="Missing doctor" description="Go back to search for a provider." />;
   }
 
   if (loadError) {
-    return <ErrorState title="Doctor unavailable" description={loadError} />;
+    return <ErrorState title="Doctor not available" description={loadError} />;
   }
 
-  if (loading || !doctor) {
-    return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        Loading doctor…
-      </div>
-    );
+  if (loading || !publicDoctor) {
+    return <ProfileSkeleton />;
   }
 
-  const name = formatDoctorName(doctor);
-  const spec = doctor.specialization || doctor.specialty || 'Specialist';
-  const rating = mockRatingFromId(String(doctor.id));
-  const reviews = mockReviewCountFromId(String(doctor.id));
-  const isVerifiedProvider = (doctor.verification_status ?? null) === 'approved';
+  if (publicDoctor.verification_status !== 'approved') {
+    return <ErrorState title="Doctor not available" description="This provider is not on the public network." />;
+  }
+
+  const name = formatDoctorName(bookingDoctor!);
   const blocked =
-    !patientId || doctor.has_availability_windows === false || !isVerifiedProvider;
-  const aboutText =
-    doctor.experience_years != null
-      ? `${name} is a ${spec.toLowerCase()} with ${doctor.experience_years}+ years of experience. Book a convenient slot in two taps.`
-      : `${name} is a ${spec.toLowerCase()}. ${tenantLine(doctor) || 'Book online in two taps.'}`.trim();
+    !patientId || publicDoctor.has_availability_windows === false;
 
   return (
     <div className="space-y-6 pb-28">
@@ -116,34 +193,7 @@ export function PatientDoctorDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 text-2xl font-bold text-primary ring-1 ring-primary/10">
-              {name
-                .split(/\s+/)
-                .map((p) => p[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
-                {name}
-                {isVerifiedProvider ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
-                    <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-                    Verified doctor
-                  </span>
-                ) : null}
-              </h1>
-              <p className="mt-0.5 text-sm font-medium text-primary/90">{spec}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-amber-700">
-                <span className="inline-flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
-                  {rating.toFixed(1)} · {reviews} reviews
-                </span>
-              </div>
-            </div>
-          </div>
+          <DoctorProfileHero doctor={publicDoctor} />
         </div>
       </div>
 
@@ -156,31 +206,29 @@ export function PatientDoctorDetail() {
         </p>
       )}
 
-      <section className="rounded-2xl border border-border/80 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-foreground">About</h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{aboutText}</p>
-      </section>
+      <DoctorProfileAbout doctor={publicDoctor} />
+      <DoctorProfileClinic doctor={publicDoctor} />
 
-      <section className="rounded-2xl border border-border/80 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-foreground">Clinic</h2>
-        <div className="mt-3 flex items-start gap-2">
-          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div>
-            <p className="text-sm font-medium text-foreground">{doctor.tenant_name || 'On the network'}</p>
-            <p className="text-xs text-muted-foreground">
-              {[doctor.tenant_organization_label, doctor.tenant_type].filter(Boolean).join(' · ') || 'Health provider'}
-            </p>
-          </div>
-        </div>
-      </section>
+      <DoctorProfileAvailabilitySummary
+        loading={avLoading}
+        error={avError}
+        nextAvailable={summaryDay?.next_available ?? null}
+        todayYmd={todayYmd}
+        tomorrowYmd={tomorrowYmd}
+        todaySlots={summaryDay?.slots ?? []}
+        tomorrowSlots={tomorrowSlots}
+        selectedStart={booking.selectedSlotStart}
+        onPickSlot={(iso, ymd) => {
+          booking.setBookDate(ymd);
+          booking.setSelectedSlotStart(iso);
+        }}
+      />
 
       {blocked && (
         <p className="text-sm text-amber-800" role="status">
-          {!isVerifiedProvider
-            ? 'This provider is not available for booking yet.'
-            : doctor.has_availability_windows === false
-              ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
-              : 'Connect your profile to book.'}
+          {publicDoctor.has_availability_windows === false
+            ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
+            : 'Connect your profile to book.'}
         </p>
       )}
 
@@ -304,9 +352,4 @@ export function PatientDoctorDetail() {
       )}
     </div>
   );
-}
-
-function tenantLine(d: Doctor): string {
-  if (d.tenant_name) return `Practices at ${d.tenant_name}.`;
-  return '';
 }

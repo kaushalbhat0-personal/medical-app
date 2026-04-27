@@ -342,7 +342,22 @@ def authorize_doctor_read(
         )
 
 
-
+def authorize_doctor_read_for_slots(
+    db: Session,
+    doctor: Doctor,
+    current_user: User | None,
+    tenant_id: UUID | None,
+) -> None:
+    """
+    Slot listing: authenticated users follow normal RBAC; unauthenticated callers may only
+    read slots for doctors with marketplace-approved structured profiles (discovery trust).
+    """
+    if current_user is not None:
+        authorize_doctor_read(db, doctor, current_user, tenant_id)
+        return
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
+    if prof is None or prof.verification_status != doctor_profile_service.VERIFICATION_APPROVED:
+        raise NotFoundError("Doctor not found")
 
 
 def authorize_doctor_update(
