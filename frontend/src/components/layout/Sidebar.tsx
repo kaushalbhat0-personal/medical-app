@@ -170,7 +170,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
               icon={item.icon}
               isCollapsed={isCollapsed}
               onNavigate={onClose}
-              title={isDoctorOnly ? doctorNavItemHint(user, token, item.path) : undefined}
+              title={isDoctorOnly ? doctorNavItemHint(user, item.path) : undefined}
             />
           ))}
         </ul>

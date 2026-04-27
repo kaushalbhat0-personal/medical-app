@@ -57,7 +57,7 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
               isCollapsed={false}
               onNavigate={onClose}
               disabled={isDoctorNavItemLocked(user, token, item.path)}
-              title={doctorNavItemHint(user, token, item.path)}
+              title={doctorNavItemHint(user, item.path)}
             />
           ))}
         </ul>

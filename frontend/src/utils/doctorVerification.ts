@@ -70,11 +70,7 @@ export function getDoctorVerificationRestrictedRedirect(
 }
 
 /** Optional nav hint for pending review (read-mostly exploration). */
-export function doctorNavItemHint(
-  user: User | null | undefined,
-  token: string | null,
-  path: string
-): string | undefined {
+export function doctorNavItemHint(user: User | null | undefined, path: string): string | undefined {
   if (user?.doctor_verification_status !== 'pending') return undefined;
   if (path === '/doctor/dashboard' || path === '/complete-profile') return undefined;
   return 'Under review — some actions stay limited until you are verified';
