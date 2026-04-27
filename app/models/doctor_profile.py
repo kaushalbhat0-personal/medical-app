@@ -50,8 +50,8 @@ class DoctorProfile(Base):
     verification_status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
-        default="pending",
-        server_default="pending",
+        default="draft",
+        server_default="draft",
     )
     verification_rejection_reason: Mapped[str | None] = mapped_column(
         Text, nullable=True, default=None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -15,6 +16,8 @@ from app.models.user import User, UserRole
 from app.models.doctor_verification_log import DoctorVerificationLog
 from app.schemas.doctor_profile import DoctorProfileUpdate, DoctorProfileWrite
 from app.services.exceptions import ForbiddenError, StaleStateError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 # Values stored in `doctor_profiles.verification_status` (String column).
 VERIFICATION_DRAFT = "draft"
@@ -167,6 +170,7 @@ def upsert_profile_from_write(
                 "verification_status": VERIFICATION_DRAFT,
             },
         )
+    # Do not change verification_status on update; only submit_for_verification (or admin) may set pending.
     _apply_write_model(row, payload)
     row.updated_at = datetime.now(timezone.utc)
     recompute_is_complete(row)
@@ -223,7 +227,7 @@ def submit_profile_for_verification(db: Session, doctor: Doctor) -> DoctorProfil
     row = ensure_profile_for_doctor(db, doctor)
     recompute_is_complete(row)
     if not row.is_profile_complete:
-        raise ValidationError("Complete your profile before submitting for verification")
+        raise ValidationError("Profile incomplete")
     cur = row.verification_status
     if cur == VERIFICATION_PENDING:
         return row
@@ -234,6 +238,12 @@ def submit_profile_for_verification(db: Session, doctor: Doctor) -> DoctorProfil
     row.updated_at = datetime.now(timezone.utc)
     db.add(row)
     db.flush()
+    logger.info(
+        "[VERIFICATION_SUBMIT] doctor_id=%s status=%s -> %s",
+        doctor.id,
+        cur,
+        VERIFICATION_PENDING,
+    )
     _append_verification_log(
         db,
         doctor_id=doctor.id,
