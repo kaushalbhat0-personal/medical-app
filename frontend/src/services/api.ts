@@ -11,6 +11,11 @@
  */
 
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+
+/** Strip auto `X-Tenant-ID` so super-admins can load the global doctor verification queue. */
+export type TenantScopedRequestConfig = InternalAxiosRequestConfig & {
+  __allTenantsDoctorVerification?: boolean;
+};
 import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
@@ -58,8 +63,14 @@ api.interceptors.request.use(
 
     if (config.headers) {
       // Multi-tenant: X-Tenant-ID = active org; X-Data-Scope = doctor (practice) vs tenant (admin).
-      const hasExplicit = config.headers['X-Tenant-ID'] != null;
-      if (!hasExplicit) {
+      const ext = config as TenantScopedRequestConfig;
+      const rawHeader = config.headers['X-Tenant-ID'];
+      const hasExplicit =
+        rawHeader != null && rawHeader !== '' && String(rawHeader).trim() !== '';
+
+      if (ext.__allTenantsDoctorVerification) {
+        delete (config.headers as Record<string, unknown>)['X-Tenant-ID'];
+      } else if (!hasExplicit) {
         const activeTenantId = getActiveTenantId();
         const tenantId = activeTenantId ?? getTenantIdForRequest();
         if (tenantId) {

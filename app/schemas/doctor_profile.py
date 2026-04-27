@@ -57,6 +57,15 @@ class DoctorVerificationQueueItem(BaseModel):
     verification_rejection_reason: str | None = None
 
 
+class DoctorVerificationQueueCounts(BaseModel):
+    """Aggregate counts for the verification queue (same tenant scope as the list)."""
+
+    pending: int
+    approved: int
+    rejected: int
+    draft: int
+
+
 class DoctorVerificationQueuePage(BaseModel):
     """Paginated queue for GET /admin/doctor-profiles."""
 
@@ -64,6 +73,7 @@ class DoctorVerificationQueuePage(BaseModel):
     total: int
     skip: int
     limit: int
+    counts: DoctorVerificationQueueCounts
 
 
 class DoctorProfileVerificationReview(BaseModel):

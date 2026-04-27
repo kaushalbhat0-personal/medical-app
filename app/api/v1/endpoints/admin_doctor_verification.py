@@ -11,12 +11,13 @@ from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.permissions import is_admin_or_owner
 from app.core.tenant_context import resolve_request_tenant
-from app.crud import crud_doctor
+from app.crud import crud_doctor, crud_doctor_profile
 from app.models.doctor import Doctor
 from app.models.user import User, UserRole
 from app.schemas.doctor_profile import (
     DoctorProfileRead,
     DoctorProfileVerificationReview,
+    DoctorVerificationQueueCounts,
     DoctorVerificationQueueItem,
     DoctorVerificationQueuePage,
 )
@@ -82,6 +83,20 @@ def list_doctor_verification_queue(
 
     v_raw = (verification_status or "").strip()
     v_filter: str | None = v_raw.lower() if v_raw else None
+    counts = DoctorVerificationQueueCounts(
+        pending=crud_doctor.count_doctors_with_verification_status(
+            db, tenant_id=scope_tenant, verification_status="pending"
+        ),
+        approved=crud_doctor.count_doctors_with_verification_status(
+            db, tenant_id=scope_tenant, verification_status="approved"
+        ),
+        rejected=crud_doctor.count_doctors_with_verification_status(
+            db, tenant_id=scope_tenant, verification_status="rejected"
+        ),
+        draft=crud_doctor.count_doctors_with_verification_status(
+            db, tenant_id=scope_tenant, verification_status="draft"
+        ),
+    )
     total = crud_doctor.count_doctors_with_verification_status(
         db,
         tenant_id=scope_tenant,
@@ -99,7 +114,46 @@ def list_doctor_verification_queue(
         total=total,
         skip=skip,
         limit=limit,
+        counts=counts,
     )
+
+
+@router.get("/doctor-profiles/{doctor_id}", response_model=DoctorProfileRead)
+def get_doctor_profile_for_verification_review(
+    doctor_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
+) -> DoctorProfileRead:
+    """Load structured profile fields for the review panel (same access rules as PATCH verification)."""
+    try:
+        request_tenant = resolve_request_tenant(db, current_user, x_tenant_id)
+    except (ForbiddenError, ValidationError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN
+            if isinstance(e, ForbiddenError)
+            else status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
+    doctor = get_doctor_or_404_with_tenant(db, doctor_id)
+    try:
+        doctor_profile_service.assert_user_can_verify_doctor(
+            db,
+            current_user,
+            doctor,
+            request_tenant_id=request_tenant,
+        )
+    except ForbiddenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        ) from e
+
+    row = crud_doctor_profile.get_by_doctor_id(db, doctor_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+    return DoctorProfileRead.model_validate(row)
 
 
 @router.patch("/doctor-profiles/{doctor_id}/verification", response_model=DoctorProfileRead)
