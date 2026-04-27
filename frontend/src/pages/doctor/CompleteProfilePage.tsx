@@ -133,26 +133,40 @@ export function CompleteProfilePage() {
     hydratedDoctorIdRef.current = doctorProfile.id;
   }, [doctorProfile, reset]);
 
+  function buildProfilePayload(data: CompleteStructuredDoctorProfileFormData) {
+    return {
+      full_name: data.full_name,
+      phone: data.phone,
+      profile_image: data.profile_image || null,
+      specialization: data.specialization,
+      experience_years: data.experience_years,
+      qualification: data.qualification || null,
+      registration_number: data.registration_number,
+      registration_council: data.registration_council,
+      clinic_name: data.clinic_name || null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || null,
+    };
+  }
+
+  const persistProfile = async (
+    data: CompleteStructuredDoctorProfileFormData,
+    opts: { submitForReview: boolean }
+  ) => {
+    const payload = buildProfilePayload(data);
+    await retryRequest(() => doctorProfileApi.put(payload), 2, 2000);
+    if (opts.submitForReview) {
+      await doctorProfileApi.submitForVerification();
+    }
+    await refreshUser();
+    toast.success(opts.submitForReview ? 'Submitted for review' : 'Profile saved');
+    navigate(doctorHomePath(), { replace: true });
+  };
+
   const onSubmit = async (data: CompleteStructuredDoctorProfileFormData) => {
     try {
-      const payload = {
-        full_name: data.full_name,
-        phone: data.phone,
-        profile_image: data.profile_image || null,
-        specialization: data.specialization,
-        experience_years: data.experience_years,
-        qualification: data.qualification || null,
-        registration_number: data.registration_number,
-        registration_council: data.registration_council,
-        clinic_name: data.clinic_name || null,
-        address: data.address || null,
-        city: data.city || null,
-        state: data.state || null,
-      };
-      await retryRequest(() => doctorProfileApi.put(payload), 2, 2000);
-      await refreshUser();
-      toast.success('Profile saved');
-      navigate(doctorHomePath(), { replace: true });
+      await persistProfile(data, { submitForReview: !rejected });
     } catch (e: unknown) {
       console.error(e);
       const err = e as {
@@ -167,10 +181,32 @@ export function CompleteProfilePage() {
       ) {
         toast('Server is starting… please wait ⏳');
       } else {
-        toast.error('Failed to save profile');
+        toast.error(rejected ? 'Failed to save profile' : 'Could not submit for verification');
       }
     }
   };
+
+  const onResubmitForVerification = handleSubmit(async (data: CompleteStructuredDoctorProfileFormData) => {
+    try {
+      await persistProfile(data, { submitForReview: true });
+    } catch (e: unknown) {
+      console.error(e);
+      const err = e as {
+        code?: string;
+        __coldStart?: boolean;
+        originalError?: { code?: string };
+      };
+      if (
+        err?.__coldStart === true ||
+        err?.code === 'ECONNABORTED' ||
+        err?.originalError?.code === 'ECONNABORTED'
+      ) {
+        toast('Server is starting… please wait ⏳');
+      } else {
+        toast.error('Could not resubmit for verification');
+      }
+    }
+  });
 
   if (isLoading) {
     return (
@@ -361,7 +397,7 @@ export function CompleteProfilePage() {
         </Card>
       </div>
       <div className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
           <Button
             form="complete-profile-form"
             type="submit"
@@ -371,11 +407,25 @@ export function CompleteProfilePage() {
             isLoading={isSubmitting}
           >
             {isSubmitting
-              ? 'Saving...'
+              ? rejected
+                ? 'Saving...'
+                : 'Submitting...'
               : rejected
                 ? 'Save changes'
-                : 'Save and continue'}
+                : 'Submit for verification'}
           </Button>
+          {rejected && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={() => void onResubmitForVerification()}
+            >
+              Resubmit for verification
+            </Button>
+          )}
         </div>
       </div>
     </div>

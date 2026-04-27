@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth';
 import { doctorVerificationAdminApi, type DoctorVerificationQueueItem } from '../services/doctorVerificationAdmin';
 import { getEffectiveRoles, canVerifyDoctorsInTenant } from '../utils/roles';
 import { Button } from '../components/common';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { ErrorState } from '../components/common';

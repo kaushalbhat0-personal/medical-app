@@ -10,7 +10,16 @@ export function normalizeRoles(roles: string | string[] | null | undefined): str
   return [String(roles).toLowerCase()];
 }
 
-type RoleHint = { roles?: string[]; role?: string } | null | undefined;
+export type RoleHint = { roles?: string[]; role?: string } | null | undefined;
+
+/** User shape for tenant-scoped checks that also need merged JWT roles. */
+export type TenantVerifyUser =
+  | (NonNullable<RoleHint> & {
+      tenant?: { type?: string } | null;
+      is_owner?: boolean;
+    })
+  | null
+  | undefined;
 
 /** Merge role lists from multiple sources (local user blob, JWT). Preserves first-seen order, dedupes. */
 export function mergeRoleSources(
@@ -91,7 +100,7 @@ export function isSuperAdminRole(roles: string | string[] | null | undefined): b
  * Solo individual-practice doctors never get approval UI (tenant.type must be `organization`).
  */
 export function canVerifyDoctorsInTenant(
-  user: { tenant?: { type?: string } | null; is_owner?: boolean } | null | undefined,
+  user: TenantVerifyUser,
   token: string | null
 ): boolean {
   const eff = getEffectiveRoles(user, token);

@@ -1,12 +1,30 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.doctor import Doctor, DoctorCreationIdempotency
 from app.models.doctor_profile import DoctorProfile
 from app.models.tenant import Tenant
+
+
+def _doctor_profile_verification_clause(verification_status_normalized: str):
+    """
+    Filter by marketplace status. For ``pending``, require core identity fields so admins
+    never review rows that could not have been submitted legitimately via the doctor API.
+    """
+    v = verification_status_normalized.strip().lower()
+    base = DoctorProfile.verification_status == v
+    if v != "pending":
+        return base
+    return and_(
+        base,
+        DoctorProfile.full_name.isnot(None),
+        DoctorProfile.specialization.isnot(None),
+        DoctorProfile.registration_number.isnot(None),
+        DoctorProfile.phone.isnot(None),
+    )
 
 
 def get_doctor_idempotency_record(
@@ -146,6 +164,9 @@ def list_doctors_with_verification_status(
     Doctors with a ``doctor_profiles`` row, optionally filtered by marketplace verification status.
 
     ``tenant_id`` None = all tenants (super-admin global view); else scope to one organization.
+
+    When filtering by ``pending``, rows must have ``full_name``, ``specialization``,
+    ``registration_number``, and ``phone`` set (non-NULL) so the admin queue stays clean.
     """
     stmt = (
         select(Doctor)
@@ -166,8 +187,7 @@ def list_doctors_with_verification_status(
     if tenant_id is not None:
         stmt = stmt.where(Doctor.tenant_id == tenant_id)
     if verification_status is not None and verification_status.strip() != "":
-        v = verification_status.strip().lower()
-        stmt = stmt.where(DoctorProfile.verification_status == v)
+        stmt = stmt.where(_doctor_profile_verification_clause(verification_status))
     stmt = stmt.offset(skip).limit(limit)
     return list(db.scalars(stmt).unique().all())
 
@@ -193,8 +213,7 @@ def count_doctors_with_verification_status(
     if tenant_id is not None:
         stmt = stmt.where(Doctor.tenant_id == tenant_id)
     if verification_status is not None and verification_status.strip() != "":
-        v = verification_status.strip().lower()
-        stmt = stmt.where(DoctorProfile.verification_status == v)
+        stmt = stmt.where(_doctor_profile_verification_clause(verification_status))
     return int(db.scalar(stmt) or 0)
 
 

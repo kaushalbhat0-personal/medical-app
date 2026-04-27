@@ -135,10 +135,13 @@ function DoctorLayoutInner() {
             <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 {vstat === 'pending' && (
-                  <p>
-                    Your profile is under review. You’ll be able to accept patients and use scheduling once
-                    verified.
-                  </p>
+                  <div>
+                    <p className="font-semibold tracking-tight">Under review</p>
+                    <p className="mt-1 text-sm font-normal opacity-90">
+                      Your profile is being verified. You’ll unlock patients, scheduling, and billing once
+                      approved.
+                    </p>
+                  </div>
                 )}
                 {vstat === 'draft' && (
                   <p>
