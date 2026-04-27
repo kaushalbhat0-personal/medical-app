@@ -203,6 +203,18 @@ export function appointmentCalendarDayYmd(iso: string, _iana: string): string {
   }
 }
 
+/** Calendar YYYY-MM-DD for a UTC ISO instant in a specific IANA zone (e.g. doctor schedule). */
+export function calendarDayYmdForInstantInZone(iso: string, iana: string | null | undefined): string {
+  const tz = (iana && iana.trim()) || DISPLAY_TIMEZONE;
+  const u = dayjs.utc(iso);
+  if (!u.isValid()) return '';
+  try {
+    return u.tz(tz).format('YYYY-MM-DD');
+  } catch {
+    return u.format('YYYY-MM-DD');
+  }
+}
+
 /** Format a slot start for display (API times are UTC). */
 export function formatSlotTime(iso: string, _iana: string): string {
   if (!iso?.trim()) return '—';

@@ -32,7 +32,7 @@ export function usePatientDoctorBookingPanel(
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [bookDate, setBookDateState] = useState('');
   const [slots, setSlots] = useState<DoctorSlot[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlotStart, setSelectedSlotStartState] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +103,7 @@ export function usePatientDoctorBookingPanel(
     setBookingIdempotencyKey(crypto.randomUUID());
     setBookDateState(ymdNowInIana(scheduleTz));
     setSlots([]);
+    setSlotsLoading(true);
     setSlotsError(null);
     setSelectedSlotStartState(null);
     setConfirmOpen(false);
@@ -130,6 +131,7 @@ export function usePatientDoctorBookingPanel(
         const ac = new AbortController();
         slotsFetchAbortRef.current = ac;
         signal = ac.signal;
+        setSlots([]);
         setSlotsLoading(true);
         setSlotsError(null);
       }

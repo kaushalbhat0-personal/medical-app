@@ -18,7 +18,7 @@ export function patientsTreatedPlaceholder(doctorId: string): number {
   return 800 + (h % 2_200);
 }
 
-/** Booking-first strip: backend next_available_slot first; schedule day refines only when profile slot missing/invalid. */
+/** Next-available headline: schedule API first; profile `next_available_slot` only after schedule has loaded. */
 export function DoctorProfileNextAvailableBanner({
   doctor,
   profileSlotIso,
@@ -27,7 +27,6 @@ export function DoctorProfileNextAvailableBanner({
   doctorTodayYmd,
   todaySlots,
   loading,
-  profileSlotsTodayCount,
 }: {
   doctor: PublicDoctorProfile;
   profileSlotIso: string | null | undefined;
@@ -36,14 +35,13 @@ export function DoctorProfileNextAvailableBanner({
   doctorTodayYmd: string;
   todaySlots: DoctorSlot[];
   loading: boolean;
-  /** From public API when schedule day not loaded yet (bookable slots remaining today). */
-  profileSlotsTodayCount?: number | null;
 }) {
   const pickIso = (): string | null => {
-    if (profileSlotIso && isSlotInstantInTheFuture(profileSlotIso)) return profileSlotIso;
     if (scheduleNext?.start && isSlotInstantInTheFuture(scheduleNext.start)) return scheduleNext.start;
-    if (profileSlotIso) return profileSlotIso;
+    if (loading) return null;
+    if (profileSlotIso && isSlotInstantInTheFuture(profileSlotIso)) return profileSlotIso;
     if (scheduleNext?.start) return scheduleNext.start;
+    if (profileSlotIso) return profileSlotIso;
     return null;
   };
   const iso = pickIso();
@@ -52,12 +50,7 @@ export function DoctorProfileNextAvailableBanner({
       ? formatNextAvailablePhrase(iso, todayYmd, doctorTodayYmd, DISPLAY_TIMEZONE)
       : null;
   const future = futureAvailableSlots(todaySlots);
-  const left =
-    future.length > 0
-      ? future.length
-      : typeof profileSlotsTodayCount === 'number' && profileSlotsTodayCount > 0
-        ? profileSlotsTodayCount
-        : 0;
+  const left = future.length;
 
   if (doctor.has_availability_windows === false) {
     return (

@@ -21,6 +21,7 @@ import {
 } from '../../components/patient/DoctorPublicProfileBlocks';
 import {
   appointmentCalendarDayYmd,
+  calendarDayYmdForInstantInZone,
   formatNextAvailablePhrase,
   formatSlotTimeWithZoneLabel,
   isSlotInstantInTheFuture,
@@ -283,6 +284,25 @@ export function PatientDoctorDetail() {
     booking.bookDate,
   ]);
 
+  const schedulePreviewSlots = useMemo(
+    () => [...(summaryDay?.slots ?? []), ...tomorrowSlots],
+    [summaryDay?.slots, tomorrowSlots]
+  );
+  const todaySlotsQuick = useMemo(
+    () =>
+      schedulePreviewSlots.filter(
+        (s) => calendarDayYmdForInstantInZone(s.start, publicDoctor?.timezone) === todayYmd
+      ),
+    [schedulePreviewSlots, publicDoctor?.timezone, todayYmd]
+  );
+  const tomorrowSlotsQuick = useMemo(
+    () =>
+      schedulePreviewSlots.filter(
+        (s) => calendarDayYmdForInstantInZone(s.start, publicDoctor?.timezone) === tomorrowYmd
+      ),
+    [schedulePreviewSlots, publicDoctor?.timezone, tomorrowYmd]
+  );
+
   if (!rawParam) {
     return <ErrorState title="Missing doctor" description="Go back to search for a provider." />;
   }
@@ -303,6 +323,13 @@ export function PatientDoctorDetail() {
   const blocked =
     !patientId || publicDoctor.has_availability_windows === false;
 
+  const showSlotsSkeleton =
+    Boolean(booking.bookDate) &&
+    Boolean(patientId) &&
+    booking.slotsLoading &&
+    booking.slots.length === 0 &&
+    !booking.slotsError;
+
   return (
     <div className="space-y-6 pb-28">
       <div className="flex items-start gap-2">
@@ -320,9 +347,8 @@ export function PatientDoctorDetail() {
             scheduleNext={summaryDay?.next_available ?? null}
             todayYmd={todayYmd}
             doctorTodayYmd={booking.doctorTodayYmd}
-            todaySlots={summaryDay?.slots ?? []}
+            todaySlots={todaySlotsQuick}
             loading={avLoading}
-            profileSlotsTodayCount={publicDoctor.slots_today_count ?? null}
           />
           <DoctorProfileHero doctor={publicDoctor} />
         </div>
@@ -345,8 +371,8 @@ export function PatientDoctorDetail() {
         error={avError}
         todayYmd={todayYmd}
         tomorrowYmd={tomorrowYmd}
-        todaySlots={summaryDay?.slots ?? []}
-        tomorrowSlots={tomorrowSlots}
+        todaySlots={todaySlotsQuick}
+        tomorrowSlots={tomorrowSlotsQuick}
         selectedStart={booking.selectedSlotStart}
         onPickSlot={(iso, ymd) => {
           booking.setBookDate(ymd);
@@ -395,8 +421,8 @@ export function PatientDoctorDetail() {
               {booking.slotsError}
             </p>
           )}
-          {booking.bookDate && patientId && booking.slotsLoading && (
-            <div className="space-y-3" aria-hidden>
+          {showSlotsSkeleton && (
+            <div className="space-y-3" aria-busy aria-label="Loading available times">
               <div className="h-3 w-40 animate-pulse rounded bg-muted" />
               <div className="grid grid-cols-3 gap-2">
                 {Array.from({ length: 9 }).map((_, i) => (
@@ -405,7 +431,8 @@ export function PatientDoctorDetail() {
               </div>
             </div>
           )}
-          {booking.bookDate &&
+          {!showSlotsSkeleton &&
+            booking.bookDate &&
             patientId &&
             !booking.slotsLoading &&
             !booking.slotsError &&
@@ -454,7 +481,11 @@ export function PatientDoctorDetail() {
                 )}
               </div>
             )}
-          {booking.bookDate && patientId && !booking.slotsLoading && booking.slots.length > 0 && (
+          {!showSlotsSkeleton &&
+            booking.bookDate &&
+            patientId &&
+            !booking.slotsLoading &&
+            booking.slots.length > 0 && (
             <>
               <DoctorSlotPicker
                 slots={booking.slots}
