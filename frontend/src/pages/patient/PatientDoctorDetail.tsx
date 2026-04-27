@@ -47,46 +47,52 @@ function publicToBookingDoctor(p: PublicDoctorProfile): Doctor {
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-6 pb-28">
-      <div className="flex items-start gap-2">
-        <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-muted" />
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className="space-y-2 rounded-2xl border-2 border-primary/10 bg-muted/40 p-4">
-            <div className="h-3 w-28 animate-pulse rounded bg-muted" />
-            <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted" />
-            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-          </div>
-          <div className="flex gap-4">
-            <div className="h-24 w-24 shrink-0 animate-pulse rounded-2xl bg-muted" />
-            <div className="flex-1 space-y-2">
-              <div className="h-7 w-48 max-w-full animate-pulse rounded-md bg-muted" />
-              <div className="h-4 w-40 max-w-full animate-pulse rounded-md bg-muted" />
-              <div className="h-4 w-56 max-w-full animate-pulse rounded-md bg-muted" />
-              <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+    <div className="pb-28">
+      <div className="mx-auto max-w-md space-y-5 px-4">
+        <div className="flex items-start gap-2">
+          <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-muted" />
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="mb-4 space-y-4 rounded-2xl border-2 border-primary/10 bg-muted/40 p-4">
+              <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+              <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted" />
+              <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 shrink-0 animate-pulse rounded-xl bg-muted" />
+                <div className="flex-1 space-y-4">
+                  <div className="h-5 w-48 max-w-full animate-pulse rounded-md bg-muted" />
+                  <div className="h-4 w-40 max-w-full animate-pulse rounded-md bg-muted" />
+                  <div className="h-4 w-56 max-w-full animate-pulse rounded-md bg-muted" />
+                  <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div className="space-y-2 rounded-2xl border border-border/60 p-4">
-        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        <div className="h-16 w-full animate-pulse rounded-lg bg-muted" />
-        <div className="h-3 w-full animate-pulse rounded bg-muted" />
-      </div>
-      <div className="h-20 animate-pulse rounded-2xl bg-muted" />
-      <div className="space-y-3 rounded-2xl border border-border/60 p-4">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-12 w-2/3 max-w-sm animate-pulse rounded-xl bg-muted" />
-        <div className="flex flex-wrap gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-10 w-[4.5rem] animate-pulse rounded-xl bg-muted" />
-          ))}
+        <div className="space-y-4 rounded-2xl border border-border/60 p-4 shadow-sm">
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="h-16 w-full animate-pulse rounded-lg bg-muted" />
+          <div className="h-3 w-full animate-pulse rounded bg-muted" />
+        </div>
+        <div className="h-20 animate-pulse rounded-2xl bg-muted/80" />
+        <div className="space-y-3 rounded-2xl border border-border/60 p-4 shadow-sm">
+          <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+          <div className="h-12 w-2/3 max-w-sm animate-pulse rounded-xl bg-muted" />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-10 w-[4.5rem] animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
         </div>
       </div>
       <div
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/80 px-4 pt-3 backdrop-blur-sm"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
-        <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+        <div className="mx-auto max-w-md">
+          <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+        </div>
       </div>
     </div>
   );
@@ -331,74 +337,77 @@ export function PatientDoctorDetail() {
     !booking.slotsError;
 
   return (
-    <div className="space-y-6 pb-28">
-      <div className="flex items-start gap-2">
-        <Link
-          to="/patient/doctors"
-          state={{ browseAllDoctors: true }}
-          className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'mt-0.5 shrink-0 -ml-2 rounded-xl')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div className="min-w-0 flex-1 space-y-4">
-          <DoctorProfileNextAvailableBanner
-            doctor={publicDoctor}
-            profileSlotIso={publicDoctor.next_available_slot ?? null}
-            scheduleNext={summaryDay?.next_available ?? null}
-            todayYmd={todayYmd}
-            doctorTodayYmd={booking.doctorTodayYmd}
-            todaySlots={todaySlotsQuick}
-            loading={avLoading}
-          />
-          <DoctorProfileHero doctor={publicDoctor} />
+    <div className="pb-28">
+      <div className="mx-auto max-w-md space-y-5 px-4">
+        <div className="flex items-start gap-2">
+          <Link
+            to="/patient/doctors"
+            state={{ browseAllDoctors: true }}
+            className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'mt-0.5 shrink-0 -ml-2 rounded-xl')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <div className="mb-4">
+              <DoctorProfileNextAvailableBanner
+                doctor={publicDoctor}
+                profileSlotIso={publicDoctor.next_available_slot ?? null}
+                scheduleNext={summaryDay?.next_available ?? null}
+                todayYmd={todayYmd}
+                doctorTodayYmd={booking.doctorTodayYmd}
+                todaySlots={todaySlotsQuick}
+                loading={avLoading}
+              />
+            </div>
+            <DoctorProfileHero doctor={publicDoctor} />
+          </div>
         </div>
-      </div>
 
-      {patientError && (
-        <p className="text-sm text-destructive" role="alert">
-          {patientError}{' '}
-          <button type="button" className="font-medium underline" onClick={() => void refreshPatient()}>
-            Retry
-          </button>
-        </p>
-      )}
+        {patientError && (
+          <p className="text-sm text-destructive" role="alert">
+            {patientError}{' '}
+            <button type="button" className="font-medium underline" onClick={() => void refreshPatient()}>
+              Retry
+            </button>
+          </p>
+        )}
 
-      <DoctorProfileAbout doctor={publicDoctor} />
-      <DoctorProfileClinic doctor={publicDoctor} />
+        <DoctorProfileAbout doctor={publicDoctor} />
+        <DoctorProfileClinic doctor={publicDoctor} />
 
-      <DoctorProfileAvailabilitySummary
-        loading={avLoading}
-        error={avError}
-        todayYmd={todayYmd}
-        tomorrowYmd={tomorrowYmd}
-        todaySlots={todaySlotsQuick}
-        tomorrowSlots={tomorrowSlotsQuick}
-        selectedStart={booking.selectedSlotStart}
-        onPickSlot={(iso, ymd) => {
-          booking.setBookDate(ymd);
-          booking.setSelectedSlotStart(iso);
-        }}
-        onScrollToBooking={
-          blocked
-            ? undefined
-            : () => bookingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
-      />
+        <DoctorProfileAvailabilitySummary
+          loading={avLoading}
+          error={avError}
+          todayYmd={todayYmd}
+          tomorrowYmd={tomorrowYmd}
+          todaySlots={todaySlotsQuick}
+          tomorrowSlots={tomorrowSlotsQuick}
+          selectedStart={booking.selectedSlotStart}
+          onPickSlot={(iso, ymd) => {
+            booking.setBookDate(ymd);
+            booking.setSelectedSlotStart(iso);
+          }}
+          onScrollToBooking={
+            blocked
+              ? undefined
+              : () => bookingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        />
 
-      {blocked && (
-        <p className="text-sm text-amber-800" role="status">
-          {publicDoctor.has_availability_windows === false
-            ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
-            : 'Connect your profile to book.'}
-        </p>
-      )}
+        {blocked && (
+          <p className="text-sm text-amber-800" role="status">
+            {publicDoctor.has_availability_windows === false
+              ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
+              : 'Connect your profile to book.'}
+          </p>
+        )}
 
-      {!blocked && !patientLoading && (
-        <section
-          ref={bookingSectionRef}
-          id="patient-booking"
-          className="scroll-mt-6 space-y-4"
-        >
+        {!blocked && !patientLoading && (
+          <section
+            ref={bookingSectionRef}
+            id="patient-booking"
+            className="scroll-mt-6 space-y-4"
+          >
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Pick a time</h2>
             <ul className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-5">
@@ -518,21 +527,24 @@ export function PatientDoctorDetail() {
               ) : null}
             </>
           )}
-        </section>
-      )}
+          </section>
+        )}
+      </div>
 
       <div
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
-        <Button
-          type="button"
-          className="h-12 w-full min-h-[48px] text-base font-semibold"
-          disabled={!booking.stickyBookEnabled}
-          onClick={() => booking.setConfirmOpen(true)}
-        >
-          Book Appointment
-        </Button>
+        <div className="mx-auto max-w-md">
+          <Button
+            type="button"
+            className="h-12 w-full min-h-[48px] text-base font-semibold"
+            disabled={!booking.stickyBookEnabled}
+            onClick={() => booking.setConfirmOpen(true)}
+          >
+            Book Appointment
+          </Button>
+        </div>
       </div>
 
       {booking.confirmOpen && (

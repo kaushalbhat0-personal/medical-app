@@ -1,4 +1,4 @@
-import { BadgeCheck, Building2, GraduationCap, MapPin, Star, Stethoscope, UserRound, Users } from 'lucide-react';
+import { BadgeCheck, Building2, GraduationCap, MapPin, Stethoscope, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PublicDoctorProfile } from '@/types';
@@ -54,7 +54,7 @@ export function DoctorProfileNextAvailableBanner({
 
   if (doctor.has_availability_windows === false) {
     return (
-      <div className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.06] p-4">
+      <div className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.06] p-4 shadow-sm">
         <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hours not online yet</p>
         <p className="mt-1 text-sm text-muted-foreground">Call the clinic or try another verified provider.</p>
       </div>
@@ -62,9 +62,9 @@ export function DoctorProfileNextAvailableBanner({
   }
 
   return (
-    <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.12] via-background to-background p-4 shadow-md">
+    <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.12] via-background to-background p-4 shadow-sm">
       {loading && !phrase ? (
-        <div className="space-y-2" aria-busy aria-label="Loading next slot">
+        <div className="space-y-4" aria-busy aria-label="Loading next slot">
           <div className="h-3 w-28 animate-pulse rounded bg-muted" />
           <div className="h-10 w-full max-w-sm animate-pulse rounded-lg bg-muted" />
         </div>
@@ -101,82 +101,72 @@ export function DoctorProfileHero({ doctor }: { doctor: PublicDoctorProfile }) {
   const synthetic = doctor.metrics_are_synthetic !== false;
 
   return (
-    <div className="flex gap-4 items-start">
-      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/80">
-        {img ? (
-          <img src={img} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/15 to-primary/5 text-2xl font-bold text-primary">
-            {initials}
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight text-foreground">
-          {doctor.full_name}
-          {doctor.verified ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-              Verified doctor
-            </span>
-          ) : null}
-        </h1>
-        <p className="mt-1 text-sm font-medium text-primary/90">
-          {doctor.specialization} · {doctor.experience} yrs experience
-        </p>
-        {doctor.clinic_name ? <p className="mt-1 text-sm text-muted-foreground">{doctor.clinic_name}</p> : null}
-        <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-          {synthetic ? (
-            <span className="inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
-              ⭐ {doctor.rating_average.toFixed(1)} (reviews coming soon)
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
-              ⭐ {doctor.rating_average.toFixed(1)} ({doctor.review_count} reviews)
-            </span>
-          )}
-        </p>
-        <p className="mt-1.5 inline-flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-          <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            {synthetic ? (
-              <>
-                <span className="font-medium text-foreground/90">📍 Distance estimate</span>
-                <span className="ml-1 text-xs">(~{doctor.distance_km.toFixed(1)} km illustrative)</span>
-              </>
+    <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="space-y-3">
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border text-xl font-semibold">
+            {img ? (
+              <img src={img} alt="" className="h-full w-full object-cover" />
             ) : (
-              <>
-                <span className="font-medium text-foreground/90">{doctor.distance_km.toFixed(1)} km away</span>
-                <span className="ml-1 text-xs">(approx.)</span>
-              </>
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/15 to-primary/5 text-xl font-semibold text-primary">
+                {initials}
+              </div>
             )}
-          </span>
-        </p>
-        <ul
-          className="mt-3 flex flex-col gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-xs text-foreground/90 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1"
+          </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="space-y-1">
+              <h1 className="text-lg font-semibold leading-tight text-foreground">{doctor.full_name}</h1>
+              {doctor.verified ? (
+                <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
+                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                  Verified doctor
+                </span>
+              ) : null}
+            </div>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>
+                {doctor.specialization} · {doctor.experience} yrs experience
+              </p>
+              {doctor.clinic_name ? <p>{doctor.clinic_name}</p> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="flex items-center gap-1 text-foreground">
+                ⭐ {doctor.rating_average.toFixed(1)}{' '}
+                <span className="text-muted-foreground">
+                  {synthetic ? '(reviews coming soon)' : `(${doctor.review_count} reviews)`}
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                📍 Distance ~{doctor.distance_km.toFixed(1)} km
+              </span>
+            </div>
+          </div>
+        </div>
+        <div
+          className="space-y-2 rounded-xl border border-border bg-white p-3 shadow-sm dark:bg-card"
           aria-label="Trust signals"
         >
           {doctor.verified ? (
-            <li className="inline-flex items-center gap-1.5 font-medium">
+            <div className="flex items-center gap-2 text-sm">
               <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
               ✔ Verified doctor
-            </li>
+            </div>
           ) : null}
-          <li className="inline-flex items-center gap-1.5">
+          <div className="flex items-center gap-2 text-sm">
             <Stethoscope className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
             ✔ {doctor.experience} years experience
-          </li>
-          <li className="inline-flex items-center gap-1.5">
+          </div>
+          <div className="flex items-center gap-2 text-sm">
             <Users className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-            {synthetic ? '👥 1000+ patients (approx.)' : `${patientsTreatedPlaceholder(doctor.id).toLocaleString()}+ patients treated`}
-          </li>
-          <li className="inline-flex items-center gap-1.5">
+            {synthetic
+              ? '👥 1000+ patients (approx.)'
+              : `${patientsTreatedPlaceholder(doctor.id).toLocaleString()}+ patients treated`}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
             <UserRound className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
             ✔ Clinic consultation
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -228,7 +218,7 @@ export function DoctorProfileClinic({ doctor }: { doctor: PublicDoctorProfile })
         <Building2 className="h-4 w-4 text-primary" aria-hidden />
         Clinic info
       </h2>
-      <div className="mt-3 space-y-2 text-sm">
+      <div className="mt-3 space-y-4 text-sm">
         {doctor.clinic_name?.trim() ? (
           <p className="font-medium text-foreground">{doctor.clinic_name.trim()}</p>
         ) : null}
