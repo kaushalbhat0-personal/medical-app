@@ -86,6 +86,15 @@ export interface PublicTenantDoctorBrief {
   id: string;
   name: string;
   specialization: string;
+  availability_status: string;
+  next_available_slot: string | null;
+  available_today: boolean;
+  rating_average: number;
+  review_count: number;
+  distance_km: number;
+  slots_today_count?: number;
+  slots_tomorrow_count?: number;
+  metrics_are_synthetic?: boolean;
 }
 
 /** GET /public/doctors/{id} — approved marketplace profile only (404 otherwise) */
@@ -103,6 +112,17 @@ export interface PublicDoctorProfile {
   verification_status: string;
   timezone: string;
   has_availability_windows: boolean;
+  /** Earliest bookable slot (UTC) from public profile — avoids an extra schedule call for the headline */
+  next_available_slot?: string | null;
+  available_today: boolean;
+  rating_average: number;
+  review_count: number;
+  /** Illustrative distance until real geolocation */
+  distance_km: number;
+  slots_today_count?: number;
+  slots_tomorrow_count?: number;
+  /** When true, show ratings/distance/patient volume as illustrative — not verified facts */
+  metrics_are_synthetic?: boolean;
 }
 
 /** GET /patients/me/doctors */
@@ -208,6 +228,15 @@ export interface Doctor {
   tenant_id?: string | null;
   /** From GET /doctors when include_availability_hint=true */
   availability_status?: 'available_today' | 'next_available_tomorrow' | 'none' | string | null;
+  /** Set on public tenant doctor list (and profile) for filters and row sublabels */
+  available_today?: boolean;
+  next_available_slot?: string | null;
+  rating_average?: number;
+  review_count?: number;
+  distance_km?: number;
+  slots_today_count?: number;
+  slots_tomorrow_count?: number;
+  metrics_are_synthetic?: boolean;
   /** Marketplace verification on structured profile (patient trust / discovery). */
   verification_status?: string | null;
   /** From GET /doctors when structured profile is approved. */

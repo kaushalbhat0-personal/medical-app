@@ -49,7 +49,7 @@ test.describe('Patient portal', () => {
     await slotsResponse;
 
     const slotLocator = page.getByTestId('slot-button');
-    const noSlots = page.getByText(/No slots available/i);
+    const noSlots = page.getByText(/no slots/i);
     if ((await slotLocator.count()) === 0) {
       await expect(noSlots).toBeVisible({ timeout: 20_000 });
       return;

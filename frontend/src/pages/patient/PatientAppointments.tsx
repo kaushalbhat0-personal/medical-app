@@ -169,19 +169,29 @@ export function PatientAppointments() {
         <p className="text-muted-foreground text-sm mt-1">Your upcoming visits and history.</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2">
-        <Button variant={tab === 'upcoming' ? 'default' : 'ghost'} size="sm" onClick={() => setTab('upcoming')}>
-          Upcoming ({upcoming.length})
-        </Button>
-        <Button variant={tab === 'past' ? 'default' : 'ghost'} size="sm" onClick={() => setTab('past')}>
-          Past ({past.length})
-        </Button>
-        {refreshing && rows.length > 0 && (
-          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
-            Updating…
-          </span>
-        )}
+      <div className="relative -mx-1 sm:mx-0">
+        <div
+          className="pointer-events-none absolute left-0 top-0 z-10 h-full w-5 bg-gradient-to-r from-background to-transparent md:hidden"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute right-0 top-0 z-10 h-full w-5 bg-gradient-to-l from-background to-transparent md:hidden"
+          aria-hidden
+        />
+        <div className="-mx-1 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-border px-1 pb-2 [scrollbar-width:none] md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+          <Button variant={tab === 'upcoming' ? 'default' : 'ghost'} size="sm" onClick={() => setTab('upcoming')}>
+            Upcoming ({upcoming.length})
+          </Button>
+          <Button variant={tab === 'past' ? 'default' : 'ghost'} size="sm" onClick={() => setTab('past')}>
+            Past ({past.length})
+          </Button>
+          {refreshing && rows.length > 0 && (
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground md:ml-auto">
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+              Updating…
+            </span>
+          )}
+        </div>
       </div>
 
       {showInitialSkeleton ? (

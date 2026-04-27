@@ -18,7 +18,7 @@ function HomeRailSkeleton() {
   return (
     <div className="flex gap-3 overflow-x-auto pb-1">
       {Array.from({ length: 3 }).map((_, i) => (
-        <Skeleton key={i} className="h-[132px] w-[min(100%,300px)] shrink-0 rounded-2xl" />
+        <Skeleton key={i} className="h-[192px] w-[min(100%,300px)] shrink-0 rounded-2xl" />
       ))}
     </div>
   );
@@ -137,9 +137,9 @@ export function PatientHome() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div className="sticky top-0 z-20 -mx-4 mb-2 border-b border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md transition-shadow duration-200 sm:mx-0 sm:mb-3 sm:rounded-2xl sm:border sm:shadow-sm">
-        <PatientSearchCombobox tenants={tenants} allDoctors={allDoctors} className="w-full" />
+        <PatientSearchCombobox tenants={tenants} allDoctors={allDoctors} className="w-full min-w-0" />
       </div>
 
       <div className="space-y-2">
@@ -189,7 +189,7 @@ export function PatientHome() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">Featured GP</p>
                   <h2 className="mt-1 truncate text-lg font-bold text-foreground">{familyDoctor.name}</h2>
                   <p className="mt-0.5 text-sm text-muted-foreground">{familyDoctor.specialization}</p>
-                  <span className="mt-3 inline-flex rounded-full bg-[#22c55e]/12 px-2.5 py-1 text-[11px] font-semibold text-[#15803d] ring-1 ring-[#22c55e]/20">
+                  <span className="mt-3 inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-950/40 dark:text-green-400">
                     Available today
                   </span>
                 </div>
@@ -240,23 +240,32 @@ export function PatientHome() {
               </p>
             </div>
           ) : (
-            <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar [scrollbar-width:none] sm:mx-0 sm:px-0">
-              {nearbyRailDoctors.map((d) => (
-                <div key={String(d.id)} className="w-[min(92vw,300px)] shrink-0 snap-start sm:w-[280px]">
-                  <DoctorRowCard
-                    compact
-                    name={d.name ?? 'Doctor'}
-                    subtitle={d.specialization ?? 'Specialist'}
-                    rating={mockRatingFromId(String(d.id))}
-                    reviewCount={mockReviewCountFromId(String(d.id))}
-                    availabilityLabel="Available today"
-                    availabilityTone="today"
-                    primaryLabel="Book Appointment"
-                    onPrimary={() => navigate(`/patient/doctor/${d.id}`)}
-                    onCardClick={() => navigate(`/patient/doctor/${d.id}`)}
-                  />
-                </div>
-              ))}
+            <div className="relative -mx-1">
+              <div
+                className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent sm:hidden"
+                aria-hidden
+              />
+              <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent sm:hidden" aria-hidden />
+              <div
+                className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+              >
+                {nearbyRailDoctors.map((d) => (
+                  <div key={String(d.id)} className="w-[min(92vw,300px)] shrink-0 snap-start sm:w-[280px]">
+                    <DoctorRowCard
+                      compact
+                      name={d.name ?? 'Doctor'}
+                      subtitle={d.specialization ?? 'Specialist'}
+                      rating={mockRatingFromId(String(d.id))}
+                      reviewCount={mockReviewCountFromId(String(d.id))}
+                      availabilityLabel="Available today"
+                      availabilityTone="today"
+                      primaryLabel="Book Appointment"
+                      onPrimary={() => navigate(`/patient/doctor/${d.id}`, { state: { focusBooking: true } })}
+                      onCardClick={() => navigate(`/patient/doctor/${d.id}`)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </PageSection>

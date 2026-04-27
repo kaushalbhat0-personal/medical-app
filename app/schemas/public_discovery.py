@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,6 +28,44 @@ class PublicDoctorProfileRead(BaseModel):
         description="IANA zone for slot calendar days and wall-clock display",
     )
     has_availability_windows: bool = False
+    next_available_slot: datetime | None = Field(
+        default=None,
+        description="Earliest bookable slot from now (UTC ISO); null if none within the scan window",
+    )
+    available_today: bool = Field(
+        default=False,
+        description="True if at least one bookable slot remains later today (doctor-local calendar)",
+    )
+    rating_average: float = Field(
+        default=4.8,
+        ge=0,
+        le=5,
+        description="Placeholder until real reviews; shown for conversion",
+    )
+    review_count: int = Field(
+        default=124,
+        ge=0,
+        description="Placeholder review count for marketplace display",
+    )
+    distance_km: float = Field(
+        default=2.3,
+        ge=0,
+        description="Illustrative distance (placeholder; replace with geolocation when available)",
+    )
+    slots_today_count: int = Field(
+        default=0,
+        ge=0,
+        description="Bookable slots remaining today (doctor-local calendar)",
+    )
+    slots_tomorrow_count: int = Field(
+        default=0,
+        ge=0,
+        description="Bookable slots on the next calendar day (doctor-local)",
+    )
+    metrics_are_synthetic: bool = Field(
+        default=True,
+        description="When True, clients must label rating/distance/patient-volume as illustrative, not verified",
+    )
 
 
 class PublicTenantDoctorBrief(BaseModel):
@@ -35,6 +74,18 @@ class PublicTenantDoctorBrief(BaseModel):
     id: UUID
     name: str
     specialization: str
+    availability_status: str = Field(
+        default="none",
+        description="available_today | next_available_tomorrow | none (same as doctor list hint)",
+    )
+    next_available_slot: datetime | None = None
+    available_today: bool = False
+    rating_average: float = 4.8
+    review_count: int = 124
+    distance_km: float = 2.3
+    slots_today_count: int = 0
+    slots_tomorrow_count: int = 0
+    metrics_are_synthetic: bool = True
 
 
 class PublicTenantDiscoveryRead(BaseModel):

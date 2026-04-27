@@ -10,6 +10,8 @@ import { ErrorState } from '../../components/common';
 import { cn } from '@/lib/utils';
 import { DoctorRowCard } from '../../components/patient/DoctorRowCard';
 import { mockRatingFromId, mockReviewCountFromId } from '@/lib/patient/mockDoctorPresentation';
+import { doctorAvailabilityPresentation } from '@/lib/patient/doctorAvailabilityPresentation';
+import type { Doctor } from '@/types';
 
 export function PatientClinicDoctors() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -77,7 +79,7 @@ export function PatientClinicDoctors() {
             <ul className="space-y-3" aria-hidden>
               {Array.from({ length: 4 }).map((_, i) => (
                 <li key={i}>
-                  <Skeleton className="h-[120px] w-full rounded-2xl" />
+                  <Skeleton className="h-[192px] w-full rounded-2xl" />
                 </li>
               ))}
             </ul>
@@ -85,25 +87,40 @@ export function PatientClinicDoctors() {
             <p className="text-sm text-muted-foreground">No doctors listed yet.</p>
           ) : (
             <ul className="space-y-3">
-              {doctors.map((d) => (
+              {doctors.map((d) => {
+                const asDoc: Doctor = {
+                  id: d.id,
+                  name: d.name,
+                  specialization: d.specialization,
+                  availability_status: d.availability_status,
+                  available_today: d.available_today,
+                  next_available_slot: d.next_available_slot ?? undefined,
+                  has_availability_windows: true,
+                };
+                const { label: availLabel, tone: availTone, subLabel: availSub } =
+                  doctorAvailabilityPresentation(asDoc);
+                return (
                 <li key={d.id}>
                   <DoctorRowCard
                     name={d.name}
                     subtitle={d.specialization}
-                    rating={mockRatingFromId(d.id)}
-                    reviewCount={mockReviewCountFromId(d.id)}
+                    rating={d.rating_average ?? mockRatingFromId(d.id)}
+                    reviewCount={d.review_count ?? mockReviewCountFromId(d.id)}
+                    distanceKm={d.distance_km}
+                    metricsAreSynthetic={d.metrics_are_synthetic !== false}
                     showVerifiedBadge
-                    availabilityLabel="Available today"
+                    availabilityLabel={availLabel}
+                    availabilitySubLabel={availSub}
+                    availabilityTone={availTone}
                     primaryLabel="Book Appointment"
                     onPrimary={() =>
-                      navigate(`/patient/doctor/${d.id}`, { state: { tenantId } })
+                      navigate(`/patient/doctor/${d.id}`, { state: { tenantId, focusBooking: true } })
                     }
-                    onCardClick={() =>
-                      navigate(`/patient/doctor/${d.id}`, { state: { tenantId } })
-                    }
+                    onCardClick={() => navigate(`/patient/doctor/${d.id}`, { state: { tenantId } })}
                   />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </CardContent>

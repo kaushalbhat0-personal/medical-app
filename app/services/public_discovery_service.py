@@ -10,8 +10,35 @@ from app.models.doctor import Doctor
 from app.models.doctor_profile import DoctorProfile
 from app.models.tenant import Tenant
 from app.schemas.public_discovery import PublicDoctorProfileRead, PublicTenantDiscoveryRead, PublicTenantDoctorBrief
-from app.services import doctor_service
+from app.services import doctor_service, doctor_slot_service
 from app.services.exceptions import NotFoundError
+
+
+def _placeholder_distance_km(doctor_id: UUID) -> float:
+    """Deterministic stand-in until patient geolocation + clinic coordinates exist."""
+    s = str(doctor_id).replace("-", "")
+    h = sum(ord(c) for c in s) % 45
+    return round(1.2 + h / 10, 1)
+
+
+def _public_tenant_doctor_brief(db: Session, doctor: Doctor) -> PublicTenantDoctorBrief:
+    doctor_service.hydrate_doctor_availability_flags(db, [doctor])
+    next_utc, av_today, st = doctor_slot_service.compute_public_marketplace_slot_meta(db, doctor)
+    st_today, st_tom = doctor_slot_service.public_marketplace_slots_today_tomorrow_counts(db, doctor)
+    return PublicTenantDoctorBrief(
+        id=doctor.id,
+        name=doctor.name,
+        specialization=doctor.specialization,
+        availability_status=st,
+        next_available_slot=next_utc,
+        available_today=av_today,
+        rating_average=4.8,
+        review_count=124,
+        distance_km=_placeholder_distance_km(doctor.id),
+        slots_today_count=st_today,
+        slots_tomorrow_count=st_tom,
+        metrics_are_synthetic=True,
+    )
 
 
 def get_public_approved_doctor(db: Session, doctor_id: UUID) -> PublicDoctorProfileRead:
@@ -38,6 +65,8 @@ def get_public_approved_doctor(db: Session, doctor_id: UUID) -> PublicDoctorProf
     exp = prof.experience_years
     if exp is None:
         exp = doctor.experience_years
+    next_utc, av_today, _st = doctor_slot_service.compute_public_marketplace_slot_meta(db, doctor)
+    st_today, st_tom = doctor_slot_service.public_marketplace_slots_today_tomorrow_counts(db, doctor)
     return PublicDoctorProfileRead(
         id=doctor.id,
         full_name=prof.full_name,
@@ -52,6 +81,14 @@ def get_public_approved_doctor(db: Session, doctor_id: UUID) -> PublicDoctorProf
         verification_status="approved",
         timezone=doctor.timezone,
         has_availability_windows=bool(getattr(doctor, "has_availability_windows", False)),
+        next_available_slot=next_utc,
+        available_today=av_today,
+        rating_average=4.8,
+        review_count=124,
+        distance_km=_placeholder_distance_km(doctor.id),
+        slots_today_count=st_today,
+        slots_tomorrow_count=st_tom,
+        metrics_are_synthetic=True,
     )
 
 
@@ -105,7 +142,7 @@ def list_public_tenants_for_discovery(db: Session) -> list[PublicTenantDiscovery
         if dc == 1:
             doc = sole_by_tenant.get(r.id)
             if doc is not None:
-                sole = PublicTenantDoctorBrief.model_validate(doc)
+                sole = _public_tenant_doctor_brief(db, doc)
         out.append(
             PublicTenantDiscoveryRead(
                 id=r.id,
@@ -136,4 +173,4 @@ def list_public_doctors_for_tenant(db: Session, tenant_id: UUID) -> list[PublicT
         .order_by(Doctor.name.asc())
     )
     doctors = list(db.scalars(stmt).all())
-    return [PublicTenantDoctorBrief.model_validate(d) for d in doctors]
+    return [_public_tenant_doctor_brief(db, d) for d in doctors]

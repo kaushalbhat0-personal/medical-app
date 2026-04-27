@@ -135,6 +135,14 @@ async def test_public_doctor_profile_approved_and_draft_404(
     assert body["verified"] is True
     assert body["verification_status"] == "approved"
     assert "full_name" in body
+    assert "next_available_slot" in body
+    assert "available_today" in body
+    assert "slots_today_count" in body
+    assert "slots_tomorrow_count" in body
+    assert "metrics_are_synthetic" in body
+    assert body["rating_average"] == 4.8
+    assert body["review_count"] == 124
+    assert "distance_km" in body
 
     r_404 = await client.get(f"/api/v1/public/doctors/{doc_draft.id}")
     assert r_404.status_code == 404

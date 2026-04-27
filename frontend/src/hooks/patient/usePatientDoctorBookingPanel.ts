@@ -11,7 +11,12 @@ import {
 } from '../../services';
 import { runAfterBookingSuccess } from '../../utils/bookingDataRefresh';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
-import { dedupeDoctorSlots, isSlotInstantInTheFuture, ymdNowInIana } from '../../utils/doctorSchedule';
+import {
+  dedupeDoctorSlots,
+  isSlotInstantInTheFuture,
+  slotKey,
+  ymdNowInIana,
+} from '../../utils/doctorSchedule';
 import { useModalFocusTrap } from '../useModalFocusTrap';
 import type { Appointment, Doctor } from '../../types';
 import { findNextAvailableSlotKey } from '../../utils/slotTimeGroups';
@@ -25,11 +30,11 @@ export function usePatientDoctorBookingPanel(
   scheduleTimeZone?: string | null
 ) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [bookDate, setBookDate] = useState('');
+  const [bookDate, setBookDateState] = useState('');
   const [slots, setSlots] = useState<DoctorSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
-  const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
+  const [selectedSlotStart, setSelectedSlotStartState] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [bookingIdempotencyKey, setBookingIdempotencyKey] = useState('');
 
@@ -37,6 +42,8 @@ export function usePatientDoctorBookingPanel(
   const abortCreateRef = useRef<AbortController | null>(null);
   const slotsRequestIdRef = useRef(0);
   const slotsFetchAbortRef = useRef<AbortController | null>(null);
+  /** Once the user changes date or taps a slot, stop auto-selecting the first opening. */
+  const scheduleInteractedRef = useRef(false);
 
   const scheduleTz = (scheduleTimeZone && scheduleTimeZone.trim()) || DISPLAY_TIMEZONE;
   const doctorTodayYmd = ymdNowInIana(scheduleTz);
@@ -56,11 +63,12 @@ export function usePatientDoctorBookingPanel(
     slotsFetchAbortRef.current?.abort();
     slotsFetchAbortRef.current = null;
     setConfirmOpen(false);
-    setBookDate('');
+    scheduleInteractedRef.current = false;
+    setBookDateState('');
     setSlots([]);
     setSlotsLoading(false);
     setSlotsError(null);
-    setSelectedSlotStart(null);
+    setSelectedSlotStartState(null);
     setSubmitting(false);
     setBookingIdempotencyKey('');
     onExit();
@@ -81,20 +89,22 @@ export function usePatientDoctorBookingPanel(
   useEffect(() => {
     if (!bookingDoctor) {
       setConfirmOpen(false);
-      setBookDate('');
+      scheduleInteractedRef.current = false;
+      setBookDateState('');
       setSlots([]);
       setSlotsLoading(false);
       setSlotsError(null);
-      setSelectedSlotStart(null);
+      setSelectedSlotStartState(null);
       setSubmitting(false);
       setBookingIdempotencyKey('');
       return;
     }
+    scheduleInteractedRef.current = false;
     setBookingIdempotencyKey(crypto.randomUUID());
-    setBookDate(ymdNowInIana(scheduleTz));
+    setBookDateState(ymdNowInIana(scheduleTz));
     setSlots([]);
     setSlotsError(null);
-    setSelectedSlotStart(null);
+    setSelectedSlotStartState(null);
     setConfirmOpen(false);
   }, [bookingDoctor?.id, scheduleTz]);
 
@@ -131,9 +141,19 @@ export function usePatientDoctorBookingPanel(
         if (reqId !== slotsRequestIdRef.current) return;
         const deduped = dedupeDoctorSlots(list);
         setSlots(deduped);
-        setSelectedSlotStart((cur) => {
-          if (cur && deduped.some((s) => s.start === cur && s.available)) return cur;
-          return null;
+        setSelectedSlotStartState((cur) => {
+          const stillValid =
+            cur != null &&
+            deduped.some(
+              (s) =>
+                s.available &&
+                isSlotInstantInTheFuture(s.start) &&
+                slotKey(s.start) === slotKey(cur)
+            );
+          if (stillValid) return cur;
+          if (scheduleInteractedRef.current) return null;
+          const first = deduped.find((s) => s.available && isSlotInstantInTheFuture(s.start));
+          return first ? first.start : null;
         });
         if (mode === 'poll') setSlotsError(null);
       } catch (e) {
@@ -162,7 +182,7 @@ export function usePatientDoctorBookingPanel(
       setSlots([]);
       setSlotsLoading(false);
       setSlotsError(null);
-      setSelectedSlotStart(null);
+      setSelectedSlotStartState(null);
       return;
     }
     void fetchSlots('initial');
@@ -272,13 +292,18 @@ export function usePatientDoctorBookingPanel(
           : '';
       if (detail.includes('Slot already booked')) {
         toast.error('That slot was just taken. Choose another time.');
-        setSelectedSlotStart(null);
+        setSelectedSlotStartState(null);
         if (bookDate && bookingDoctor) {
           invalidateDoctorSlotsClientCache(String(bookingDoctor.id), bookDate);
           setSlotsLoading(true);
           try {
             const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, { skipCache: true });
-            setSlots(dedupeDoctorSlots(list));
+            const deduped = dedupeDoctorSlots(list);
+            setSlots(deduped);
+            if (!scheduleInteractedRef.current) {
+              const first = deduped.find((s) => s.available && isSlotInstantInTheFuture(s.start));
+              setSelectedSlotStartState(first ? first.start : null);
+            }
           } catch {
             setSlotsError('Unable to load available slots.');
           } finally {
@@ -296,19 +321,27 @@ export function usePatientDoctorBookingPanel(
     }
   };
 
+  const setBookDate = useCallback((d: string) => {
+    scheduleInteractedRef.current = true;
+    setBookDateState(d);
+    setSelectedSlotStartState(null);
+  }, []);
+
+  const pickSlot = useCallback((key: string | null) => {
+    if (key !== null) scheduleInteractedRef.current = true;
+    setSelectedSlotStartState(key);
+  }, []);
+
   return {
     confirmOpen,
     setConfirmOpen,
     bookDate,
-    setBookDate: (d: string) => {
-      setBookDate(d);
-      setSelectedSlotStart(null);
-    },
+    setBookDate,
     slots,
     slotsLoading,
     slotsError,
     selectedSlotStart,
-    setSelectedSlotStart,
+    setSelectedSlotStart: pickSlot,
     submitting,
     bookingReady,
     slotOk,

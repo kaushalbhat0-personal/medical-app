@@ -18,9 +18,9 @@ export function PatientLayout() {
   const hideHeaderSearch = pathname === '/patient/home';
 
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-background text-foreground">
+    <div className="flex min-h-screen w-full flex-col overflow-x-hidden overflow-y-auto bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-white/90 shadow-sm shadow-black/[0.03] backdrop-blur-md">
-        <div className="mx-auto w-full max-w-5xl px-4 py-3">
+        <div className="mx-auto w-full max-w-md px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex items-center justify-between gap-3 sm:justify-start">
               <div className="flex min-w-0 items-center gap-3">
@@ -49,7 +49,7 @@ export function PatientLayout() {
               </div>
             </div>
 
-            {!hideHeaderSearch && <PatientSearchCombobox className="w-full flex-1" />}
+            {!hideHeaderSearch && <PatientSearchCombobox className="w-full min-w-0 flex-1" />}
 
             {user && (
               <div className="hidden items-center gap-2 sm:flex">
@@ -76,8 +76,8 @@ export function PatientLayout() {
         </div>
 
         <div className="border-t border-border/60 bg-muted/30">
-          <nav className="mx-auto max-w-5xl px-2 pb-2 pt-1 sm:px-4">
-            <div className="flex gap-1 overflow-x-auto no-scrollbar sm:inline-flex sm:rounded-full sm:bg-white sm:p-1 sm:ring-1 sm:ring-border/80">
+          <nav className="mx-auto w-full min-w-0 max-w-md px-4 pb-2 pt-1">
+            <div className="flex w-full min-w-0 gap-1 overflow-x-auto overflow-y-hidden no-scrollbar [scrollbar-width:none] sm:inline-flex sm:rounded-full sm:bg-white sm:p-1 sm:ring-1 sm:ring-border/80">
               {tabs.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -101,7 +101,7 @@ export function PatientLayout() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full min-w-0 max-w-md flex-1 px-4 py-6 pb-20">
         <Outlet />
       </main>
     </div>

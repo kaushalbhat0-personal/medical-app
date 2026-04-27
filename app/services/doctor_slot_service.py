@@ -437,3 +437,52 @@ def compute_doctor_availability_status_for_list(db: Session, doctor: Doctor) -> 
     if next_local_date == tomorrow_local:
         return "next_available_tomorrow"
     return "none"
+
+
+def compute_public_marketplace_slot_meta(
+    db: Session,
+    doctor: Doctor,
+) -> tuple[datetime | None, bool, str]:
+    """
+    Slot hints for public discovery (approved doctors only — no auth).
+
+    Returns (next_bookable_start_utc, available_today, availability_status).
+    """
+    st = compute_doctor_availability_status_for_list(db, doctor)
+    doctor_tz = _doctor_zoneinfo(doctor)
+    today_local = datetime.now(doctor_tz).date()
+    next_s = _next_available_from_doctor(db, doctor, today_local, horizon_days=14)
+    next_start = _utc_naive(next_s.start) if next_s is not None else None
+    available_today = st == "available_today"
+    return next_start, available_today, st
+
+
+def count_bookable_slots_on_local_date(
+    db: Session,
+    doctor: Doctor,
+    local_date: date,
+) -> int:
+    """Bookable slot count for a doctor-local calendar day (today excludes past starts)."""
+    doctor_tz = _doctor_zoneinfo(doctor)
+    today_local = datetime.now(doctor_tz).date()
+    now_utc = datetime.now(timezone.utc)
+    slots = _get_cached_slots_for_doctor_date(db, doctor, local_date)
+    if local_date < today_local:
+        return 0
+    if local_date > today_local:
+        return sum(1 for s in slots if s.available)
+    return sum(1 for s in slots if s.available and _utc_naive(s.start) > now_utc)
+
+
+def public_marketplace_slots_today_tomorrow_counts(
+    db: Session,
+    doctor: Doctor,
+) -> tuple[int, int]:
+    """(slots_today_count, slots_tomorrow_count) for list/profile cards."""
+    doctor_tz = _doctor_zoneinfo(doctor)
+    today_local = datetime.now(doctor_tz).date()
+    tomorrow_local = today_local + timedelta(days=1)
+    return (
+        count_bookable_slots_on_local_date(db, doctor, today_local),
+        count_bookable_slots_on_local_date(db, doctor, tomorrow_local),
+    )

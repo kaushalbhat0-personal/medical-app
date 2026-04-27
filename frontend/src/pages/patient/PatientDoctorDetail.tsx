@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import axios from 'axios';
@@ -17,8 +17,15 @@ import {
   DoctorProfileAvailabilitySummary,
   DoctorProfileClinic,
   DoctorProfileHero,
+  DoctorProfileNextAvailableBanner,
 } from '../../components/patient/DoctorPublicProfileBlocks';
-import { formatSlotTimeWithZoneLabel } from '../../utils/doctorSchedule';
+import {
+  appointmentCalendarDayYmd,
+  formatNextAvailablePhrase,
+  formatSlotTimeWithZoneLabel,
+  isSlotInstantInTheFuture,
+  relativeCalendarDayHeadingInZone,
+} from '../../utils/doctorSchedule';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { ymdAddDaysInIana, ymdNowInIana } from '../../utils/doctorSchedule';
 import { PATIENT_BOOKING_PENDING_STORAGE_KEY, PATIENT_CLINIC_BOOKING_SCOPE_KEY } from '../../constants/patient';
@@ -39,16 +46,47 @@ function publicToBookingDoctor(p: PublicDoctorProfile): Doctor {
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-4 pb-28">
-      <div className="flex gap-4">
-        <div className="h-24 w-24 shrink-0 animate-pulse rounded-2xl bg-muted" />
-        <div className="flex-1 space-y-2">
-          <div className="h-6 w-48 animate-pulse rounded-md bg-muted" />
-          <div className="h-4 w-36 animate-pulse rounded-md bg-muted" />
+    <div className="space-y-6 pb-28">
+      <div className="flex items-start gap-2">
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-muted" />
+        <div className="min-w-0 flex-1 space-y-4">
+          <div className="space-y-2 rounded-2xl border-2 border-primary/10 bg-muted/40 p-4">
+            <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+            <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted" />
+            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="flex gap-4">
+            <div className="h-24 w-24 shrink-0 animate-pulse rounded-2xl bg-muted" />
+            <div className="flex-1 space-y-2">
+              <div className="h-7 w-48 max-w-full animate-pulse rounded-md bg-muted" />
+              <div className="h-4 w-40 max-w-full animate-pulse rounded-md bg-muted" />
+              <div className="h-4 w-56 max-w-full animate-pulse rounded-md bg-muted" />
+              <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="h-32 animate-pulse rounded-2xl bg-muted" />
-      <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+      <div className="space-y-2 rounded-2xl border border-border/60 p-4">
+        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="h-16 w-full animate-pulse rounded-lg bg-muted" />
+        <div className="h-3 w-full animate-pulse rounded bg-muted" />
+      </div>
+      <div className="h-20 animate-pulse rounded-2xl bg-muted" />
+      <div className="space-y-3 rounded-2xl border border-border/60 p-4">
+        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+        <div className="h-12 w-2/3 max-w-sm animate-pulse rounded-xl bg-muted" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-10 w-[4.5rem] animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      </div>
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/80 px-4 pt-3 backdrop-blur-sm"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+      </div>
     </div>
   );
 }
@@ -57,8 +95,15 @@ export function PatientDoctorDetail() {
   const { id, doctorId } = useParams<{ id?: string; doctorId?: string }>();
   const rawParam = doctorId ?? id;
   const navigate = useNavigate();
-  const { state: routeState } = useLocation();
-  const tenantFromRoute = (routeState as { tenantId?: string } | null)?.tenantId;
+  const location = useLocation();
+  const { state: routeState } = location;
+  const tenantFromRoute = (routeState as { tenantId?: string; focusBooking?: boolean } | null)?.tenantId;
+  const focusBookingFromRoute = Boolean(
+    (routeState as { focusBooking?: boolean } | null)?.focusBooking
+  );
+  const bookingSectionRef = useRef<HTMLElement>(null);
+  const clearedFocusBookingRef = useRef(false);
+
   const { patientId, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLinkedPatient();
   const [publicDoctor, setPublicDoctor] = useState<PublicDoctorProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -69,6 +114,8 @@ export function PatientDoctorDetail() {
   const [tomorrowYmd, setTomorrowYmd] = useState('');
   const [summaryDay, setSummaryDay] = useState<DoctorScheduleDay | null>(null);
   const [tomorrowSlots, setTomorrowSlots] = useState<DoctorSlot[]>([]);
+  const [nextAfterNoSlots, setNextAfterNoSlots] = useState<DoctorSlot | null>(null);
+  const [nextAfterNoSlotsLoading, setNextAfterNoSlotsLoading] = useState(false);
 
   const bookingDoctor = useMemo(
     () => (publicDoctor ? publicToBookingDoctor(publicDoctor) : null),
@@ -131,6 +178,40 @@ export function PatientDoctorDetail() {
   }, [rawParam]);
 
   useEffect(() => {
+    clearedFocusBookingRef.current = false;
+  }, [location.key]);
+
+  useEffect(() => {
+    if (!focusBookingFromRoute || clearedFocusBookingRef.current) return;
+    if (!publicDoctor || loading || patientLoading) return;
+    clearedFocusBookingRef.current = true;
+    const blockedHere = !patientId || publicDoctor.has_availability_windows === false;
+    const t = window.setTimeout(() => {
+      if (!blockedHere) {
+        bookingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      navigate(
+        { pathname: location.pathname, hash: location.hash },
+        {
+          replace: true,
+          state: tenantFromRoute ? { tenantId: tenantFromRoute } : undefined,
+        }
+      );
+    }, 120);
+    return () => clearTimeout(t);
+  }, [
+    focusBookingFromRoute,
+    publicDoctor,
+    loading,
+    patientLoading,
+    patientId,
+    navigate,
+    location.pathname,
+    location.hash,
+    tenantFromRoute,
+  ]);
+
+  useEffect(() => {
     if (!publicDoctor) return;
     const tz = publicDoctor.timezone;
     const t0 = ymdNowInIana(tz);
@@ -162,6 +243,46 @@ export function PatientDoctorDetail() {
     };
   }, [publicDoctor?.id, publicDoctor?.timezone]);
 
+  useEffect(() => {
+    if (!publicDoctor || !patientId) {
+      setNextAfterNoSlots(null);
+      setNextAfterNoSlotsLoading(false);
+      return;
+    }
+    if (booking.slotsLoading || booking.slotsError) return;
+    if (booking.slots.length > 0) {
+      setNextAfterNoSlots(null);
+      setNextAfterNoSlotsLoading(false);
+      return;
+    }
+    if (!booking.bookDate) return;
+    const tz = publicDoctor.timezone;
+    const fromNextDay = ymdAddDaysInIana(booking.bookDate, tz, 1);
+    let cancelled = false;
+    (async () => {
+      setNextAfterNoSlotsLoading(true);
+      setNextAfterNoSlots(null);
+      try {
+        const n = await doctorsApi.getNextAvailable(String(publicDoctor.id), fromNextDay, { horizonDays: 21 });
+        if (!cancelled) setNextAfterNoSlots(n);
+      } catch {
+        if (!cancelled) setNextAfterNoSlots(null);
+      } finally {
+        if (!cancelled) setNextAfterNoSlotsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    publicDoctor,
+    patientId,
+    booking.slots.length,
+    booking.slotsLoading,
+    booking.slotsError,
+    booking.bookDate,
+  ]);
+
   if (!rawParam) {
     return <ErrorState title="Missing doctor" description="Go back to search for a provider." />;
   }
@@ -192,7 +313,17 @@ export function PatientDoctorDetail() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-4">
+          <DoctorProfileNextAvailableBanner
+            doctor={publicDoctor}
+            profileSlotIso={publicDoctor.next_available_slot ?? null}
+            scheduleNext={summaryDay?.next_available ?? null}
+            todayYmd={todayYmd}
+            doctorTodayYmd={booking.doctorTodayYmd}
+            todaySlots={summaryDay?.slots ?? []}
+            loading={avLoading}
+            profileSlotsTodayCount={publicDoctor.slots_today_count ?? null}
+          />
           <DoctorProfileHero doctor={publicDoctor} />
         </div>
       </div>
@@ -212,7 +343,6 @@ export function PatientDoctorDetail() {
       <DoctorProfileAvailabilitySummary
         loading={avLoading}
         error={avError}
-        nextAvailable={summaryDay?.next_available ?? null}
         todayYmd={todayYmd}
         tomorrowYmd={tomorrowYmd}
         todaySlots={summaryDay?.slots ?? []}
@@ -233,8 +363,24 @@ export function PatientDoctorDetail() {
       )}
 
       {!blocked && !patientLoading && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold tracking-tight">Pick a time</h2>
+        <section
+          ref={bookingSectionRef}
+          id="patient-booking"
+          className="scroll-mt-6 space-y-4"
+        >
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Pick a time</h2>
+            <ul className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-5">
+              <li>✔ Instant booking</li>
+              <li>✔ No waiting time</li>
+              <li>✔ Confirmed appointment</li>
+            </ul>
+          </div>
+          {nextAfterNoSlotsLoading && !booking.slotsLoading && booking.slots.length === 0 ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              Finding next opening…
+            </p>
+          ) : null}
           <Input
             id="book-date"
             type="date"
@@ -250,25 +396,91 @@ export function PatientDoctorDetail() {
             </p>
           )}
           {booking.bookDate && patientId && booking.slotsLoading && (
-            <div className="grid grid-cols-3 gap-2" aria-hidden>
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="min-h-[48px] animate-pulse rounded-xl bg-muted" />
-              ))}
+            <div className="space-y-3" aria-hidden>
+              <div className="h-3 w-40 animate-pulse rounded bg-muted" />
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className="min-h-[48px] animate-pulse rounded-xl bg-muted" />
+                ))}
+              </div>
             </div>
           )}
-          {booking.bookDate && patientId && !booking.slotsLoading && !booking.slotsError && booking.slots.length === 0 && (
-            <p className="text-sm text-muted-foreground">No slots this day.</p>
-          )}
+          {booking.bookDate &&
+            patientId &&
+            !booking.slotsLoading &&
+            !booking.slotsError &&
+            booking.slots.length === 0 && (
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm" role="status">
+                <p className="text-sm font-medium text-foreground">No slots on this day</p>
+                {!nextAfterNoSlotsLoading && nextAfterNoSlots?.start && (
+                  <>
+                    <p className="text-base font-semibold text-foreground">
+                      Next available:{' '}
+                      {formatNextAvailablePhrase(
+                        nextAfterNoSlots.start,
+                        appointmentCalendarDayYmd(nextAfterNoSlots.start, DISPLAY_TIMEZONE),
+                        booking.doctorTodayYmd,
+                        DISPLAY_TIMEZONE
+                      )}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-11 w-full rounded-xl"
+                      onClick={() => {
+                        const y = appointmentCalendarDayYmd(
+                          nextAfterNoSlots.start,
+                          DISPLAY_TIMEZONE
+                        );
+                        booking.setBookDate(y);
+                      }}
+                    >
+                      {(() => {
+                        const h = relativeCalendarDayHeadingInZone(
+                          nextAfterNoSlots.start,
+                          DISPLAY_TIMEZONE
+                        );
+                        if (h === 'Tomorrow') return 'View tomorrow’s slots';
+                        if (h === 'Today') return 'View today’s slots';
+                        return `View slots — ${h}`;
+                      })()}
+                    </Button>
+                  </>
+                )}
+                {!nextAfterNoSlotsLoading && !nextAfterNoSlots?.start && (
+                  <p className="text-sm text-muted-foreground">
+                    Try another date or check back—openings are released as the schedule updates.
+                  </p>
+                )}
+              </div>
+            )}
           {booking.bookDate && patientId && !booking.slotsLoading && booking.slots.length > 0 && (
-            <DoctorSlotPicker
-              slots={booking.slots}
-              bookDate={booking.bookDate}
-              doctorTodayYmd={booking.doctorTodayYmd}
-              selectedSlotStart={booking.selectedSlotStart}
-              onSelect={booking.setSelectedSlotStart}
-              disabled={booking.submitting}
-              nextAvailableKey={booking.nextAvailableKey}
-            />
+            <>
+              <DoctorSlotPicker
+                slots={booking.slots}
+                bookDate={booking.bookDate}
+                doctorTodayYmd={booking.doctorTodayYmd}
+                selectedSlotStart={booking.selectedSlotStart}
+                onSelect={booking.setSelectedSlotStart}
+                disabled={booking.submitting}
+                nextAvailableKey={booking.nextAvailableKey}
+              />
+              {booking.selectedSlotStart && isSlotInstantInTheFuture(booking.selectedSlotStart) ? (
+                <p className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2.5 text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                  You&apos;ll be seen at{' '}
+                  {formatSlotTimeWithZoneLabel(booking.selectedSlotStart, DISPLAY_TIMEZONE)}
+                  <span className="font-normal opacity-90">
+                    {' '}
+                    (
+                    {relativeCalendarDayHeadingInZone(
+                      booking.selectedSlotStart,
+                      DISPLAY_TIMEZONE
+                    ).toLowerCase()}
+                    ).
+                  </span>
+                </p>
+              ) : null}
+            </>
           )}
         </section>
       )}
