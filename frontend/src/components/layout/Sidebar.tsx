@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
 import { canAccessAdminUI, getEffectiveRoles, isPatientRole, isSuperAdminRole, normalizeRoles } from '../../utils/roles';
+import { doctorNavItemHint, isDoctorNavItemVisible } from '../../utils/doctorVerification';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { NavItem } from './NavItem';
 import { DOCTOR_PRACTICE_NAV } from './doctorNav';
@@ -83,10 +84,16 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
     return [adminModeNavBase[0], tenantsItem, ...adminModeNavBase.slice(1)];
   }, [effRoles]);
 
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const doctorNavFiltered = useMemo(
+    () => DOCTOR_PRACTICE_NAV.filter((item) => isDoctorNavItemVisible(user, token, item.path)),
+    [user, token]
+  );
+
   const navItems = isPatientRole(effRoles)
     ? patientFallbackNavItems
     : isDoctorOnly
-      ? DOCTOR_PRACTICE_NAV
+      ? doctorNavFiltered
       : useAdminModeLayout
         ? adminModeItems
         : staffNavItems;
@@ -163,6 +170,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
               icon={item.icon}
               isCollapsed={isCollapsed}
               onNavigate={onClose}
+              title={isDoctorOnly ? doctorNavItemHint(user, token, item.path) : undefined}
             />
           ))}
         </ul>

@@ -12,6 +12,7 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_resolved_data_scope,
+    require_doctor_verification_approved,
     require_structured_profile_complete,
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
@@ -42,6 +43,7 @@ def create_appointment(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> AppointmentRead:
     appt, idempotent_replay = appointment_service.create_appointment(
         db,

@@ -8,7 +8,38 @@ from sqlalchemy.orm import Session
 from app.crud import crud_doctor_profile
 from app.models.doctor import Doctor
 from app.models.doctor_profile import DoctorProfile
+from app.models.doctor_verification_log import DoctorVerificationLog
 from app.schemas.doctor_profile import DoctorProfileUpdate, DoctorProfileWrite
+from app.services.exceptions import ValidationError
+
+# Values stored in `doctor_profiles.verification_status` (String column).
+VERIFICATION_DRAFT = "draft"
+VERIFICATION_PENDING = "pending"
+VERIFICATION_APPROVED = "approved"
+VERIFICATION_REJECTED = "rejected"
+
+
+def is_doctor_active(profile: DoctorProfile | None) -> bool:
+    """True when marketplace verification allows full practice APIs (single source of truth)."""
+    return profile is not None and profile.verification_status == VERIFICATION_APPROVED
+
+
+def _append_verification_log(
+    db: Session,
+    *,
+    doctor_id: UUID,
+    status: str,
+    reason: str | None,
+    reviewed_by_user_id: UUID | None,
+) -> None:
+    db.add(
+        DoctorVerificationLog(
+            doctor_id=doctor_id,
+            status=status.strip().lower(),
+            reason=reason,
+            reviewed_by_user_id=reviewed_by_user_id,
+        )
+    )
 
 
 def _blank_to_none(s: str | None) -> str | None:
@@ -74,7 +105,7 @@ def ensure_profile_for_doctor(db: Session, doctor: Doctor) -> DoctorProfile:
             "full_name": doctor.name,
             "specialization": doctor.specialization,
             "experience_years": doctor.experience_years,
-            "verification_status": "pending",
+            "verification_status": VERIFICATION_DRAFT,
         },
     )
     recompute_is_complete(row)
@@ -100,7 +131,7 @@ def upsert_profile_from_write(
             data={
                 "doctor_id": doctor.id,
                 "full_name": payload.full_name.strip(),
-                "verification_status": "pending",
+                "verification_status": VERIFICATION_DRAFT,
             },
         )
     _apply_write_model(row, payload)
@@ -152,3 +183,71 @@ def doctor_profile_complete_for_user(db: Session, *, user_id: UUID) -> bool | No
     if prof is None:
         return False
     return bool(prof.is_profile_complete)
+
+
+def submit_profile_for_verification(db: Session, doctor: Doctor) -> DoctorProfile:
+    """Move draft or resubmit rejected → pending (org admin will approve/reject)."""
+    row = ensure_profile_for_doctor(db, doctor)
+    recompute_is_complete(row)
+    if not row.is_profile_complete:
+        raise ValidationError("Complete your profile before submitting for verification")
+    if row.verification_status == VERIFICATION_PENDING:
+        return row
+    if row.verification_status not in (VERIFICATION_DRAFT, VERIFICATION_REJECTED):
+        raise ValidationError("Profile cannot be submitted in its current state")
+    row.verification_status = VERIFICATION_PENDING
+    row.verification_rejection_reason = None
+    row.updated_at = datetime.now(timezone.utc)
+    db.add(row)
+    db.flush()
+    _append_verification_log(
+        db,
+        doctor_id=doctor.id,
+        status=VERIFICATION_PENDING,
+        reason=None,
+        reviewed_by_user_id=None,
+    )
+    db.flush()
+    db.refresh(row)
+    return row
+
+
+def set_verification_status_admin(
+    db: Session,
+    *,
+    doctor_id: UUID,
+    status: str,
+    reason: str | None = None,
+    reviewed_by_user_id: UUID | None = None,
+) -> DoctorProfile:
+    """Internal/admin: approve, reject, or re-open a profile for review."""
+    from app.services.doctor_service import get_doctor_or_404_with_tenant
+
+    doctor = get_doctor_or_404_with_tenant(db, doctor_id)
+    prof = ensure_profile_for_doctor(db, doctor)
+    st = status.strip().lower()
+    if st == VERIFICATION_APPROVED:
+        prof.verification_status = VERIFICATION_APPROVED
+        prof.verification_rejection_reason = None
+    elif st == VERIFICATION_REJECTED:
+        prof.verification_status = VERIFICATION_REJECTED
+        prof.verification_rejection_reason = (reason or "").strip() or "No reason provided"
+    elif st == VERIFICATION_PENDING:
+        prof.verification_status = VERIFICATION_PENDING
+        prof.verification_rejection_reason = None
+    else:
+        raise ValidationError("Invalid verification status")
+    prof.updated_at = datetime.now(timezone.utc)
+    db.add(prof)
+    db.flush()
+    log_reason = prof.verification_rejection_reason if st == VERIFICATION_REJECTED else None
+    _append_verification_log(
+        db,
+        doctor_id=doctor.id,
+        status=st,
+        reason=log_reason,
+        reviewed_by_user_id=reviewed_by_user_id,
+    )
+    db.flush()
+    db.refresh(prof)
+    return prof

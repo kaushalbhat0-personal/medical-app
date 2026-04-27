@@ -15,7 +15,7 @@ from app.core.security import decode_access_token
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
 from app.crud import crud_doctor, crud_doctor_profile, crud_user
 from app.models.doctor import Doctor
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services import doctor_service
 from app.services.exceptions import ForbiddenError, ValidationError
 from app.core.permissions import require_admin_or_owner
@@ -180,6 +180,28 @@ def require_structured_profile_complete(
     prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
     if prof is None or not prof.is_profile_complete:
         raise ForbiddenError("Complete your profile to continue")
+
+
+def require_doctor_verification_approved(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """
+    For accounts with primary role ``doctor``, always require a linked roster row and
+    marketplace-approved structured profile for high-trust actions (no bypass when
+    the doctor row is missing).
+    """
+    from app.services.doctor_profile_service import is_doctor_active
+
+    if current_user.role != UserRole.doctor:
+        return
+    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+    if doctor is None:
+        raise ForbiddenError("Doctor verification pending")
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
+    if is_doctor_active(prof):
+        return
+    raise ForbiddenError("Doctor verification pending")
 
 
 def get_current_users_doctor_for_structured_profile(

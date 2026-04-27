@@ -8,17 +8,57 @@ interface NavItemProps {
   icon: LucideIcon;
   isCollapsed: boolean;
   onNavigate?: () => void;
+  /** When true, item is visible but not navigable (e.g. doctor not yet verified). */
+  disabled?: boolean;
+  /** Native tooltip (e.g. pending verification read-mostly hint). */
+  title?: string;
 }
 
-export function NavItem({ path, label, icon: Icon, isCollapsed, onNavigate }: NavItemProps) {
+export function NavItem({
+  path,
+  label,
+  icon: Icon,
+  isCollapsed,
+  onNavigate,
+  disabled = false,
+  title,
+}: NavItemProps) {
   const location = useLocation();
   const isActive = location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  if (disabled) {
+    return (
+      <li>
+        <div
+          className={cn(
+            'group relative flex cursor-not-allowed items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 opacity-50',
+            'text-muted-foreground'
+          )}
+          aria-disabled="true"
+          role="link"
+          title={title ?? 'Available after your profile is verified'}
+        >
+          <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary opacity-0" />
+          <Icon className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden />
+          <span
+            className={cn(
+              'text-sm whitespace-nowrap transition-all duration-300',
+              isCollapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'w-auto translate-x-0 opacity-100'
+            )}
+          >
+            {label}
+          </span>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li>
       <NavLink
         to={path}
         onClick={onNavigate}
+        title={title}
         className={({ isActive: navIsActive }) =>
           cn(
             'group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 transition-all duration-200',

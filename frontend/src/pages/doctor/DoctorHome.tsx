@@ -11,6 +11,7 @@ import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { useAuth } from '../../hooks/useAuth';
 import { isDoctorOnlyRole } from '../../utils/roles';
+import { isDoctorVerificationApproved } from '../../utils/doctorVerification';
 import { isIndividualTenantUser } from '../../utils/tenantMode';
 import { ErrorState } from '../../components/common';
 import { tenantsApi } from '../../services/tenants';
@@ -55,9 +56,10 @@ function isAppointmentToday(a: Appointment): boolean {
 export function DoctorHome() {
   const navigate = useNavigate();
   const { user, patchUser, refreshUser } = useAuth();
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const practiceDataEnabled = isDoctorVerificationApproved(user, token);
   const { setMode } = useAppMode();
   const { selfDoctor, loading: workspaceLoading, refetch: refetchWorkspace } = useDoctorWorkspace();
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
   const isIndividualDoctor = isIndividualTenantUser(user);
   const showUpgradeToClinic =
     isIndividualDoctor && isDoctorOnlyRole(user, token) && !workspaceLoading;
@@ -104,8 +106,14 @@ export function DoctorHome() {
       setUpgradeSubmitting(false);
     }
   }, [clinicName, navigate, patchUser, refreshUser, refetchWorkspace, setMode]);
-  const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments();
-  const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients();
+  const { appointments, loading: aptLoading, error: aptError, refetch: refetchApt } = useAppointments(
+    undefined,
+    practiceDataEnabled
+  );
+  const { patients, loading: patLoading, error: patError, refetch: refetchPat } = usePatients(
+    undefined,
+    practiceDataEnabled
+  );
 
   const loading = aptLoading || patLoading;
   const error = aptError || patError;

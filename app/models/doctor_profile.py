@@ -50,6 +50,9 @@ class DoctorProfile(Base):
         default="pending",
         server_default="pending",
     )
+    verification_rejection_reason: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default=None
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

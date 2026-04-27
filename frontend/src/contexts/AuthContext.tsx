@@ -158,6 +158,9 @@ function buildUserFromRegister(response: RegisterResponse): User {
     ...(u.doctor_verification_status != null
       ? { doctor_verification_status: u.doctor_verification_status }
       : {}),
+    ...(u.doctor_verification_rejection_reason != null
+      ? { doctor_verification_rejection_reason: u.doctor_verification_rejection_reason }
+      : {}),
   };
 }
 
@@ -449,6 +452,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           doctor_id: me.doctor_id != null ? String(me.doctor_id) : null,
           doctor_profile_complete: me.doctor_profile_complete,
           doctor_verification_status: me.doctor_verification_status,
+          doctor_verification_rejection_reason: me.doctor_verification_rejection_reason,
           ...(me.tenant != null ? { tenant: me.tenant } : { tenant: undefined }),
         };
         if (prev?.force_password_reset !== undefined) {

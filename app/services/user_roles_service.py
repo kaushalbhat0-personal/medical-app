@@ -49,19 +49,24 @@ def roles_and_doctor_id_for_user(db: Session, user: User) -> tuple[list[str], uu
 
 def _doctor_profile_flags(
     db: Session, doctor_id: UUID | None
-) -> tuple[bool | None, str | None]:
+) -> tuple[bool | None, str | None, str | None]:
     if doctor_id is None:
-        return None, None
+        return None, None, None
     prof = crud_doctor_profile.get_by_doctor_id(db, doctor_id)
     if prof is None:
-        return False, None
-    return bool(prof.is_profile_complete), str(prof.verification_status)
+        return False, None, None
+    reason = getattr(prof, "verification_rejection_reason", None)
+    if reason is None or (isinstance(reason, str) and not reason.strip()):
+        r = None
+    else:
+        r = str(reason).strip()
+    return bool(prof.is_profile_complete), str(prof.verification_status), r
 
 
 def user_read_with_roles(db: Session, user: User) -> UserRead:
     base = UserRead.model_validate(user)
     roles, doctor_id = roles_and_doctor_id_for_user(db, user)
-    dcomp, vstat = _doctor_profile_flags(db, doctor_id)
+    dcomp, vstat, vreason = _doctor_profile_flags(db, doctor_id)
     tenant_brief: UserMeTenantBrief | None = None
     if user.tenant_id is not None:
         row = db.get(Tenant, user.tenant_id)
@@ -73,6 +78,7 @@ def user_read_with_roles(db: Session, user: User) -> UserRead:
             "doctor_id": doctor_id,
             "doctor_profile_complete": dcomp,
             "doctor_verification_status": vstat,
+            "doctor_verification_rejection_reason": vreason,
             "tenant": tenant_brief,
         }
     )
@@ -81,12 +87,13 @@ def user_read_with_roles(db: Session, user: User) -> UserRead:
 def user_response_with_roles(db: Session, user: User) -> UserResponse:
     base = UserResponse.model_validate(user)
     roles, doctor_id = roles_and_doctor_id_for_user(db, user)
-    dcomp, vstat = _doctor_profile_flags(db, doctor_id)
+    dcomp, vstat, vreason = _doctor_profile_flags(db, doctor_id)
     return base.model_copy(
         update={
             "roles": roles,
             "doctor_id": doctor_id,
             "doctor_profile_complete": dcomp,
             "doctor_verification_status": vstat,
+            "doctor_verification_rejection_reason": vreason,
         }
     )

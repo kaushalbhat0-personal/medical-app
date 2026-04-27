@@ -9,6 +9,7 @@ import {
   staffHomePath,
 } from '../../utils/roles';
 import { useAppMode } from '../../contexts/AppModeContext';
+import { getDoctorVerificationRestrictedRedirect } from '../../utils/doctorVerification';
 
 interface DoctorRouteProps {
   user: User | null;
@@ -19,9 +20,14 @@ interface DoctorRouteProps {
 export function DoctorRoute({ user, children }: DoctorRouteProps) {
   const { isDualModeUser, resolvedMode } = useAppMode();
   const location = useLocation();
-  const eff = getEffectiveRoles(user, localStorage.getItem('token'));
+  const token = localStorage.getItem('token');
+  const eff = getEffectiveRoles(user, token);
   if (isDualModeUser && resolvedMode === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
+  }
+  const verificationRedirect = getDoctorVerificationRestrictedRedirect(location.pathname, user, token);
+  if (verificationRedirect) {
+    return <Navigate to={verificationRedirect} replace />;
   }
   if (needsStructuredDoctorProfile(user) && location.pathname !== '/complete-profile') {
     return <Navigate to="/complete-profile" replace state={{ from: location }} />;

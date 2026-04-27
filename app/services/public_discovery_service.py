@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.organization_display import organization_label_from_active_doctor_count
 from app.models.doctor import Doctor
+from app.models.doctor_profile import DoctorProfile
 from app.models.tenant import Tenant
 from app.schemas.public_discovery import PublicTenantDiscoveryRead, PublicTenantDoctorBrief
 from app.services.exceptions import NotFoundError
@@ -42,10 +43,12 @@ def list_public_tenants_for_discovery(db: Session) -> list[PublicTenantDiscovery
     if solo_tenant_ids:
         doc_stmt = (
             select(Doctor)
+            .join(DoctorProfile, DoctorProfile.doctor_id == Doctor.id)
             .where(
                 Doctor.tenant_id.in_(solo_tenant_ids),
                 Doctor.is_active == True,  # noqa: E712
                 Doctor.is_deleted == False,  # noqa: E712
+                DoctorProfile.verification_status == "approved",
             )
             .order_by(Doctor.name.asc())
         )
@@ -81,10 +84,12 @@ def list_public_doctors_for_tenant(db: Session, tenant_id: UUID) -> list[PublicT
 
     stmt = (
         select(Doctor)
+        .join(DoctorProfile, DoctorProfile.doctor_id == Doctor.id)
         .where(
             Doctor.tenant_id == tenant_id,
             Doctor.is_active == True,  # noqa: E712
             Doctor.is_deleted == False,  # noqa: E712
+            DoctorProfile.verification_status == "approved",
         )
         .order_by(Doctor.name.asc())
     )

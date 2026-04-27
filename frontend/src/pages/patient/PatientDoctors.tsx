@@ -76,7 +76,10 @@ export function PatientDoctors() {
   const loadSearchIndex = useCallback(async () => {
     if (allDoctorsForSearch.length > 0) return;
     try {
-      const [tList, global] = await Promise.all([publicDiscoveryApi.listTenants(), doctorsApi.getAll()]);
+      const [tList, global] = await Promise.all([
+        publicDiscoveryApi.listTenants(),
+        doctorsApi.getAll({ only_verified: true, limit: 100 }),
+      ]);
       setTenants(tList);
       setAllDoctorsForSearch(global);
     } catch {
@@ -114,7 +117,11 @@ export function PatientDoctors() {
           }));
           if (!cancelled) setDoctors(list);
         } else {
-          const list = await doctorsApi.getAll({ limit: 100, include_availability_hint: true });
+          const list = await doctorsApi.getAll({
+            limit: 100,
+            include_availability_hint: true,
+            only_verified: true,
+          });
           if (!cancelled) {
             setDoctors(list);
             setAllDoctorsForSearch((prev) => (prev.length > 0 ? prev : list));
@@ -197,6 +204,9 @@ export function PatientDoctors() {
                   reviewCount={mockReviewCountFromId(String(d.id))}
                   availabilityLabel={availLabel}
                   availabilityTone={availTone}
+                  showVerifiedBadge={
+                    resolvedTenantId ? true : (d.verification_status ?? null) === 'approved'
+                  }
                   primaryLabel="Book Appointment"
                   onPrimary={blocked ? undefined : () => navigate(`/patient/doctor/${d.id}`)}
                   onCardClick={blocked ? undefined : () => navigate(`/patient/doctor/${d.id}`)}

@@ -18,6 +18,7 @@ import {
   isSuperAdminRole,
 } from '../../utils/roles';
 import type { DoctorStructuredProfile } from '../../types';
+import { doctorProfileFieldsToReview } from '../../utils/doctorVerification';
 
 const REQUIRED_COMPLETION_KEYS = [
   'full_name',
@@ -79,6 +80,8 @@ export function CompleteProfilePage() {
     hydratedDoctorIdRef.current = null;
   }, [user?.doctor_id]);
 
+  const rejected = user?.doctor_verification_status === 'rejected';
+
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
     if (!user?.doctor_id) {
@@ -89,7 +92,7 @@ export function CompleteProfilePage() {
       navigate('/dashboard', { replace: true });
       return;
     }
-    if (user.doctor_profile_complete === true) {
+    if (user.doctor_profile_complete === true && !rejected) {
       navigate(doctorHomePath(), { replace: true });
       return;
     }
@@ -108,7 +111,7 @@ export function CompleteProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoading, isAuthenticated, user?.doctor_id, user?.doctor_profile_complete, eff, navigate]);
+  }, [isLoading, isAuthenticated, user?.doctor_id, user?.doctor_profile_complete, rejected, eff, navigate]);
 
   useEffect(() => {
     if (!doctorProfile) return;
@@ -169,18 +172,37 @@ export function CompleteProfilePage() {
   if (!user?.doctor_id) {
     return null;
   }
-  if (user.doctor_profile_complete === true) {
+  if (user.doctor_profile_complete === true && !rejected) {
     return null;
   }
+
+  const reviewFields = new Set(
+    doctorProfileFieldsToReview(user?.doctor_verification_rejection_reason ?? doctorProfile?.verification_rejection_reason)
+  );
+  const ringInvalid = (name: string) =>
+    rejected && reviewFields.has(name) ? 'ring-2 ring-amber-500/60 border-amber-500/70' : '';
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex-1 overflow-y-auto p-4 pb-28 flex justify-center">
         <Card padding="lg" className="w-full max-w-2xl">
-          <h1 className="text-xl font-bold text-text-primary mb-1">Complete your professional profile</h1>
+          <h1 className="text-xl font-bold text-text-primary mb-1">
+            {rejected ? 'Fix your profile and resubmit' : 'Complete your professional profile'}
+          </h1>
           <p className="text-sm text-text-secondary mb-4">
-            A few required details for licensing and contact. You can update these anytime later.
+            {rejected
+              ? 'We could not verify your details yet. Update the highlighted fields and submit again for review.'
+              : 'A few required details for licensing and contact. You can update these anytime later.'}
           </p>
+          {rejected && (user?.doctor_verification_rejection_reason || doctorProfile?.verification_rejection_reason) && (
+            <div
+              className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              role="status"
+            >
+              <span className="font-medium">Rejected: </span>
+              {user?.doctor_verification_rejection_reason ?? doctorProfile?.verification_rejection_reason}
+            </div>
+          )}
           <div className="mb-6" aria-label="Profile completion">
             <div className="flex items-center justify-between text-sm text-text-secondary mb-1.5">
               <span>Profile completion</span>
@@ -209,6 +231,7 @@ export function CompleteProfilePage() {
                   disabled={isSubmitting}
                   placeholder="e.g. Dr. Sayali Nevase"
                   autoFocus
+                  className={ringInvalid('full_name')}
                   {...register('full_name')}
                 />
                 <div className="space-y-1.5 sm:min-w-0">
@@ -218,6 +241,7 @@ export function CompleteProfilePage() {
                     disabled={isSubmitting}
                     placeholder="e.g. 98765 43210 or +91 9876543210"
                     autoComplete="tel"
+                    className={ringInvalid('phone')}
                     {...register('phone')}
                   />
                   <p className="text-sm text-text-secondary">
@@ -243,6 +267,7 @@ export function CompleteProfilePage() {
                   error={errors.specialization?.message}
                   disabled={isSubmitting}
                   placeholder="e.g. Dentist, Cardiologist"
+                  className={ringInvalid('specialization')}
                   {...register('specialization')}
                 />
                 <Input
@@ -250,6 +275,7 @@ export function CompleteProfilePage() {
                   type="number"
                   error={errors.experience_years?.message}
                   disabled={isSubmitting}
+                  className={ringInvalid('experience_years')}
                   {...register('experience_years')}
                 />
                 <div className="sm:col-span-2">
@@ -258,6 +284,7 @@ export function CompleteProfilePage() {
                     error={errors.qualification?.message}
                     disabled={isSubmitting}
                     placeholder="e.g. BDS, MBBS, MD"
+                    className={ringInvalid('qualification')}
                     {...register('qualification')}
                   />
                 </div>
@@ -266,12 +293,14 @@ export function CompleteProfilePage() {
                   error={errors.registration_number?.message}
                   disabled={isSubmitting}
                   placeholder="e.g. DENT-IND-2024-00123"
+                  className={ringInvalid('registration_number')}
                   {...register('registration_number')}
                 />
                 <Input
                   label="Registration council / medical body (optional)"
                   error={errors.registration_council?.message}
                   disabled={isSubmitting}
+                  className={ringInvalid('registration_council')}
                   {...register('registration_council')}
                 />
               </div>
@@ -285,14 +314,33 @@ export function CompleteProfilePage() {
                     error={errors.clinic_name?.message}
                     disabled={isSubmitting}
                     placeholder="e.g. Nevase Dental Clinic"
+                    className={ringInvalid('clinic_name')}
                     {...register('clinic_name')}
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Input label="Address" error={errors.address?.message} disabled={isSubmitting} {...register('address')} />
+                  <Input
+                    label="Address"
+                    error={errors.address?.message}
+                    disabled={isSubmitting}
+                    className={ringInvalid('address')}
+                    {...register('address')}
+                  />
                 </div>
-                <Input label="City" error={errors.city?.message} disabled={isSubmitting} {...register('city')} />
-                <Input label="State" error={errors.state?.message} disabled={isSubmitting} {...register('state')} />
+                <Input
+                  label="City"
+                  error={errors.city?.message}
+                  disabled={isSubmitting}
+                  className={ringInvalid('city')}
+                  {...register('city')}
+                />
+                <Input
+                  label="State"
+                  error={errors.state?.message}
+                  disabled={isSubmitting}
+                  className={ringInvalid('state')}
+                  {...register('state')}
+                />
               </div>
             </section>
           </form>
@@ -308,7 +356,7 @@ export function CompleteProfilePage() {
             className="w-full"
             isLoading={isSubmitting}
           >
-            Save and continue
+            {rejected ? 'Save changes' : 'Save and continue'}
           </Button>
         </div>
       </div>

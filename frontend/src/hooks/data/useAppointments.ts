@@ -13,11 +13,13 @@ export interface AppointmentFilters {
   type?: 'past' | 'upcoming';
 }
 
-export function useAppointments(filters?: AppointmentFilters) {
+export function useAppointments(filters?: AppointmentFilters, enabled: boolean = true) {
   const { data, loading, refetching, error, refetch } = useFetch(
     fetchAppointmentDataHandler,
     filters,
-    'appointments'
+    'appointments',
+    enabled,
+    { subscribeScopeEvents: enabled }
   );
 
   return {

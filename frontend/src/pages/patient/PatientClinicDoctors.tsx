@@ -92,6 +92,7 @@ export function PatientClinicDoctors() {
                     subtitle={d.specialization}
                     rating={mockRatingFromId(d.id)}
                     reviewCount={mockReviewCountFromId(d.id)}
+                    showVerifiedBadge
                     availabilityLabel="Available today"
                     primaryLabel="Book Appointment"
                     onPrimary={() =>

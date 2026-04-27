@@ -3,11 +3,13 @@ import { fetchPatientsHandler } from '../../handlers';
 import { safeArray } from '../../utils';
 import type { Patient } from '../../types';
 
-export function usePatients(search?: string) {
+export function usePatients(search?: string, enabled: boolean = true) {
   const { data, loading, error, refetch } = useFetch(
     fetchPatientsHandler,
     search?.trim() || undefined,
-    'patients'
+    'patients',
+    enabled,
+    { subscribeScopeEvents: enabled }
   );
 
   return {

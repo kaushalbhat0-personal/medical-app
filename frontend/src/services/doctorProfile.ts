@@ -10,6 +10,10 @@ export const doctorProfileApi = {
     const { data } = await api.put<DoctorStructuredProfile>('/doctor/profile', body);
     return data;
   },
+  submitForVerification: async (): Promise<DoctorStructuredProfile> => {
+    const { data } = await api.post<DoctorStructuredProfile>('/doctor/profile/submit-for-verification');
+    return data;
+  },
 };
 
 /** Payload for create/replace (matches backend `DoctorProfileWrite`). */

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    admin_doctor_verification,
     appointment,
     auth,
     billing,
@@ -29,3 +30,4 @@ api_router.include_router(billing.router)
 api_router.include_router(inventory.router)
 api_router.include_router(dashboard.router, prefix="/dashboard")
 api_router.include_router(dashboard.admin_router, prefix="/admin")
+api_router.include_router(admin_doctor_verification.router, prefix="/admin")

@@ -11,6 +11,7 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_resolved_data_scope,
+    require_doctor_verification_approved,
     require_structured_profile_complete,
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
@@ -48,6 +49,7 @@ def create_patient(
     current_user: User = Depends(get_current_active_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> PatientRead:
     return patient_service.create_patient(
         db, payload, current_user, tenant_id, acting_doctor=acting_doctor
@@ -64,6 +66,7 @@ def read_patients(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> list[PatientListRead]:
     return patient_service.get_patients(
         db,
@@ -85,6 +88,7 @@ def read_patient(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> PatientRead:
     patient = patient_service.get_patient_or_404(db, patient_id)
     patient_service.authorize_patient_read(
@@ -108,6 +112,7 @@ def update_patient(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> PatientRead:
     return patient_service.update_patient(
         db,
@@ -128,6 +133,7 @@ def delete_patient(
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> Response:
     patient_service.delete_patient(
         db,

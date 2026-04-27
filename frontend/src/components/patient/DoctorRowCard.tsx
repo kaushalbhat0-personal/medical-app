@@ -1,4 +1,4 @@
-import { ChevronRight, Star } from 'lucide-react';
+import { BadgeCheck, ChevronRight, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { initialsFromName } from '@/lib/patient/mockDoctorPresentation';
@@ -24,6 +24,8 @@ export interface DoctorRowCardProps {
   compact?: boolean;
   /** When false, CTA is hidden and card is non-interactive where applicable. */
   disabled?: boolean;
+  /** Marketplace-approved clinician badge */
+  showVerifiedBadge?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export function DoctorRowCard({
   availabilityTone = 'today',
   compact,
   disabled,
+  showVerifiedBadge,
 }: DoctorRowCardProps) {
   const interactive = Boolean(onCardClick) && !disabled;
   const showRating = typeof rating === 'number' && !Number.isNaN(rating);
@@ -78,7 +81,18 @@ export function DoctorRowCard({
         {initialsFromName(name)}
       </div>
       <div className="min-w-0 flex-1 py-0.5">
-        <h3 className="truncate text-base font-semibold leading-tight text-foreground">{name}</h3>
+        <h3 className="flex min-w-0 items-center gap-1.5 truncate text-base font-semibold leading-tight text-foreground">
+          <span className="truncate">{name}</span>
+          {showVerifiedBadge ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400"
+              title="Verified doctor"
+            >
+              <BadgeCheck className="h-3 w-3" aria-hidden />
+              Verified
+            </span>
+          ) : null}
+        </h3>
         <p className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</p>
         {showRating && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

@@ -228,6 +228,8 @@ export const doctorsApi = {
       radius?: string;
       specialization?: string;
       include_availability_hint?: boolean;
+      /** Only marketplace-approved doctors (also enforced server-side for patients). */
+      only_verified?: boolean;
     },
     options?: { tenantScopeId?: string }
   ): Promise<Doctor[]> => {

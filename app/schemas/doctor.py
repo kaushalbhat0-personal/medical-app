@@ -64,6 +64,10 @@ class DoctorRead(BaseModel):
         default=None,
         description="When requested: available_today | next_available_tomorrow | none",
     )
+    verification_status: str | None = Field(
+        default=None,
+        description="Marketplace verification on structured profile: draft | pending | approved | rejected",
+    )
 
 
 class DoctorUpdate(BaseModel):

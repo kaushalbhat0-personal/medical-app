@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.doctor import Doctor, DoctorCreationIdempotency
+from app.models.doctor_profile import DoctorProfile
 from app.models.tenant import Tenant
 
 
@@ -99,11 +100,17 @@ def get_doctors(
     tenant_id: UUID | None = None,
     user_id: UUID | None = None,
     specialization: str | None = None,
+    *,
+    only_marketplace_verified: bool = False,
 ) -> list[Doctor]:
     stmt = (
         select(Doctor)
         .order_by(Doctor.created_at.desc())
-        .options(joinedload(Doctor.tenant), joinedload(Doctor.user))
+        .options(
+            joinedload(Doctor.tenant),
+            joinedload(Doctor.user),
+            joinedload(Doctor.structured_profile),
+        )
         .where(
             Doctor.is_active == True,
             Doctor.is_deleted == False,
@@ -119,8 +126,12 @@ def get_doctors(
         stmt = stmt.where(Doctor.tenant_id == tenant_id)
     # Public listing safety: only show doctors attached to active tenants
     stmt = stmt.join(Doctor.tenant).where(Tenant.is_active == True)
+    if only_marketplace_verified:
+        stmt = stmt.join(DoctorProfile, DoctorProfile.doctor_id == Doctor.id).where(
+            DoctorProfile.verification_status == "approved"
+        )
     stmt = stmt.offset(skip).limit(limit)
-    return list(db.scalars(stmt).all())
+    return list(db.scalars(stmt).unique().all())
 
 
 def update_doctor(

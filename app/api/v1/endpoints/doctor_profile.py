@@ -62,3 +62,19 @@ def patch_structured_profile(
     db.commit()
     db.refresh(row)
     return DoctorProfileRead.model_validate(row)
+
+
+@router.post(
+    "/profile/submit-for-verification",
+    response_model=DoctorProfileRead,
+    status_code=status.HTTP_200_OK,
+)
+def submit_structured_profile_for_verification(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_active_user),
+    doctor: Doctor = Depends(get_current_users_doctor_for_structured_profile),
+) -> DoctorProfileRead:
+    row = doctor_profile_service.submit_profile_for_verification(db, doctor)
+    db.commit()
+    db.refresh(row)
+    return DoctorProfileRead.model_validate(row)

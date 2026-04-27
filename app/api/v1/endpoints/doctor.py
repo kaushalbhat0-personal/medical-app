@@ -13,9 +13,11 @@ from app.api.deps import (
     get_scoped_tenant_id,
     get_scoped_tenant_id_active,
     require_current_user_admin_or_owner,
+    require_doctor_verification_approved,
 )
 from app.core.database import get_db
 from app.core.tenant_context import resolve_tenant_id_for_scoped_request
+from app.crud import crud_doctor_profile
 from app.models.user import User, UserRole
 from app.schemas.user import UserRead
 from app.schemas.doctor import (
@@ -106,6 +108,10 @@ def read_doctors(
         default=False,
         description="Populate availability_status on each doctor (extra slot computation per row)",
     ),
+    only_verified: bool = Query(
+        default=False,
+        description="Only doctors with marketplace-approved structured profiles (patients always get this filter)",
+    ),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
     x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
@@ -120,6 +126,9 @@ def read_doctors(
     if (lat is None) ^ (lng is None):
         raise ValidationError("lat and lng must be provided together")
     radius_km = _radius_km_from_query(radius, has_coords=has_coords)
+    enforce_verified = only_verified or (
+        current_user is not None and current_user.role == UserRole.patient
+    )
     return doctor_service.get_doctors(
         db,
         current_user,
@@ -133,6 +142,7 @@ def read_doctors(
         radius_km=radius_km,
         specialization=specialization,
         include_availability_hint=include_availability_hint,
+        only_marketplace_verified=enforce_verified,
     )
 
 
@@ -266,6 +276,7 @@ def create_doctor_availability_window(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID = Depends(get_scoped_tenant_id),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> DoctorAvailabilityRead:
     try:
         row = doctor_availability_service.create_availability_window(
@@ -290,6 +301,7 @@ def copy_doctor_availability_windows(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID = Depends(get_scoped_tenant_id),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> list[DoctorAvailabilityRead]:
     try:
         doctor_availability_service.copy_availability_to_days(
@@ -384,6 +396,7 @@ def create_doctor_time_off(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID = Depends(get_scoped_tenant_id),
+    _verified: None = Depends(require_doctor_verification_approved),
 ) -> DoctorTimeOffRead:
     try:
         row = doctor_availability_service.create_time_off(
@@ -453,6 +466,12 @@ def read_doctor(
     doctor = doctor_service.get_doctor_or_404(db, doctor_id)
     doctor_service.authorize_doctor_read(db, doctor, current_user, tenant_id)
     doctor_service.hydrate_doctor_availability_flags(db, [doctor])
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
+    setattr(
+        doctor,
+        "verification_status",
+        prof.verification_status if prof is not None else None,
+    )
     return doctor
 
 

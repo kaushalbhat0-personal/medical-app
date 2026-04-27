@@ -21,6 +21,8 @@ export interface User {
   doctor_profile_complete?: boolean | null;
   /** From backend verification workflow (display-only badge). */
   doctor_verification_status?: string | null;
+  /** When verification is rejected, admin may include a reason (GET /me). */
+  doctor_verification_rejection_reason?: string | null;
   /** From GET /me after sync — use ``type`` for practice vs org mode (not roles/localStorage). */
   tenant?: MeTenantBrief | null;
   /** When true, client must complete password reset before using the app */
@@ -39,6 +41,7 @@ export interface MeUserResponse {
   doctor_id: string | null;
   doctor_profile_complete?: boolean | null;
   doctor_verification_status?: string | null;
+  doctor_verification_rejection_reason?: string | null;
   tenant: MeTenantBrief | null;
   created_at: string;
   updated_at: string;
@@ -62,6 +65,7 @@ export interface DoctorStructuredProfile {
   profile_image: string | null;
   is_profile_complete: boolean;
   verification_status: string;
+  verification_rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -187,6 +191,8 @@ export interface Doctor {
   tenant_id?: string | null;
   /** From GET /doctors when include_availability_hint=true */
   availability_status?: 'available_today' | 'next_available_tomorrow' | 'none' | string | null;
+  /** Marketplace verification on structured profile (patient trust / discovery). */
+  verification_status?: string | null;
 }
 
 export interface Appointment {
@@ -265,6 +271,7 @@ export interface RegisterResponseUser {
   doctor_id?: string | null;
   doctor_profile_complete?: boolean | null;
   doctor_verification_status?: string | null;
+  doctor_verification_rejection_reason?: string | null;
 }
 
 export interface RegisterResponse {

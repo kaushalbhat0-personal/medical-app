@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Loader2, Star } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Building2, Loader2, Star } from 'lucide-react';
 import axios from 'axios';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,7 +97,9 @@ export function PatientDoctorDetail() {
   const spec = doctor.specialization || doctor.specialty || 'Specialist';
   const rating = mockRatingFromId(String(doctor.id));
   const reviews = mockReviewCountFromId(String(doctor.id));
-  const blocked = !patientId || doctor.has_availability_windows === false;
+  const isVerifiedProvider = (doctor.verification_status ?? null) === 'approved';
+  const blocked =
+    !patientId || doctor.has_availability_windows === false || !isVerifiedProvider;
   const aboutText =
     doctor.experience_years != null
       ? `${name} is a ${spec.toLowerCase()} with ${doctor.experience_years}+ years of experience. Book a convenient slot in two taps.`
@@ -124,7 +126,15 @@ export function PatientDoctorDetail() {
                 .toUpperCase()}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">{name}</h1>
+              <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+                {name}
+                {isVerifiedProvider ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
+                    <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                    Verified doctor
+                  </span>
+                ) : null}
+              </h1>
               <p className="mt-0.5 text-sm font-medium text-primary/90">{spec}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-amber-700">
                 <span className="inline-flex items-center gap-1">
@@ -166,9 +176,11 @@ export function PatientDoctorDetail() {
 
       {blocked && (
         <p className="text-sm text-amber-800" role="status">
-          {doctor.has_availability_windows === false
-            ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
-            : 'Connect your profile to book.'}
+          {!isVerifiedProvider
+            ? 'This provider is not available for booking yet.'
+            : doctor.has_availability_windows === false
+              ? 'This doctor has not set online hours yet. Try another provider or call the clinic.'
+              : 'Connect your profile to book.'}
         </p>
       )}
 

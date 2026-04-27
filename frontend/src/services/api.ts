@@ -165,6 +165,8 @@ api.interceptors.response.use(
         } else {
           toast.error(m);
         }
+      } else if (m.toLowerCase().includes('doctor verification pending')) {
+        toast.error('Your profile is not verified yet. Submit for review or wait for approval.');
       } else {
         toast.error('Access denied. You do not have permission.');
       }

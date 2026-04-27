@@ -119,7 +119,11 @@ class UserRead(BaseModel):
     )
     doctor_verification_status: str | None = Field(
         default=None,
-        description="pending | verified | rejected — trust badge for Phase 2 approval workflow.",
+        description="draft | pending | approved | rejected — marketplace verification.",
+    )
+    doctor_verification_rejection_reason: str | None = Field(
+        default=None,
+        description="When rejected, org/admin may store a reason for the clinician.",
     )
     tenant: UserMeTenantBrief | None = Field(
         default=None,
@@ -172,6 +176,7 @@ class UserResponse(BaseModel):
     )
     doctor_profile_complete: bool | None = None
     doctor_verification_status: str | None = None
+    doctor_verification_rejection_reason: str | None = None
     full_name: str = ""
 
     def __init__(self, **data):

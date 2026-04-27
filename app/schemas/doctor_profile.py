@@ -23,6 +23,7 @@ class DoctorProfileRead(BaseModel):
     profile_image: str | None = None
     is_profile_complete: bool
     verification_status: str
+    verification_rejection_reason: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -42,6 +43,21 @@ class DoctorProfileWrite(BaseModel):
     address: str | None = None
     city: str | None = None
     state: str | None = None
+
+
+class DoctorProfileVerificationReview(BaseModel):
+    """Admin/org: set marketplace verification on a doctor's structured profile."""
+
+    status: str = Field(
+        min_length=1,
+        max_length=32,
+        description="approved | pending | rejected",
+    )
+    reason: str | None = Field(
+        default=None,
+        max_length=4000,
+        description="Required context when status is rejected; stored for clinician UX.",
+    )
 
 
 class DoctorProfileUpdate(BaseModel):

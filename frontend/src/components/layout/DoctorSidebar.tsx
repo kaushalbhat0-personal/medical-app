@@ -1,6 +1,11 @@
 import { X, Stethoscope, UserRound } from 'lucide-react';
 import type { User } from '../../types';
 import { getEffectiveRoles, normalizeRoles } from '../../utils/roles';
+import {
+  doctorNavItemHint,
+  isDoctorNavItemLocked,
+  isDoctorNavItemVisible,
+} from '../../utils/doctorVerification';
 import { NavItem } from './NavItem';
 import { DOCTOR_PRACTICE_NAV } from './doctorNav';
 
@@ -14,9 +19,10 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
   const eff = getEffectiveRoles(user, token);
   const roles = normalizeRoles(eff);
   const isDoctor = roles.includes('doctor');
-  const links = isDoctor
+  const baseLinks = isDoctor
     ? DOCTOR_PRACTICE_NAV
     : DOCTOR_PRACTICE_NAV.filter((l) => l.path !== '/doctor/availability');
+  const links = baseLinks.filter((item) => isDoctorNavItemVisible(user, token, item.path));
 
   return (
     <div className="flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white">
@@ -50,6 +56,8 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
               icon={item.icon}
               isCollapsed={false}
               onNavigate={onClose}
+              disabled={isDoctorNavItemLocked(user, token, item.path)}
+              title={doctorNavItemHint(user, token, item.path)}
             />
           ))}
         </ul>
@@ -69,13 +77,16 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
               {user.doctor_id && user.doctor_verification_status && (
                 <p
                   className="mt-1 text-[10px] font-medium uppercase tracking-wide"
-                  title="Verification (Phase 2: admin review)"
+                  title="Marketplace verification"
                 >
-                  {user.doctor_verification_status === 'verified' && (
+                  {user.doctor_verification_status === 'approved' && (
                     <span className="text-emerald-600">Verified doctor</span>
                   )}
+                  {user.doctor_verification_status === 'draft' && (
+                    <span className="text-slate-600">Profile not submitted</span>
+                  )}
                   {user.doctor_verification_status === 'pending' && (
-                    <span className="text-amber-600">Pending verification</span>
+                    <span className="text-amber-600">Under review</span>
                   )}
                   {user.doctor_verification_status === 'rejected' && (
                     <span className="text-red-600">Verification rejected</span>

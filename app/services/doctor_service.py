@@ -768,6 +768,7 @@ def get_doctors(
     radius_km: float | None = None,
     specialization: str | None = None,
     include_availability_hint: bool = False,
+    only_marketplace_verified: bool = False,
 ) -> list[Doctor]:
     if current_user is None:
         logger.info("[RBAC] role=None, user=None")
@@ -808,6 +809,7 @@ def get_doctors(
         tenant_id=eff_tenant_id,
         user_id=user_id_filter,
         specialization=specialization,
+        only_marketplace_verified=only_marketplace_verified,
     )
 
     hydrate_doctor_availability_flags(db, doctors)
@@ -854,6 +856,12 @@ def get_doctors(
             d,
             "linked_user_role",
             (u.role.value if u is not None and u.role is not None else None),
+        )
+        prof = getattr(d, "structured_profile", None)
+        setattr(
+            d,
+            "verification_status",
+            prof.verification_status if prof is not None else None,
         )
         if include_availability_hint:
             if available_today:
