@@ -141,7 +141,7 @@ export function usePatientDoctorBookingPanel(
           skipCache: true,
         });
         if (reqId !== slotsRequestIdRef.current) return;
-        const deduped = dedupeDoctorSlots(list);
+        const deduped = dedupeDoctorSlots(list).filter((s) => isSlotInstantInTheFuture(s.start));
         setSlots(deduped);
         setSelectedSlotStartState((cur) => {
           const stillValid =
@@ -292,7 +292,9 @@ export function usePatientDoctorBookingPanel(
         axios.isAxiosError(err) && err.response?.data && typeof err.response.data === 'object'
           ? String((err.response.data as { detail?: unknown }).detail ?? '')
           : '';
-      if (detail.includes('Slot already booked')) {
+      if (detail.toLowerCase().includes('already have an appointment at this time')) {
+        toast.error('You already have another visit booked at this time. Pick a different time.');
+      } else if (detail.includes('Slot already booked')) {
         toast.error('That slot was just taken. Choose another time.');
         setSelectedSlotStartState(null);
         if (bookDate && bookingDoctor) {
@@ -300,7 +302,7 @@ export function usePatientDoctorBookingPanel(
           setSlotsLoading(true);
           try {
             const list = await doctorsApi.getSlots(String(bookingDoctor.id), bookDate, { skipCache: true });
-            const deduped = dedupeDoctorSlots(list);
+            const deduped = dedupeDoctorSlots(list).filter((s) => isSlotInstantInTheFuture(s.start));
             setSlots(deduped);
             if (!scheduleInteractedRef.current) {
               const first = deduped.find((s) => s.available && isSlotInstantInTheFuture(s.start));

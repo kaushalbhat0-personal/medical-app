@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, time
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
 from app.models.user import UserRole
-from tests.factories import create_patient_profile, create_user, seed_bookable_doctor_and_patient
+from tests.factories import (
+    BOOKING_ANCHOR_DATE_ISO,
+    add_weekly_availability,
+    create_doctor_profile,
+    create_patient_profile,
+    create_user,
+    seed_bookable_doctor_and_patient,
+)
 
 
 @pytest.mark.asyncio
@@ -125,6 +133,84 @@ async def test_slot_conflict_second_patient_same_slot_rejected(
     assert second.status_code == 400
     detail = (second.json().get("detail") or "").lower()
     assert "slot already booked" in detail or "30 minutes" in detail or "appointment within" in detail
+
+
+@pytest.mark.asyncio
+async def test_patient_cannot_book_two_doctors_same_instant(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_a_email = f"doca_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_b_email = f"docb_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor_a, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_a_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    tenant_id = doctor_a.tenant_id
+    assert tenant_id is not None
+
+    doc_b_user = create_user(
+        db_session,
+        email=doc_b_email,
+        password=doc_pw,
+        role=UserRole.doctor,
+        tenant_id=tenant_id,
+    )
+    doctor_b = create_doctor_profile(
+        db_session,
+        tenant_id=tenant_id,
+        user_id=doc_b_user.id,
+        timezone_name="Asia/Kolkata",
+    )
+    anchor = date.fromisoformat(BOOKING_ANCHOR_DATE_ISO)
+    add_weekly_availability(
+        db_session,
+        doctor_id=doctor_b.id,
+        tenant_id=tenant_id,
+        day_of_week=anchor.weekday(),
+        start=time(10, 0),
+        end=time(12, 0),
+        slot_duration=30,
+    )
+    db_session.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": pat_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = await client.post(
+        "/api/v1/appointments",
+        json={
+            "patient_id": str(patient.id),
+            "doctor_id": str(doctor_a.id),
+            "appointment_time": slot.isoformat(),
+        },
+        headers=headers,
+    )
+    assert first.status_code == 201, first.text
+
+    second = await client.post(
+        "/api/v1/appointments",
+        json={
+            "patient_id": str(patient.id),
+            "doctor_id": str(doctor_b.id),
+            "appointment_time": slot.isoformat(),
+        },
+        headers=headers,
+    )
+    assert second.status_code == 400
+    assert "already have an appointment at this time" in (second.json().get("detail") or "").lower()
 
 
 @pytest.mark.asyncio

@@ -102,6 +102,22 @@ def _validate_slot_not_double_booked(
         raise ValidationError("Slot already booked")
 
 
+def _validate_patient_no_other_appointment_same_instant(
+    db: Session,
+    patient_id: UUID,
+    appointment_time: datetime,
+    *,
+    exclude_appointment_id: UUID | None = None,
+) -> None:
+    if crud_appointment.patient_has_scheduled_appointment_at(
+        db,
+        patient_id,
+        appointment_time,
+        exclude_appointment_id=exclude_appointment_id,
+    ):
+        raise ValidationError("You already have an appointment at this time")
+
+
 def authorize_appointment_create(
     db: Session,
     appointment_in: AppointmentCreate,
@@ -231,6 +247,9 @@ def create_appointment(
         appointment_time=appt_in.appointment_time,
     )
     _validate_slot_not_double_booked(db, appt_in.doctor_id, appt_in.appointment_time)
+    _validate_patient_no_other_appointment_same_instant(
+        db, appt_in.patient_id, appt_in.appointment_time
+    )
     _validate_appointment_time_in_future(appt_in.appointment_time)
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
@@ -541,6 +560,17 @@ def update_appointment(
         _validate_slot_not_double_booked(
             db,
             doctor_id,
+            appointment_time,
+            exclude_appointment_id=appointment.id,
+        )
+    if (
+        appointment_time != prev_appointment_time
+        or patient_id != appointment.patient_id
+        or doctor_id != prev_doctor_id
+    ):
+        _validate_patient_no_other_appointment_same_instant(
+            db,
+            patient_id,
             appointment_time,
             exclude_appointment_id=appointment.id,
         )

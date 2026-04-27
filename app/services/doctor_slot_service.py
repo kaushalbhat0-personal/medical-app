@@ -249,6 +249,9 @@ def _compute_slots(
             )
 
     slots.sort(key=lambda s: s.start)
+    now_utc = datetime.now(timezone.utc)
+    # Booking UX: only expose future slot starts (past intervals are not bookable).
+    slots = [s for s in slots if _utc_naive(s.start) > now_utc]
     return slots
 
 

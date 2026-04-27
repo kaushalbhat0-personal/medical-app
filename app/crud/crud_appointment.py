@@ -166,6 +166,25 @@ def get_doctor_appointment_at_time(
     return db.scalars(stmt).first()
 
 
+def patient_has_scheduled_appointment_at(
+    db: Session,
+    patient_id: UUID,
+    appointment_time: datetime,
+    exclude_appointment_id: UUID | None = None,
+) -> bool:
+    """True if the patient already has a scheduled (active) appointment at this exact start instant."""
+    appointment_time = normalize_appointment_time_utc(appointment_time)
+    stmt = select(Appointment.id).where(
+        Appointment.patient_id == patient_id,
+        Appointment.appointment_time == appointment_time,
+        Appointment.status == AppointmentStatus.scheduled,
+        Appointment.is_deleted == False,
+    )
+    if exclude_appointment_id is not None:
+        stmt = stmt.where(Appointment.id != exclude_appointment_id)
+    return db.scalar(stmt.limit(1)) is not None
+
+
 def doctor_has_non_cancelled_appointment_at(
     db: Session,
     doctor_id: UUID,
