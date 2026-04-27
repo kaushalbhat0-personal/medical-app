@@ -727,7 +727,7 @@ def require_doctor_profile(db: Session, current_user: User) -> Doctor:
         raise ForbiddenError("Doctor tenant is not set")
     prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
     if prof is None or not prof.is_profile_complete:
-        raise ForbiddenError("Doctor profile incomplete")
+        raise ForbiddenError("Complete your profile to continue")
     return doctor
 
 

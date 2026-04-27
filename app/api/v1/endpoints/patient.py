@@ -11,6 +11,7 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_resolved_data_scope,
+    require_structured_profile_complete,
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
@@ -25,7 +26,11 @@ from app.schemas.patient import (
 )
 from app.services import patient_service
 
-router = APIRouter(prefix="/patients", tags=["patients"])
+router = APIRouter(
+    prefix="/patients",
+    tags=["patients"],
+    dependencies=[Depends(require_structured_profile_complete)],
+)
 
 
 @router.get("/me/doctors", response_model=list[PatientMyDoctorRead])

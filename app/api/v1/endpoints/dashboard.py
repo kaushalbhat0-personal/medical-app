@@ -4,7 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_resolved_data_scope, get_scoped_tenant_id
+from app.api.deps import (
+    get_current_user,
+    get_resolved_data_scope,
+    get_scoped_tenant_id,
+    require_structured_profile_complete,
+)
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.database import get_db
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
@@ -15,10 +20,13 @@ from app.schemas.dashboard import (
     DoctorPerformanceItem,
     RevenueTrendItem,
 )
-from app.services import dashboard_service, doctor_service
+from app.services import dashboard_service
 
-router = APIRouter()
-admin_router = APIRouter(tags=["admin", "dashboard"])
+router = APIRouter(dependencies=[Depends(require_structured_profile_complete)])
+admin_router = APIRouter(
+    tags=["admin", "dashboard"],
+    dependencies=[Depends(require_structured_profile_complete)],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -36,8 +44,6 @@ def get_dashboard(
     - Today's appointments count
     - Total revenue (sum of paid bills)
     """
-    if data_scope.kind == DataScopeKind.doctor and data_scope.doctor_id is not None:
-        doctor_service.require_doctor_profile(db, current_user)
     logger.info("Dashboard endpoint hit - fetching stats")
 
     doc_id = (

@@ -152,7 +152,22 @@ api.interceptors.response.use(
 
     // Handle 403 Forbidden
     if (error.response?.status === 403) {
-      toast.error('Access denied. You do not have permission.');
+      const m =
+        typeof messageForToast === 'string' && messageForToast
+          ? messageForToast
+          : typeof message === 'string'
+            ? message
+            : '';
+      if (m.toLowerCase().includes('complete your profile')) {
+        if (window.location.pathname !== '/complete-profile') {
+          toast.error('Please complete your profile to continue.');
+          navigateTo('/complete-profile');
+        } else {
+          toast.error(m);
+        }
+      } else {
+        toast.error('Access denied. You do not have permission.');
+      }
     }
 
     // Handle 404 Not Found

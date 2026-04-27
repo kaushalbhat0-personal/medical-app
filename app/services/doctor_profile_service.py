@@ -25,6 +25,7 @@ def is_profile_complete_fields(profile: DoctorProfile) -> bool:
             _blank_to_none(profile.specialization),
             _blank_to_none(profile.registration_number),
             _blank_to_none(profile.phone),
+            _blank_to_none(profile.qualification),
         ]
     )
 

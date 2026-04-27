@@ -135,7 +135,8 @@ def _ensure_structured_doctor_profile_complete(db: Session, d: Doctor) -> None:
 
     p = doctor_profile_service.ensure_profile_for_doctor(db, d)
     p.registration_number = p.registration_number or "TEST-REG-NUM"
-    p.phone = p.phone or "555-0100"
+    p.phone = p.phone or "9876543210"
+    p.qualification = p.qualification or "MBBS"
     doctor_profile_service.recompute_is_complete(p)
     db.add(p)
     db.flush()

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -17,17 +17,41 @@ import {
   isAdminRole,
   isSuperAdminRole,
 } from '../../utils/roles';
+import type { DoctorStructuredProfile } from '../../types';
+
+const REQUIRED_COMPLETION_KEYS = [
+  'full_name',
+  'phone',
+  'specialization',
+  'registration_number',
+  'qualification',
+] as const;
+
+function completionPercent(watched: Record<string, unknown>): number {
+  const checks = [
+    String(watched.full_name ?? '').trim().length > 0,
+    String(watched.phone ?? '').replace(/\D/g, '').length === 10,
+    String(watched.specialization ?? '').trim().length > 0,
+    String(watched.registration_number ?? '').trim().length > 0,
+    String(watched.qualification ?? '').trim().length > 0,
+  ];
+  const done = checks.filter(Boolean).length;
+  return Math.round((done / REQUIRED_COMPLETION_KEYS.length) * 100);
+}
 
 export function CompleteProfilePage() {
   const { user, refreshUser, isLoading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const eff = getEffectiveRoles(user, token);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorStructuredProfile | null>(null);
+  const hydratedDoctorIdRef = useRef<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CompleteStructuredDoctorProfileFormInput, unknown, CompleteStructuredDoctorProfileFormData>({
     resolver: zodResolver(completeStructuredDoctorProfileSchema),
@@ -46,6 +70,14 @@ export function CompleteProfilePage() {
       state: '',
     },
   });
+
+  const watched = watch();
+  const progressPct = useMemo(() => completionPercent(watched as Record<string, unknown>), [watched]);
+
+  useEffect(() => {
+    setDoctorProfile(null);
+    hydratedDoctorIdRef.current = null;
+  }, [user?.doctor_id]);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
@@ -66,20 +98,7 @@ export function CompleteProfilePage() {
       try {
         const p = await doctorProfileApi.get();
         if (cancelled) return;
-        reset({
-          full_name: p.full_name,
-          phone: p.phone ?? '',
-          profile_image: p.profile_image ?? '',
-          specialization: p.specialization ?? '',
-          experience_years: p.experience_years ?? 0,
-          qualification: p.qualification ?? '',
-          registration_number: p.registration_number ?? '',
-          registration_council: p.registration_council ?? '',
-          clinic_name: p.clinic_name ?? '',
-          address: p.address ?? '',
-          city: p.city ?? '',
-          state: p.state ?? '',
-        });
+        setDoctorProfile(p);
       } catch {
         if (!cancelled) {
           toast.error('Could not load your profile. Try again.');
@@ -89,7 +108,27 @@ export function CompleteProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoading, isAuthenticated, user, eff, navigate, reset]);
+  }, [isLoading, isAuthenticated, user?.doctor_id, user?.doctor_profile_complete, eff, navigate]);
+
+  useEffect(() => {
+    if (!doctorProfile) return;
+    if (hydratedDoctorIdRef.current === doctorProfile.id) return;
+    reset({
+      full_name: doctorProfile.full_name,
+      phone: doctorProfile.phone ?? '',
+      profile_image: doctorProfile.profile_image ?? '',
+      specialization: doctorProfile.specialization ?? '',
+      experience_years: doctorProfile.experience_years ?? 0,
+      qualification: doctorProfile.qualification ?? '',
+      registration_number: doctorProfile.registration_number ?? '',
+      registration_council: doctorProfile.registration_council ?? '',
+      clinic_name: doctorProfile.clinic_name ?? '',
+      address: doctorProfile.address ?? '',
+      city: doctorProfile.city ?? '',
+      state: doctorProfile.state ?? '',
+    });
+    hydratedDoctorIdRef.current = doctorProfile.id;
+  }, [doctorProfile, reset]);
 
   const onSubmit = async (data: CompleteStructuredDoctorProfileFormData) => {
     try {
@@ -120,7 +159,7 @@ export function CompleteProfilePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
         <div className="spinner" />
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-text-secondary">Loading…</p>
       </div>
     );
   }
@@ -135,105 +174,144 @@ export function CompleteProfilePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card padding="lg" className="w-full max-w-2xl">
-        <h1 className="text-xl font-bold text-text-primary mb-1">Complete your professional profile</h1>
-        <p className="text-sm text-text-secondary mb-6">
-          A few required details for licensing and contact. You can update these anytime later.
-        </p>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <section>
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Basic</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Input
-                label="Full name"
-                error={errors.full_name?.message}
-                disabled={isSubmitting}
-                {...register('full_name')}
+    <div className="min-h-screen flex flex-col bg-background">
+      <div className="flex-1 overflow-y-auto p-4 pb-28 flex justify-center">
+        <Card padding="lg" className="w-full max-w-2xl">
+          <h1 className="text-xl font-bold text-text-primary mb-1">Complete your professional profile</h1>
+          <p className="text-sm text-text-secondary mb-4">
+            A few required details for licensing and contact. You can update these anytime later.
+          </p>
+          <div className="mb-6" aria-label="Profile completion">
+            <div className="flex items-center justify-between text-sm text-text-secondary mb-1.5">
+              <span>Profile completion</span>
+              <span className="font-medium text-text-primary tabular-nums">{progressPct}%</span>
+            </div>
+            <div
+              className="h-2 w-full rounded-full bg-border/60 overflow-hidden"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPct}
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{ width: `${progressPct}%` }}
               />
-              <Input
-                label="Phone"
-                error={errors.phone?.message}
-                disabled={isSubmitting}
-                {...register('phone')}
-              />
-              <div className="sm:col-span-2">
+            </div>
+          </div>
+          <form id="complete-profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <section>
+              <h2 className="text-sm font-semibold text-text-primary mb-3">👤 Personal details</h2>
+              <div className="grid sm:grid-cols-2 gap-3">
                 <Input
-                  label="Profile photo URL (optional)"
-                  error={errors.profile_image?.message}
+                  label="Full name"
+                  error={errors.full_name?.message}
                   disabled={isSubmitting}
-                  placeholder="https://…"
-                  {...register('profile_image')}
+                  placeholder="e.g. Dr. Sayali Nevase"
+                  autoFocus
+                  {...register('full_name')}
+                />
+                <div className="space-y-1.5 sm:min-w-0">
+                  <Input
+                    label="Phone"
+                    error={errors.phone?.message}
+                    disabled={isSubmitting}
+                    placeholder="e.g. 98765 43210 or +91 9876543210"
+                    autoComplete="tel"
+                    {...register('phone')}
+                  />
+                  <p className="text-sm text-text-secondary">
+                    Enter a 10-digit number (with or without +91 or spaces).
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Profile photo URL (optional)"
+                    error={errors.profile_image?.message}
+                    disabled={isSubmitting}
+                    placeholder="https://…"
+                    {...register('profile_image')}
+                  />
+                </div>
+              </div>
+            </section>
+            <section>
+              <h2 className="text-sm font-semibold text-text-primary mb-3">🩺 Professional details</h2>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Input
+                  label="Specialization"
+                  error={errors.specialization?.message}
+                  disabled={isSubmitting}
+                  placeholder="e.g. Dentist, Cardiologist"
+                  {...register('specialization')}
+                />
+                <Input
+                  label="Experience (years)"
+                  type="number"
+                  error={errors.experience_years?.message}
+                  disabled={isSubmitting}
+                  {...register('experience_years')}
+                />
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Qualification"
+                    error={errors.qualification?.message}
+                    disabled={isSubmitting}
+                    placeholder="e.g. BDS, MBBS, MD"
+                    {...register('qualification')}
+                  />
+                </div>
+                <Input
+                  label="License / registration number"
+                  error={errors.registration_number?.message}
+                  disabled={isSubmitting}
+                  placeholder="e.g. DENT-IND-2024-00123"
+                  {...register('registration_number')}
+                />
+                <Input
+                  label="Registration council / medical body (optional)"
+                  error={errors.registration_council?.message}
+                  disabled={isSubmitting}
+                  {...register('registration_council')}
                 />
               </div>
-            </div>
-          </section>
-          <section>
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Professional</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Input
-                label="Specialization"
-                error={errors.specialization?.message}
-                disabled={isSubmitting}
-                {...register('specialization')}
-              />
-              <Input
-                label="Experience (years)"
-                type="number"
-                error={errors.experience_years?.message}
-                disabled={isSubmitting}
-                {...register('experience_years')}
-              />
-              <div className="sm:col-span-2">
-                <Input
-                  label="Qualification (optional)"
-                  error={errors.qualification?.message}
-                  disabled={isSubmitting}
-                  {...register('qualification')}
-                />
+            </section>
+            <section>
+              <h2 className="text-sm font-semibold text-text-primary mb-3">🏥 Clinic info</h2>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Clinic or practice name (optional)"
+                    error={errors.clinic_name?.message}
+                    disabled={isSubmitting}
+                    placeholder="e.g. Nevase Dental Clinic"
+                    {...register('clinic_name')}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Input label="Address" error={errors.address?.message} disabled={isSubmitting} {...register('address')} />
+                </div>
+                <Input label="City" error={errors.city?.message} disabled={isSubmitting} {...register('city')} />
+                <Input label="State" error={errors.state?.message} disabled={isSubmitting} {...register('state')} />
               </div>
-            </div>
-          </section>
-          <section>
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Registration & verification</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Input
-                label="Medical registration number"
-                error={errors.registration_number?.message}
-                disabled={isSubmitting}
-                {...register('registration_number')}
-              />
-              <Input
-                label="Registration council / medical body"
-                error={errors.registration_council?.message}
-                disabled={isSubmitting}
-                {...register('registration_council')}
-              />
-            </div>
-          </section>
-          <section>
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Clinic (optional)</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <Input
-                  label="Clinic or practice name"
-                  error={errors.clinic_name?.message}
-                  disabled={isSubmitting}
-                  {...register('clinic_name')}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Input label="Address" error={errors.address?.message} disabled={isSubmitting} {...register('address')} />
-              </div>
-              <Input label="City" error={errors.city?.message} disabled={isSubmitting} {...register('city')} />
-              <Input label="State" error={errors.state?.message} disabled={isSubmitting} {...register('state')} />
-            </div>
-          </section>
-          <Button type="submit" variant="primary" size="lg" className="w-full" isLoading={isSubmitting}>
+            </section>
+          </form>
+        </Card>
+      </div>
+      <div className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto w-full max-w-2xl">
+          <Button
+            form="complete-profile-form"
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            isLoading={isSubmitting}
+          >
             Save and continue
           </Button>
-        </form>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

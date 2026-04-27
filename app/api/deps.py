@@ -13,9 +13,9 @@ from app.core.data_scope import ResolvedDataScope, resolve_data_scope
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
-from app.crud import crud_doctor, crud_user
+from app.crud import crud_doctor, crud_doctor_profile, crud_user
 from app.models.doctor import Doctor
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services import doctor_service
 from app.services.exceptions import ForbiddenError, ValidationError
 from app.core.permissions import require_admin_or_owner
@@ -163,6 +163,23 @@ def get_current_doctor(
 ) -> Doctor:
     """Doctor profile for the current user; use on doctor-only routes."""
     return doctor_service.require_doctor_profile(db, current_user)
+
+
+def require_structured_profile_complete(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """
+    If this account has a linked `doctors` row, block most APIs until
+    `doctor_profiles.is_profile_complete` (clinicians cannot use the app with a stub profile).
+    Does not apply to users without a linked doctor (e.g. staff-only, patients).
+    """
+    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
+    if doctor is None:
+        return
+    prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
+    if prof is None or not prof.is_profile_complete:
+        raise ForbiddenError("Complete your profile to continue")
 
 
 def get_current_users_doctor_for_structured_profile(

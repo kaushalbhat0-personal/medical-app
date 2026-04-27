@@ -11,6 +11,7 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_resolved_data_scope,
+    require_structured_profile_complete,
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
@@ -20,7 +21,11 @@ from app.models.user import User
 from app.schemas.billing import BillingCreate, BillingRead, BillingUpdate
 from app.services import billing_service
 
-router = APIRouter(prefix="/bills", tags=["bills"])
+router = APIRouter(
+    prefix="/bills",
+    tags=["bills"],
+    dependencies=[Depends(require_structured_profile_complete)],
+)
 
 
 @router.post("", response_model=BillingRead, status_code=201)

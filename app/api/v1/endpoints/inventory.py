@@ -9,6 +9,7 @@ from app.api.deps import (
     get_optional_scoped_tenant_id,
     get_optional_scoped_tenant_id_active,
     get_resolved_data_scope,
+    require_structured_profile_complete,
 )
 from app.core.data_scope import ResolvedDataScope
 from app.core.database import get_db
@@ -27,7 +28,11 @@ from app.schemas.inventory import (
 )
 from app.services import inventory_service
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(
+    prefix="/inventory",
+    tags=["inventory"],
+    dependencies=[Depends(require_structured_profile_complete)],
+)
 
 
 @router.get("/stock/bulk", response_model=None)

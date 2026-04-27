@@ -132,22 +132,22 @@ export const hospitalSignupSchema = signupLoginSchema.merge(
   })
 );
 
-/** Mandatory fields aligned with backend `is_profile_complete` (name, spec, reg, phone). */
+/** Mandatory fields aligned with backend `is_profile_complete` (name, phone, spec, reg, qualification). */
 export const completeStructuredDoctorProfileSchema = z.object({
   full_name: z.string().min(1, 'Full name is required'),
   phone: z
     .string()
     .min(1, 'Phone is required')
-    .refine(
-      (val) => val.replace(/\D/g, '').length >= 10,
-      'Enter a valid phone (at least 10 digits)'
-    ),
+    .transform((val) => val.replace(/\D/g, ''))
+    .refine((val) => val.length === 10, {
+      message: 'Enter a valid 10-digit phone number',
+    }),
   profile_image: z.string().max(2000).optional(),
   specialization: z.string().min(1, 'Specialization is required'),
   experience_years: z.coerce.number().int().min(0).max(80),
-  qualification: z.string().max(2000).optional(),
+  qualification: z.string().min(1, 'Qualification is required').max(2000),
   registration_number: z.string().min(1, 'Registration / license number is required'),
-  registration_council: z.string().min(1, 'Medical council is required'),
+  registration_council: z.string().max(2000).optional(),
   clinic_name: z.string().max(500).optional(),
   address: z.string().max(2000).optional(),
   city: z.string().max(200).optional(),
