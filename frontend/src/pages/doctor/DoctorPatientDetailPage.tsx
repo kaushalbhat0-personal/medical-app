@@ -343,12 +343,11 @@ export function DoctorPatientDetailPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-4 space-y-4 pb-24">
+    <div className="max-w-md mx-auto px-4 py-4 space-y-6 pb-24">
       <div
         className={cn(
-          'sticky w-full px-0 py-3 border-b border-border',
-          'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80',
-          'top-14'
+          'sticky top-14 z-10 w-full border-b border-border py-2',
+          'bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/30'
         )}
       >
         <Link
@@ -364,63 +363,61 @@ export function DoctorPatientDetailPage() {
         {loading && !patient ? (
           <PageSkeleton />
         ) : (
-          <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight truncate">{patient?.name || 'Patient'}</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {contactLine || 'No phone or email on file'}
-                </p>
-              </div>
-              {isIndependent && !isReadOnly && (
-                <div className="flex w-full min-w-0 gap-2 sm:w-auto sm:max-w-md">
-                  <Button type="button" size="sm" className="flex-1" onClick={goBook}>
-                    Book appointment
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
-                    Create bill
-                  </Button>
-                </div>
-              )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight truncate">{patient?.name || 'Patient'}</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {contactLine || 'No phone or email on file'}
+              </p>
             </div>
-
-            {!loading && patient && (
-              <div className="mt-4 flex flex-col gap-4">
-                <Card className="flex flex-col gap-3">
-                  <div className="text-sm text-muted-foreground">Total visits</div>
-                  <div className="text-lg font-semibold tabular-nums">{stats.totalVisits}</div>
-                </Card>
-                <Card className="flex flex-col gap-3">
-                  <div className="text-sm text-muted-foreground">Last visit</div>
-                  <div className="text-lg font-semibold">{stats.lastVisitLabel}</div>
-                </Card>
-                <Card className="flex flex-col gap-3">
-                  <div className="text-sm text-muted-foreground">Outstanding bills</div>
-                  {outstandingBills.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No bills</div>
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {outstandingBills.map((b) => (
-                        <li key={String(b.id)} className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="text-lg font-semibold tabular-nums">
-                            {b.currency} {Number(b.amount).toFixed(0)}
-                          </span>
-                          <Link
-                            to={`/doctor/bills/${b.id}`}
-                            className="text-sm text-primary font-medium hover:underline shrink-0"
-                          >
-                            View bill
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Card>
+            {isIndependent && !isReadOnly && (
+              <div className="flex w-full min-w-0 gap-2 sm:w-auto sm:max-w-md">
+                <Button type="button" size="sm" className="flex-1" onClick={goBook}>
+                  Book appointment
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
+                  Create bill
+                </Button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
+
+      {!loading && patient && (
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col gap-3">
+            <div className="text-sm text-muted-foreground">Total visits</div>
+            <div className="text-lg font-semibold tabular-nums">{stats.totalVisits}</div>
+          </Card>
+          <Card className="flex flex-col gap-3">
+            <div className="text-sm text-muted-foreground">Last visit</div>
+            <div className="text-lg font-semibold">{stats.lastVisitLabel}</div>
+          </Card>
+          <Card className="flex flex-col gap-3">
+            <div className="text-sm text-muted-foreground">Outstanding bills</div>
+            {outstandingBills.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No bills</div>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {outstandingBills.map((b) => (
+                  <li key={String(b.id)} className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-lg font-semibold tabular-nums">
+                      {b.currency} {Number(b.amount).toFixed(0)}
+                    </span>
+                    <Link
+                      to={`/doctor/bills/${b.id}`}
+                      className="text-sm text-primary font-medium hover:underline shrink-0"
+                    >
+                      View bill
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      )}
 
       {!loading && (
         <div className="flex flex-wrap gap-2 border-b border-border pb-3">
@@ -449,12 +446,12 @@ export function DoctorPatientDetailPage() {
       {!loading && section === 'activity' && (
         <div className="flex flex-col gap-4">
           {patient && (
-            <Card>
-              <CardHeader className="pb-2">
+            <Card className="rounded-xl border bg-white p-4 shadow-md relative z-0">
+              <CardHeader className="pb-2 px-0 pt-0">
                 <CardTitle className="text-base">Notes</CardTitle>
                 <CardDescription>Quick context for the next visit (saved on this patient)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 px-0 pb-0">
                 {canMutate ? (
                   <>
                     <Textarea
