@@ -169,13 +169,31 @@ export function DoctorPatientDetailPage() {
     const scrollTarget = getScrollParent(root);
     if (!scrollTarget) return;
 
-    const handleScroll = () => {
-      const y =
-        scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
-      setHeaderCollapsed(y > 80);
+    let ticking = false;
+
+    const readY = () =>
+      scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
+
+    const applyScroll = () => {
+      const y = readY();
+      setHeaderCollapsed((prev) => {
+        if (y > 100 && !prev) return true;
+        if (y < 60 && prev) return false;
+        return prev;
+      });
     };
 
-    handleScroll();
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          applyScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    applyScroll();
     scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollTarget.removeEventListener('scroll', handleScroll);
   }, [id]);
@@ -370,78 +388,96 @@ export function DoctorPatientDetailPage() {
   };
 
   const showActions = isIndependent && !isReadOnly;
+  const inHeaderSkeleton = loading && !patient;
+  const expandedHeaderVisible = !headerCollapsed || inHeaderSkeleton;
+  const collapsedHeaderVisible = headerCollapsed && !inHeaderSkeleton;
 
   return (
     <div ref={pageRootRef} className="min-h-full bg-muted/30">
       <div className="mx-auto max-w-md">
         <div
           className={cn(
-            'sticky top-0 z-30 border-b border-border bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-            'dark:bg-background/80 dark:supports-[backdrop-filter]:bg-background/70'
+            'sticky top-0 z-30 min-h-[110px] border-b border-border bg-white/80 backdrop-blur transition-all duration-200',
+            'supports-[backdrop-filter]:bg-white/70 dark:bg-background/80 dark:supports-[backdrop-filter]:bg-background/70'
           )}
         >
-          <div className="px-4 py-3">
-            <div className="transition-all duration-200 ease-out">
-              {loading && !patient ? (
-                <HeaderLoadingSkeleton />
-              ) : headerCollapsed ? (
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="relative h-[110px] overflow-hidden px-4">
+            <div
+              className={cn(
+                'transition-all duration-200 ease-out transform-gpu will-change-transform',
+                expandedHeaderVisible
+                  ? 'opacity-100 translate-y-0 scale-100'
+                  : 'pointer-events-none opacity-0 -translate-y-2 scale-95'
+              )}
+            >
+              <div className="flex h-[110px] min-h-0 flex-col justify-center gap-1.5">
+                {inHeaderSkeleton ? (
+                  <HeaderLoadingSkeleton />
+                ) : (
+                  <>
                     <Link
                       to="/doctor/patients"
                       className={cn(
-                        buttonVariants({ variant: 'ghost', size: 'icon' }),
-                        'h-8 w-8 shrink-0 text-muted-foreground'
+                        buttonVariants({ variant: 'ghost', size: 'sm' }),
+                        'h-8 w-fit gap-1.5 px-2 -ml-2 text-muted-foreground'
                       )}
-                      aria-label="Back to patients"
                     >
-                      <ArrowLeft className="h-4 w-4" aria-hidden />
+                      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                      Patients
                     </Link>
-                    <span className="truncate font-medium text-foreground">
+                    <div className="truncate text-lg font-semibold tracking-tight text-foreground">
                       {patient?.name || 'Patient'}
-                    </span>
-                  </div>
-                  {showActions ? (
-                    <div className="flex shrink-0 gap-2">
-                      <Button type="button" size="sm" onClick={goBook}>
-                        Book
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={goCreateBill}>
-                        Bill
-                      </Button>
                     </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Link
-                    to="/doctor/patients"
-                    className={cn(
-                      buttonVariants({ variant: 'ghost', size: 'sm' }),
-                      'gap-1.5 h-8 px-2 -ml-2 text-muted-foreground'
+                    <div className="truncate text-sm text-muted-foreground">
+                      {contactLine || 'No phone or email on file'}
+                    </div>
+                    {showActions && (
+                      <div className="flex gap-2 pt-0.5">
+                        <Button type="button" size="sm" className="flex-1" onClick={goBook}>
+                          Book appointment
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
+                          Create bill
+                        </Button>
+                      </div>
                     )}
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-                    Patients
-                  </Link>
-                  <div className="text-lg font-semibold tracking-tight truncate">
-                    {patient?.name || 'Patient'}
-                  </div>
-                  <div className="text-sm text-muted-foreground truncate">
-                    {contactLine || 'No phone or email on file'}
-                  </div>
-                  {showActions && (
-                    <div className="flex gap-2 pt-1">
-                      <Button type="button" size="sm" className="flex-1" onClick={goBook}>
-                        Book appointment
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
-                        Create bill
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                'absolute inset-0 flex items-center justify-between gap-2 px-4',
+                'transition-all duration-200 ease-out transform-gpu will-change-transform',
+                collapsedHeaderVisible
+                  ? 'opacity-100 translate-y-0 scale-100'
+                  : 'pointer-events-none opacity-0 translate-y-2 scale-95'
               )}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <Link
+                  to="/doctor/patients"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
+                    'h-8 w-8 shrink-0 text-muted-foreground'
+                  )}
+                  aria-label="Back to patients"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                </Link>
+                <span className="truncate font-medium text-foreground">{patient?.name || 'Patient'}</span>
+              </div>
+              {showActions ? (
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" size="sm" onClick={goBook}>
+                    Book
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={goCreateBill}>
+                    Bill
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
