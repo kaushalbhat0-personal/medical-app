@@ -346,7 +346,7 @@ export function DoctorPatientDetailPage() {
     <div className="max-w-md mx-auto px-4 py-4 space-y-6 pb-24">
       <div
         className={cn(
-          'sticky top-14 z-10 w-full border-b border-border py-2',
+          '-mx-4 px-4 sticky top-[56px] z-20 w-full border-b border-border py-3',
           'bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/30'
         )}
       >
@@ -354,7 +354,7 @@ export function DoctorPatientDetailPage() {
           to="/doctor/patients"
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'mb-1 gap-1.5 h-8 px-2 text-muted-foreground'
+            'mb-2 gap-1.5 h-8 px-2 -ml-2 text-muted-foreground'
           )}
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -363,15 +363,13 @@ export function DoctorPatientDetailPage() {
         {loading && !patient ? (
           <PageSkeleton />
         ) : (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight truncate">{patient?.name || 'Patient'}</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {contactLine || 'No phone or email on file'}
-              </p>
+          <div className="space-y-2">
+            <div className="text-lg font-semibold tracking-tight truncate">{patient?.name || 'Patient'}</div>
+            <div className="text-sm text-muted-foreground truncate">
+              {contactLine || 'No phone or email on file'}
             </div>
             {isIndependent && !isReadOnly && (
-              <div className="flex w-full min-w-0 gap-2 sm:w-auto sm:max-w-md">
+              <div className="flex gap-2 pt-1">
                 <Button type="button" size="sm" className="flex-1" onClick={goBook}>
                   Book appointment
                 </Button>
