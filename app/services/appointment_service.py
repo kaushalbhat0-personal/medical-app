@@ -227,6 +227,13 @@ def create_appointment(
     doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
     patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
+    if (
+        patient_row.tenant_id is not None
+        and doctor.tenant_id is not None
+        and patient_row.tenant_id != doctor.tenant_id
+    ):
+        raise ForbiddenError("Cross-tenant appointment not allowed")
+
     if patient_row.tenant_id is None and doctor.tenant_id is not None:
         patient_row.tenant_id = doctor.tenant_id
         db.add(patient_row)
@@ -253,13 +260,12 @@ def create_appointment(
     _validate_appointment_time_in_future(appt_in.appointment_time)
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
-    # Prefer request org scope, then the patient's org; doctor tenant is fallback only.
     if tenant_id is not None:
         appointment_data["tenant_id"] = tenant_id
+    elif patient_row.tenant_id is not None:
+        appointment_data["tenant_id"] = patient_row.tenant_id
     else:
-        appointment_data["tenant_id"] = (
-            patient_row.tenant_id or doctor.tenant_id
-        )
+        appointment_data["tenant_id"] = doctor.tenant_id
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
 

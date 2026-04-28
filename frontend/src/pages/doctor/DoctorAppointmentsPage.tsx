@@ -112,7 +112,7 @@ export function DoctorAppointmentsPage() {
     if (!billDialogAppt) return;
     const pid = billDialogAppt.patient_id != null ? String(billDialogAppt.patient_id) : '';
     if (!pid) {
-      toast.error('Missing patient for this visit');
+      toast.error('Cannot bill: patient missing');
       return;
     }
     const n = parseFloat(billAmount);
@@ -277,6 +277,10 @@ export function DoctorAppointmentsPage() {
                       size="sm"
                       variant="secondary"
                       onClick={() => {
+                        if (!a.patient_id) {
+                          toast.error('Cannot bill: patient missing');
+                          return;
+                        }
                         setBillDialogAppt(a);
                         setBillAmount('');
                         setBillDescription('');

@@ -66,6 +66,15 @@ export function DoctorBillsPage() {
 
   useModalFocusTrap(dialogRef, createOpen);
 
+  const openCreateBillModal = useCallback(() => {
+    if (!bookableAppointments.some((a) => Boolean(a.patient_id))) {
+      toast.error('Cannot bill: patient missing');
+      return;
+    }
+    setPrefillBillPatientId(null);
+    setCreateOpen(true);
+  }, [bookableAppointments]);
+
   const closeCreate = useCallback(() => {
     setCreateOpen(false);
     setPrefillBillPatientId(null);
@@ -89,11 +98,35 @@ export function DoctorBillsPage() {
     if (st?.billPatientId) {
       setPrefillBillPatientId(String(st.billPatientId));
     }
-    if (st?.openCreateBill && isIndependent && !createOpenedRef.current) {
-      createOpenedRef.current = true;
-      setCreateOpen(true);
+    if (!st?.openCreateBill || !isIndependent || createOpenedRef.current) return;
+    if (aptLoading) return;
+
+    const billPid = st.billPatientId != null ? String(st.billPatientId) : null;
+    const pool = billPid
+      ? bookableAppointments.filter((a) => String(a.patient_id) === billPid)
+      : bookableAppointments;
+
+    if (pool.length > 0 && !pool.some((a) => Boolean(a.patient_id))) {
+      toast.error('Cannot bill: patient missing');
+      navigate(
+        { pathname: location.pathname, search: location.search, hash: location.hash },
+        { replace: true, state: {} }
+      );
+      return;
     }
-  }, [location.state, isIndependent]);
+
+    createOpenedRef.current = true;
+    setCreateOpen(true);
+  }, [
+    location.state,
+    location.pathname,
+    location.search,
+    location.hash,
+    isIndependent,
+    aptLoading,
+    bookableAppointments,
+    navigate,
+  ]);
 
   const bookableForModal = useMemo(() => {
     if (!prefillBillPatientId) return bookableAppointments;
@@ -117,6 +150,10 @@ export function DoctorBillsPage() {
   const createBill = async () => {
     if (!selectedAppt || !appointmentId) {
       toast.error('Choose a visit to bill');
+      return;
+    }
+    if (!selectedAppt.patient_id) {
+      toast.error('Cannot bill: patient missing');
       return;
     }
     const n = parseFloat(amount);
@@ -172,8 +209,7 @@ export function DoctorBillsPage() {
             size="sm"
             className="gap-2"
             onClick={() => {
-              setPrefillBillPatientId(null);
-              setCreateOpen(true);
+              openCreateBillModal();
             }}
           >
             <Plus className="h-4 w-4" aria-hidden />

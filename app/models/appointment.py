@@ -21,6 +21,11 @@ class Appointment(Base):
     __table_args__ = (
         Index("idx_user_doctor_time", "created_by", "doctor_id", "appointment_time"),
         Index(
+            "idx_appointments_patient_tenant",
+            "patient_id",
+            "tenant_id",
+        ),
+        Index(
             "ix_appointments_tenant_patient_created",
             "tenant_id",
             "patient_id",
@@ -43,7 +48,7 @@ class Appointment(Base):
     )
     patient_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("patients.id", ondelete="CASCADE"),
+        ForeignKey("patients.id", ondelete="RESTRICT"),
         nullable=False,
     )
     doctor_id: Mapped[uuid.UUID] = mapped_column(

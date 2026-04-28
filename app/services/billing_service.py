@@ -24,6 +24,39 @@ from app.services.security_audit import (
 logger = logging.getLogger(__name__)
 
 
+def _validate_billing_patient_matches_appointment_tenant(
+    db: Session,
+    appointment: Appointment,
+    patient_id: UUID,
+) -> None:
+    patient = patient_service.get_patient_or_404(db, patient_id)
+    if (
+        appointment.tenant_id is not None
+        and patient.tenant_id is not None
+        and appointment.tenant_id != patient.tenant_id
+    ):
+        logger.warning(
+            "Billing blocked: patient and appointment tenant mismatch",
+            extra={
+                "appointment_id": str(appointment.id),
+                "patient_id": str(patient_id),
+            },
+        )
+        raise ForbiddenError("Cross-tenant billing not allowed")
+
+
+def _validate_appointment_completed_for_billing(appointment: Appointment) -> None:
+    if appointment.status != AppointmentStatus.completed:
+        logger.warning(
+            "Billing blocked: appointment not completed",
+            extra={
+                "appointment_id": str(appointment.id),
+                "status": appointment.status.value if appointment.status else None,
+            },
+        )
+        raise ValidationError("Only completed visits can be billed")
+
+
 def _validate_appointment_exists(db: Session, appointment_id: UUID) -> None:
     appointment_service.get_appointment_or_404(db, appointment_id)
 
@@ -165,7 +198,11 @@ def create_bill(
     # Validate patient exists
     try:
         patient_service.get_patient_or_404(db, billing_in.patient_id)
-    except NotFoundError as e:
+    except NotFoundError:
+        logger.warning(
+            "Billing failed: patient not found",
+            extra={"patient_id": str(billing_in.patient_id)},
+        )
         raise ValidationError(f"Patient not found: {billing_in.patient_id}")
 
     appointment: Appointment | None = None
@@ -174,12 +211,24 @@ def create_bill(
             db, billing_in.appointment_id
         )
         if appointment.patient_id is None:
+            logger.warning(
+                "Billing failed: missing patient for visit",
+                extra={"appointment_id": str(appointment.id)},
+            )
             raise ValidationError("Missing patient for this visit")
         if (
             tenant_id is not None
             and appointment.tenant_id is not None
             and appointment.tenant_id != tenant_id
         ):
+            logger.warning(
+                "Billing failed: invalid tenant access",
+                extra={
+                    "appointment_id": str(appointment.id),
+                    "appointment_tenant_id": str(appointment.tenant_id),
+                    "request_tenant_id": str(tenant_id),
+                },
+            )
             raise ForbiddenError("Invalid tenant access")
         _validate_appointment_not_cancelled(db, billing_in.appointment_id)
         _validate_no_duplicate_bill(db, billing_in.appointment_id)
@@ -188,10 +237,10 @@ def create_bill(
             patient_id=billing_in.patient_id,
             appointment_id=billing_in.appointment_id,
         )
-        if current_user.role == UserRole.doctor and appointment.status != AppointmentStatus.completed:
-            raise ValidationError(
-                "Doctors can only create bills for completed appointments"
-            )
+        _validate_billing_patient_matches_appointment_tenant(
+            db, appointment, billing_in.patient_id
+        )
+        _validate_appointment_completed_for_billing(appointment)
     _validate_idempotency_key(db, billing_in.idempotency_key)
 
     billing_data = billing_in.model_dump()
@@ -201,6 +250,10 @@ def create_bill(
             logger.error(
                 "[TENANT INTEGRITY] appointment.tenant_id is None for appointment_id=%s",
                 appointment.id,
+            )
+            logger.warning(
+                "Billing failed: appointment tenant not set",
+                extra={"appointment_id": str(appointment.id)},
             )
             raise ValidationError("Appointment tenant is not set")
         billing_data["tenant_id"] = appointment.tenant_id

@@ -78,5 +78,15 @@ export const fetchPatientAppointmentsHandler = async (patientId: string): Promis
     skip: 0,
     limit: 100,
   });
-  return safeArray<Appointment>(appointments);
+  const list = safeArray<Appointment>(appointments);
+  if (import.meta.env.DEV) {
+    const unexpected = list.filter((a) => a.status !== 'completed');
+    if (unexpected.length > 0) {
+      console.warn(
+        '[billing] API returned non-completed appointments despite status=completed filter',
+        unexpected
+      );
+    }
+  }
+  return list;
 };
