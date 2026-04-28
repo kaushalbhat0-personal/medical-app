@@ -162,17 +162,16 @@ export function DoctorPatientDetailPage() {
       visitTimes.length > 0
         ? visitTimes.reduce((best, cur) => (new Date(cur) > new Date(best) ? cur : best), visitTimes[0])
         : null;
-    const outstanding = bills
-      .filter((b) => b.status === 'pending' || b.status === 'failed')
-      .reduce((s, b) => s + Number(b.amount), 0);
-    const cur = bills.find((b) => b.currency)?.currency || 'INR';
     return {
       totalVisits: completed.length,
       lastVisitLabel: lastVisitIso ? formatRelativePast(lastVisitIso) : '—',
-      outstanding,
-      outstandingCurrency: cur,
     };
-  }, [appointments, bills]);
+  }, [appointments]);
+
+  const outstandingBills = useMemo(
+    () => bills.filter((b) => b.status === 'pending' || b.status === 'failed'),
+    [bills]
+  );
 
   const { timelineByDay, dayOrder } = useMemo(() => {
     const items: TimelineItem[] = [];
@@ -344,10 +343,10 @@ export function DoctorPatientDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-md mx-auto px-4 py-4 space-y-4 pb-24">
       <div
         className={cn(
-          'sticky z-30 w-full px-0 py-3 border-b border-border',
+          'sticky w-full px-0 py-3 border-b border-border',
           'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80',
           'top-14'
         )}
@@ -386,28 +385,36 @@ export function DoctorPatientDetailPage() {
             </div>
 
             {!loading && patient && (
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Card>
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm text-muted-foreground">Total visits</div>
-                    <div className="text-lg font-semibold tabular-nums">{stats.totalVisits}</div>
-                  </div>
+              <div className="mt-4 flex flex-col gap-4">
+                <Card className="flex flex-col gap-3">
+                  <div className="text-sm text-muted-foreground">Total visits</div>
+                  <div className="text-lg font-semibold tabular-nums">{stats.totalVisits}</div>
                 </Card>
-                <Card>
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm text-muted-foreground">Last visit</div>
-                    <div className="text-lg font-semibold">{stats.lastVisitLabel}</div>
-                  </div>
+                <Card className="flex flex-col gap-3">
+                  <div className="text-sm text-muted-foreground">Last visit</div>
+                  <div className="text-lg font-semibold">{stats.lastVisitLabel}</div>
                 </Card>
-                <Card>
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm text-muted-foreground">Outstanding bills</div>
-                    <div className="text-lg font-semibold tabular-nums">
-                      {stats.outstanding > 0
-                        ? `${stats.outstandingCurrency} ${stats.outstanding.toFixed(0)}`
-                        : '—'}
-                    </div>
-                  </div>
+                <Card className="flex flex-col gap-3">
+                  <div className="text-sm text-muted-foreground">Outstanding bills</div>
+                  {outstandingBills.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No bills</div>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {outstandingBills.map((b) => (
+                        <li key={String(b.id)} className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-lg font-semibold tabular-nums">
+                            {b.currency} {Number(b.amount).toFixed(0)}
+                          </span>
+                          <Link
+                            to={`/doctor/bills/${b.id}`}
+                            className="text-sm text-primary font-medium hover:underline shrink-0"
+                          >
+                            View bill
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </Card>
               </div>
             )}
@@ -440,7 +447,7 @@ export function DoctorPatientDetailPage() {
       )}
 
       {!loading && section === 'activity' && (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {patient && (
             <Card>
               <CardHeader className="pb-2">
@@ -490,7 +497,7 @@ export function DoctorPatientDetailPage() {
           )}
 
           {dayOrder.length > 0 && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {dayOrder.map((dayKey, dayIdx) => {
                 const list = timelineByDay.get(dayKey) ?? [];
                 const sampleIso = list[0]?.iso;
@@ -648,7 +655,7 @@ export function DoctorPatientDetailPage() {
       )}
 
       {!loading && section === 'bills' && (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-4">
           {bills.length === 0 && (
             <EmptyState
               title="No bills yet"
@@ -713,12 +720,13 @@ export function DoctorPatientDetailPage() {
       )}
 
       {!loading && section === 'info' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>Demographics and contact details on file</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm space-y-3 max-w-md">
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile</CardTitle>
+              <CardDescription>Demographics and contact details on file</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm space-y-3 max-w-md">
             <div className="grid grid-cols-[8rem_1fr] gap-2">
               <span className="text-muted-foreground">Name</span>
               <span>{patient?.name || '—'}</span>
@@ -739,6 +747,7 @@ export function DoctorPatientDetailPage() {
             )}
           </CardContent>
         </Card>
+        </div>
       )}
     </div>
   );
