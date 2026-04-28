@@ -26,6 +26,15 @@ from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 
 logger = logging.getLogger(__name__)
 
+_NIL_UUID = UUID("00000000-0000-0000-0000-000000000000")
+
+
+def _non_nil_tenant_id(value: UUID | None) -> UUID | None:
+    """Treat NULL and the all-zero UUID sentinel as missing for tenant resolution."""
+    if value is None or value == _NIL_UUID:
+        return None
+    return value
+
 
 def _appointment_payload_hash(appointment_in: AppointmentCreate) -> str:
     body = appointment_in.model_dump(mode="json")
@@ -260,17 +269,21 @@ def create_appointment(
     _validate_appointment_time_in_future(appt_in.appointment_time)
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
-    if tenant_id is not None:
-        appointment_data["tenant_id"] = tenant_id
-    elif patient_row.tenant_id is not None:
-        appointment_data["tenant_id"] = patient_row.tenant_id
+
+    scoped = _non_nil_tenant_id(tenant_id)
+    patient_tid = _non_nil_tenant_id(patient_row.tenant_id)
+    doctor_tid = _non_nil_tenant_id(doctor.tenant_id)
+    if scoped:
+        appointment_data["tenant_id"] = scoped
+    elif patient_tid:
+        appointment_data["tenant_id"] = patient_tid
+    elif doctor_tid:
+        appointment_data["tenant_id"] = doctor_tid
     else:
-        appointment_data["tenant_id"] = doctor.tenant_id
+        raise ValidationError("Tenant cannot be resolved")
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
 
-    if appointment_data.get("tenant_id") is None:
-        raise ValidationError("Appointment tenant must be set")
     assert appointment_data["tenant_id"] is not None
 
     try:
