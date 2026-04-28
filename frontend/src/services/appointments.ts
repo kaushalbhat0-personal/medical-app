@@ -13,7 +13,7 @@ export interface AppointmentFilters {
   doctor_id?: string;
   patient_id?: string;
   status?: 'scheduled' | 'completed' | 'cancelled' | 'pending';
-  /** `past` = completed + cancelled; `upcoming` = scheduled (server). */
+  /** `past` = completed/cancelled or overdue scheduled; `upcoming` = future scheduled. */
   type?: 'past' | 'upcoming';
   skip?: number;
   limit?: number;
@@ -73,6 +73,11 @@ export const appointmentsApi = {
     }>
   ): Promise<Appointment> => {
     const response = await api.put(`/appointments/${id}`, payload);
+    return response.data;
+  },
+  /** Doctor-only: marks a scheduled visit complete (billing unlocks). Prefer over generic update. */
+  markCompleted: async (id: string): Promise<Appointment> => {
+    const response = await api.post<Appointment>(`/appointments/${id}/mark-completed`);
     return response.data;
   },
   delete: async (id: string): Promise<void> => {

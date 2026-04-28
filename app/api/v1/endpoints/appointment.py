@@ -88,6 +88,25 @@ def read_appointments(
     )
 
 
+@router.post("/{appointment_id}/mark-completed", response_model=AppointmentRead)
+def mark_appointment_completed(
+    appointment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
+    data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+) -> AppointmentRead:
+    return appointment_service.mark_appointment_completed(
+        db,
+        appointment_id,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
+    )
+
+
 @router.get("/{appointment_id}", response_model=AppointmentRead)
 def read_appointment(
     appointment_id: UUID,

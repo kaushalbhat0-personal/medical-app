@@ -329,59 +329,7 @@ def get_appointment_or_404(db: Session, appointment_id: UUID) -> Appointment:
     appointment = crud_appointment.get_appointment(db, appointment_id)
     if appointment is None:
         raise NotFoundError("Appointment not found")
-
-    # Auto-update status if appointment time has passed
-    now = datetime.now(timezone.utc)
-    apt_time = appointment.appointment_time
-    if apt_time.tzinfo is None:
-        apt_time = apt_time.replace(tzinfo=timezone.utc)
-    else:
-        apt_time = apt_time.astimezone(timezone.utc)
-    if (
-        appointment.status == AppointmentStatus.scheduled
-        and apt_time < now
-    ):
-        appointment.status = AppointmentStatus.completed
-        db.add(appointment)
-        db.commit()
-        reloaded = crud_appointment.get_appointment(db, appointment_id)
-        if reloaded is None:
-            raise NotFoundError("Appointment not found")
-        return reloaded
-
     return appointment
-
-
-def _update_status_for_past_appointments(
-    db: Session,
-    appointments: list[Appointment],
-) -> list[Appointment]:
-    """Auto-update status to completed for past scheduled appointments."""
-    now = datetime.now(timezone.utc)
-    updated = []
-
-    for apt in appointments:
-        apt_time = apt.appointment_time
-        if apt_time.tzinfo is None:
-            apt_time = apt_time.replace(tzinfo=timezone.utc)
-        else:
-            apt_time = apt_time.astimezone(timezone.utc)
-        if (
-            apt.status == AppointmentStatus.scheduled
-            and apt_time < now
-        ):
-            apt.status = AppointmentStatus.completed
-            db.add(apt)
-            updated.append(apt)
-
-    if updated:
-        db.commit()
-        by_id = crud_appointment.get_appointments_by_ids(
-            db, [a.id for a in appointments]
-        )
-        return [by_id[a.id] for a in appointments]
-
-    return appointments
 
 
 def get_appointments(
@@ -446,7 +394,54 @@ def get_appointments(
         current_user.id,
         len(appointments),
     )
-    return _update_status_for_past_appointments(db, appointments)
+    return appointments
+
+
+def mark_appointment_completed(
+    db: Session,
+    appointment_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
+    *,
+    acting_doctor: Doctor | None = None,
+    restrict_to_doctor_id: UUID | None = None,
+) -> Appointment:
+    """Set status to completed; only the assigned doctor may call this."""
+    appointment = get_appointment_or_404(db, appointment_id)
+    authorize_appointment_access(
+        db,
+        appointment,
+        current_user,
+        tenant_id,
+        acting_doctor=acting_doctor,
+        rbac_action="mark_appointment_completed",
+        restrict_to_doctor_id=restrict_to_doctor_id,
+    )
+    if current_user.role != UserRole.doctor:
+        raise ForbiddenError("Only the assigned doctor can mark a visit complete")
+    doc = acting_doctor or doctor_service.require_doctor_profile(db, current_user)
+    if appointment.doctor_id != doc.id:
+        raise ForbiddenError("Not your appointment")
+    if appointment.status != AppointmentStatus.scheduled:
+        raise ValidationError("Only scheduled visits can be completed")
+    appointment.status = AppointmentStatus.completed
+    db.add(appointment)
+    db.commit()
+    slot_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
+    doctor_slot_service.invalidate_slots_cache_for_appointment(
+        db, slot_doctor, appointment.appointment_time
+    )
+    log_audit_mutation(
+        "update",
+        current_user,
+        "appointment",
+        appointment.id,
+        appointment.tenant_id,
+    )
+    reloaded = crud_appointment.get_appointment(db, appointment_id)
+    if reloaded is None:
+        raise NotFoundError("Appointment not found")
+    return reloaded
 
 
 def authorize_appointment_access(

@@ -425,7 +425,7 @@ export function DayCalendar({
     async (apptId: string) => {
       setApptActionBusy(apptId);
       try {
-        await appointmentsApi.update(apptId, { status: 'completed' });
+        await appointmentsApi.markCompleted(apptId);
         toast.success('Visit marked complete');
         onBooked?.();
         void loadDaySchedule({ skipSlotsCache: true });
@@ -650,19 +650,26 @@ export function DayCalendar({
       appt?.patient?.name ||
       (appt && !s.available ? 'Patient' : '');
 
+    const overdueNeedsAction = Boolean(
+      past &&
+        appt &&
+        (appt.status === 'scheduled' || appt.status === 'pending')
+    );
     let statusLabel: string;
-    if (past) statusLabel = 'Past';
+    if (overdueNeedsAction) statusLabel = 'Needs completion';
+    else if (past) statusLabel = 'Past';
     else if (s.available) statusLabel = 'Available';
     else if (appt?.status === 'completed') statusLabel = 'Completed';
     else if (appt?.status === 'cancelled') statusLabel = 'Cancelled';
     else statusLabel = 'Booked';
 
     const showCompleteCancel =
-      isInteractive && !past && appt && (appt.status === 'scheduled' || appt.status === 'pending');
+      isInteractive && appt && (appt.status === 'scheduled' || appt.status === 'pending');
 
     const listCardBaseClass = cn(
       'w-full rounded-xl border p-4 text-left transition-colors min-h-[44px] flex flex-col gap-3 sm:min-h-[64px]',
-      past && 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400',
+      past && !overdueNeedsAction && 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400',
+      overdueNeedsAction && 'border border-amber-200 bg-amber-50 text-amber-950',
       !past && s.available && !selected && 'border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
       !past && s.available && selected && 'z-[1] border border-primary bg-primary text-white shadow-sm hover:bg-primary/90',
       !past && !s.available && appt?.status !== 'completed' && appt?.status !== 'cancelled' && 'border border-red-200 bg-red-50 text-red-900',
@@ -763,7 +770,7 @@ export function DayCalendar({
               {apptActionBusy === String(appt.id) ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                'Complete'
+                'Mark completed'
               )}
             </Button>
             <Button

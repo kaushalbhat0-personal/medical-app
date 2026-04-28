@@ -275,7 +275,7 @@ export function DoctorPatientDetailPage() {
     const key = `a-${apptId}`;
     setRowBusyKey(key);
     try {
-      await appointmentsApi.update(apptId, { status: 'completed' });
+      await appointmentsApi.markCompleted(apptId);
       toast.success('Marked completed');
       await load();
     } catch (e) {

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.appointment import Appointment, AppointmentCreationIdempotency, AppointmentStatus
@@ -130,14 +130,28 @@ def get_appointments(
         )
     )
 
+    now_utc = datetime.now(timezone.utc)
+
     if list_type == "past":
+        # Past tab: finished/cancelled visits, or scheduled visits whose time has passed (awaiting completion).
         stmt = stmt.where(
-            Appointment.status.in_(
-                (AppointmentStatus.completed, AppointmentStatus.cancelled)
+            or_(
+                Appointment.status.in_(
+                    (AppointmentStatus.completed, AppointmentStatus.cancelled)
+                ),
+                and_(
+                    Appointment.status == AppointmentStatus.scheduled,
+                    Appointment.appointment_time < now_utc,
+                ),
             )
         )
     elif list_type == "upcoming":
-        stmt = stmt.where(Appointment.status == AppointmentStatus.scheduled)
+        stmt = stmt.where(
+            and_(
+                Appointment.status == AppointmentStatus.scheduled,
+                Appointment.appointment_time >= now_utc,
+            )
+        )
 
     if doctor_id is not None:
         stmt = stmt.where(Appointment.doctor_id == doctor_id)

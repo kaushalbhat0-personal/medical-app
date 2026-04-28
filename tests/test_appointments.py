@@ -248,6 +248,8 @@ async def test_get_appointments_includes_doctor_timezone(
     }
     created = await client.post("/api/v1/appointments", json=payload, headers=headers)
     assert created.status_code == 201, created.text
+    assert created.json()["patient_id"] == str(patient.id)
+    assert created.json()["doctor_id"] == str(doctor.id)
     appt_id = created.json()["id"]
 
     listed = await client.get("/api/v1/appointments", headers=headers)
@@ -255,6 +257,8 @@ async def test_get_appointments_includes_doctor_timezone(
     rows = listed.json()
     match = next((r for r in rows if r["id"] == appt_id), None)
     assert match is not None
+    assert match["patient_id"] == str(patient.id)
+    assert match["doctor_id"] == str(doctor.id)
     doc_out = match["doctor"]
     assert doc_out["id"] == str(doctor.id)
     assert doc_out["name"] == doctor.name
@@ -267,7 +271,7 @@ async def test_get_appointments_includes_doctor_timezone(
 async def test_get_appointments_type_past_and_upcoming(
     client: AsyncClient, db_session: Session
 ) -> None:
-    """GET ?type=past returns completed (and cancelled); ?type=upcoming returns scheduled only."""
+    """GET ?type=past returns completed, cancelled, or overdue scheduled; ?type=upcoming returns future scheduled."""
     doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
     pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
     doc_pw = "DocPass123!"
@@ -337,6 +341,64 @@ async def test_get_appointments_type_past_and_upcoming(
     row = next((r for r in past2.json() if r["id"] == appt_id), None)
     assert row is not None
     assert row["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_only_assigned_doctor(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+
+    login_pat = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": pat_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login_pat.status_code == 200
+    pat_headers = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
+    created = await client.post(
+        "/api/v1/appointments",
+        json={
+            "patient_id": str(patient.id),
+            "doctor_id": str(doctor.id),
+            "appointment_time": slot.isoformat(),
+        },
+        headers=pat_headers,
+    )
+    assert created.status_code == 201, created.text
+    appt_id = created.json()["id"]
+
+    deny = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        headers=pat_headers,
+    )
+    assert deny.status_code == 403
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {"Authorization": f"Bearer {doc_login.json()['access_token']}"}
+    ok = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        headers=doc_headers,
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "completed"
+    assert ok.json()["patient_id"] == str(patient.id)
 
 
 def test_appointment_tenant_always_matches_patient_invariant(

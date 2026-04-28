@@ -38,6 +38,8 @@ class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    patient_id: UUID
+    doctor_id: UUID
     appointment_time: datetime
     status: AppointmentStatus
     created_by: UUID

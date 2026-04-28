@@ -232,7 +232,7 @@ export function DoctorAppointmentsPage() {
           description={
             tab === 'upcoming'
               ? 'Your list will show here; book from the schedule above when slots are open.'
-              : 'Completed and cancelled visits appear here when available.'
+              : 'Completed, cancelled, and overdue visits that still need completion appear here.'
           }
         />
       )}

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import axios from 'axios';
 import { ArrowLeft, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { appointmentsApi, billingApi } from '../../services';
 import { ErrorState } from '../../components/common';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
+import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import type { Appointment, Bill } from '../../types';
 
 function statusVariant(
@@ -22,11 +25,13 @@ function statusVariant(
 
 export function DoctorAppointmentDetailPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
+  const { isIndependent, isReadOnly } = useDoctorWorkspace();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [linkedBill, setLinkedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [markBusy, setMarkBusy] = useState(false);
 
   useEffect(() => {
     if (!appointmentId) {
@@ -87,6 +92,30 @@ export function DoctorAppointmentDetailPage() {
   }
 
   const pid = appointment.patient_id != null ? String(appointment.patient_id) : '';
+  const canMarkComplete =
+    isIndependent &&
+    !isReadOnly &&
+    (appointment.status === 'scheduled' || appointment.status === 'pending');
+
+  const markCompleted = async () => {
+    if (!appointmentId) return;
+    setMarkBusy(true);
+    try {
+      const a = await appointmentsApi.markCompleted(appointmentId);
+      setAppointment(a);
+      toast.success('Visit marked complete');
+      const forAppt = await billingApi.getAll({ appointment_id: String(a.id), limit: 5 });
+      setLinkedBill(forAppt.length > 0 ? forAppt[0] : null);
+    } catch (e) {
+      const msg =
+        axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
+          ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not mark complete')
+          : 'Could not mark complete';
+      toast.error(msg);
+    } finally {
+      setMarkBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-6" id={appointmentId ? `appt-${appointmentId}` : undefined}>
@@ -130,6 +159,13 @@ export function DoctorAppointmentDetailPage() {
                 {linkedBill.currency} {Number(linkedBill.amount).toFixed(2)} ({linkedBill.status})
               </Link>
             </p>
+          )}
+          {canMarkComplete && (
+            <div className="pt-2">
+              <Button type="button" size="sm" disabled={markBusy} onClick={() => void markCompleted()}>
+                {markBusy ? 'Saving…' : 'Mark as completed'}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
