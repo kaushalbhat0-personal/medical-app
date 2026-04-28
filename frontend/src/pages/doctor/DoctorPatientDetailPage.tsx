@@ -416,6 +416,8 @@ export function DoctorPatientDetailPage() {
   const inHeaderSkeleton = loading && !patient;
   const isCollapsed = ready ? headerCollapsed : false;
   const collapsed = isCollapsed && !inHeaderSkeleton;
+  /** Expanded header needs >104px when actions/skeleton rows exist; fixed 104px was clipping primary CTAs */
+  const headerExpandedNeedsTallRow = showActions || inHeaderSkeleton;
 
   return (
     <div ref={pageRootRef} className="min-h-full bg-muted/30">
@@ -429,7 +431,12 @@ export function DoctorPatientDetailPage() {
             'dark:supports-[backdrop-filter]:from-background/85 dark:supports-[backdrop-filter]:to-background/65'
           )}
         >
-          <div className="relative h-[104px] overflow-hidden">
+          <div
+            className={cn(
+              'relative overflow-hidden transition-[height] duration-200 ease-out',
+              collapsed ? 'h-16' : headerExpandedNeedsTallRow ? 'h-[184px]' : 'h-[132px]'
+            )}
+          >
             {/* Expanded */}
             <div
               className={cn(
