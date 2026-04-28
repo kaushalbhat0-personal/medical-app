@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -86,25 +86,35 @@ function billStatusLabel(status: Bill['status']): { label: string; className: st
   return { label: status, className: '' };
 }
 
-function PageSkeleton() {
+function HeaderLoadingSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse" aria-hidden>
-      <div className="h-8 w-48 rounded-md bg-muted" />
-      <div className="h-4 w-72 rounded-md bg-muted" />
-      <div className="flex gap-2">
-        <div className="h-9 w-32 rounded-md bg-muted" />
-        <div className="h-9 w-20 rounded-md bg-muted" />
-        <div className="h-9 w-24 rounded-md bg-muted" />
+    <div className="space-y-2 animate-pulse" aria-hidden>
+      <div className="h-6 w-48 rounded-md bg-muted" />
+      <div className="h-4 w-40 rounded-md bg-muted" />
+      <div className="flex gap-2 pt-1">
+        <div className="h-8 flex-1 rounded-md bg-muted" />
+        <div className="h-8 flex-1 rounded-md bg-muted" />
       </div>
-      <div className="h-48 rounded-xl bg-muted" />
     </div>
   );
+}
+
+function getScrollParent(from: HTMLElement | null): HTMLElement | Window | null {
+  let el: HTMLElement | null = from?.parentElement ?? null;
+  while (el && el !== document.body) {
+    const { overflowY } = getComputedStyle(el);
+    if (overflowY === 'auto' || overflowY === 'scroll') return el;
+    el = el.parentElement;
+  }
+  return typeof window !== 'undefined' ? window : null;
 }
 
 export function DoctorPatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -152,6 +162,23 @@ export function DoctorPatientDetailPage() {
   useEffect(() => {
     setNotesDraft(patient?.clinical_notes ?? '');
   }, [patient?.id, patient?.clinical_notes]);
+
+  useEffect(() => {
+    const root = pageRootRef.current;
+    if (!root) return;
+    const scrollTarget = getScrollParent(root);
+    if (!scrollTarget) return;
+
+    const handleScroll = () => {
+      const y =
+        scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
+      setHeaderCollapsed(y > 80);
+    };
+
+    handleScroll();
+    scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollTarget.removeEventListener('scroll', handleScroll);
+  }, [id]);
 
   const stats = useMemo(() => {
     const completed = appointments.filter((a) => a.status === 'completed');
@@ -342,46 +369,84 @@ export function DoctorPatientDetailPage() {
     }
   };
 
+  const showActions = isIndependent && !isReadOnly;
+
   return (
-    <div className="max-w-md mx-auto px-4 py-4 space-y-6 pb-24">
-      <div
-        className={cn(
-          '-mx-4 px-4 sticky top-[56px] z-20 w-full border-b border-border py-3',
-          'bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/30'
-        )}
-      >
-        <Link
-          to="/doctor/patients"
+    <div ref={pageRootRef} className="min-h-full bg-muted/30">
+      <div className="mx-auto max-w-md">
+        <div
           className={cn(
-            buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'mb-2 gap-1.5 h-8 px-2 -ml-2 text-muted-foreground'
+            'sticky top-0 z-30 border-b border-border bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+            'dark:bg-background/80 dark:supports-[backdrop-filter]:bg-background/70'
           )}
         >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          Patients
-        </Link>
-        {loading && !patient ? (
-          <PageSkeleton />
-        ) : (
-          <div className="space-y-2">
-            <div className="text-lg font-semibold tracking-tight truncate">{patient?.name || 'Patient'}</div>
-            <div className="text-sm text-muted-foreground truncate">
-              {contactLine || 'No phone or email on file'}
+          <div className="px-4 py-3">
+            <div className="transition-all duration-200 ease-out">
+              {loading && !patient ? (
+                <HeaderLoadingSkeleton />
+              ) : headerCollapsed ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    <Link
+                      to="/doctor/patients"
+                      className={cn(
+                        buttonVariants({ variant: 'ghost', size: 'icon' }),
+                        'h-8 w-8 shrink-0 text-muted-foreground'
+                      )}
+                      aria-label="Back to patients"
+                    >
+                      <ArrowLeft className="h-4 w-4" aria-hidden />
+                    </Link>
+                    <span className="truncate font-medium text-foreground">
+                      {patient?.name || 'Patient'}
+                    </span>
+                  </div>
+                  {showActions ? (
+                    <div className="flex shrink-0 gap-2">
+                      <Button type="button" size="sm" onClick={goBook}>
+                        Book
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={goCreateBill}>
+                        Bill
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Link
+                    to="/doctor/patients"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                      'gap-1.5 h-8 px-2 -ml-2 text-muted-foreground'
+                    )}
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                    Patients
+                  </Link>
+                  <div className="text-lg font-semibold tracking-tight truncate">
+                    {patient?.name || 'Patient'}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    {contactLine || 'No phone or email on file'}
+                  </div>
+                  {showActions && (
+                    <div className="flex gap-2 pt-1">
+                      <Button type="button" size="sm" className="flex-1" onClick={goBook}>
+                        Book appointment
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
+                        Create bill
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            {isIndependent && !isReadOnly && (
-              <div className="flex gap-2 pt-1">
-                <Button type="button" size="sm" className="flex-1" onClick={goBook}>
-                  Book appointment
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
-                  Create bill
-                </Button>
-              </div>
-            )}
           </div>
-        )}
-      </div>
+        </div>
 
+        <div className="space-y-6 px-4 py-4 pb-24">
       {!loading && patient && (
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-3">
@@ -744,6 +809,8 @@ export function DoctorPatientDetailPage() {
         </Card>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

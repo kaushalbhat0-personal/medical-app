@@ -190,7 +190,7 @@ function DoctorLayoutInner() {
           </div>
         )}
 
-        <main className="mx-auto w-full max-w-5xl flex-1 min-h-0 overflow-y-auto px-4 py-6 md:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-5xl flex-1 min-h-0 scroll-smooth overflow-y-auto px-4 py-6 md:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>
