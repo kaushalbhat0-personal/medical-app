@@ -49,7 +49,7 @@ export function PatientBills() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {Array.from({ length: 3 }).map((_, i) => (
             <Card key={i}>
               <CardHeader>
@@ -70,7 +70,7 @@ export function PatientBills() {
           </CardHeader>
         </Card>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-6">
           {bills.map((b) => (
             <Card key={b.id}>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">

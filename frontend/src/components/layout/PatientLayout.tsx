@@ -18,7 +18,7 @@ export function PatientLayout() {
   const hideHeaderSearch = pathname === '/patient/home';
 
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-x-hidden overflow-y-auto bg-background text-foreground">
+    <div className="flex min-h-screen w-full flex-col overflow-x-hidden overflow-y-auto bg-muted/30 text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-white/90 shadow-sm shadow-black/[0.03] backdrop-blur-md">
         <div className="mx-auto w-full max-w-md px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">

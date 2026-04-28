@@ -75,10 +75,10 @@ export function DoctorRowCard({
           : undefined
       }
       className={cn(
-        'overflow-hidden rounded-2xl border border-border/80 bg-white shadow-sm transition-all duration-200',
-        compact ? 'p-3' : 'p-4',
-        'hover:border-primary/25 hover:shadow-md',
-        interactive && 'cursor-pointer active:scale-[0.99]',
+        'relative z-0 rounded-xl border border-border/80 bg-white p-4 shadow-md transition-all duration-200',
+        compact && 'p-3',
+        'hover:border-primary/25 hover:shadow-lg',
+        interactive && 'cursor-pointer',
         disabled && 'opacity-60',
         className
       )}

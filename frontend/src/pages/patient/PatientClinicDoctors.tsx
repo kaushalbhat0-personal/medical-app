@@ -76,7 +76,7 @@ export function PatientClinicDoctors() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <ul className="space-y-3" aria-hidden>
+            <ul className="space-y-6" aria-hidden>
               {Array.from({ length: 4 }).map((_, i) => (
                 <li key={i}>
                   <Skeleton className="h-[192px] w-full rounded-2xl" />
@@ -86,7 +86,7 @@ export function PatientClinicDoctors() {
           ) : doctors.length === 0 ? (
             <p className="text-sm text-muted-foreground">No doctors listed yet.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-6">
               {doctors.map((d) => {
                 const asDoc: Doctor = {
                   id: d.id,

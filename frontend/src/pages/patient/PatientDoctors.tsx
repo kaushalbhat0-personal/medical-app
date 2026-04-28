@@ -232,7 +232,7 @@ export function PatientDoctors() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="mt-2 mb-3">
         <h1 className="text-xl font-semibold tracking-tight">Doctors</h1>
         <p className="text-xs text-muted-foreground">
@@ -322,7 +322,7 @@ export function PatientDoctors() {
             </div>
           ) : null}
 
-          <div className="grid gap-4">
+          <div className="grid gap-6">
             {displayDoctors.map((d) => {
               const spec = d.specialization || d.specialty || 'Specialist';
               const noAvailability = d.has_availability_windows === false;
@@ -358,10 +358,7 @@ export function PatientDoctors() {
                       ? undefined
                       : () => navigate(`/patient/doctor/${d.id}`, { state: doctorProfileState })
                   }
-                  className={cn(
-                    'transition-transform duration-200 hover:-translate-y-0.5',
-                    blocked && 'opacity-60'
-                  )}
+                  className={cn(blocked && 'opacity-60')}
                 />
               );
             })}

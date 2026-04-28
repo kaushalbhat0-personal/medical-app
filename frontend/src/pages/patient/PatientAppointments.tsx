@@ -195,7 +195,7 @@ export function PatientAppointments() {
       </div>
 
       {showInitialSkeleton ? (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {Array.from({ length: 3 }).map((_, i) => (
             <Card key={i}>
               <CardContent>
@@ -230,7 +230,7 @@ export function PatientAppointments() {
           {tab === 'upcoming' ? 'No upcoming appointments.' : 'No past appointments in your history.'}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-6">
           {shown.map((a) => {
             const t = appointmentTime(a);
             const isPending = a.status === 'pending';

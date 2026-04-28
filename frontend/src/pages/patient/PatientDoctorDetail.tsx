@@ -48,16 +48,16 @@ function publicToBookingDoctor(p: PublicDoctorProfile): Doctor {
 function ProfileSkeleton() {
   return (
     <div className="pb-28">
-      <div className="mx-auto max-w-md space-y-5 px-4">
+      <div className="mx-auto max-w-md space-y-6 px-4">
         <div className="flex items-start gap-2">
           <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-muted" />
-          <div className="min-w-0 flex-1 space-y-4">
+          <div className="min-w-0 flex-1 space-y-6">
             <div className="mb-4 space-y-4 rounded-2xl border-2 border-primary/10 bg-muted/40 p-4">
               <div className="h-3 w-28 animate-pulse rounded bg-muted" />
               <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted" />
               <div className="h-4 w-40 animate-pulse rounded bg-muted" />
             </div>
-            <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-md relative z-0">
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 shrink-0 animate-pulse rounded-xl bg-muted" />
                 <div className="flex-1 space-y-4">
@@ -70,13 +70,13 @@ function ProfileSkeleton() {
             </div>
           </div>
         </div>
-        <div className="space-y-4 rounded-2xl border border-border/60 p-4 shadow-sm">
+        <div className="space-y-4 rounded-xl border border-border/60 p-4 shadow-md relative z-0">
           <div className="h-4 w-32 animate-pulse rounded bg-muted" />
           <div className="h-16 w-full animate-pulse rounded-lg bg-muted" />
           <div className="h-3 w-full animate-pulse rounded bg-muted" />
         </div>
         <div className="h-20 animate-pulse rounded-2xl bg-muted/80" />
-        <div className="space-y-3 rounded-2xl border border-border/60 p-4 shadow-sm">
+        <div className="space-y-3 rounded-xl border border-border/60 p-4 shadow-md relative z-0">
           <div className="h-4 w-28 animate-pulse rounded bg-muted" />
           <div className="h-12 w-2/3 max-w-sm animate-pulse rounded-xl bg-muted" />
           <div className="flex flex-wrap gap-2">
@@ -338,7 +338,7 @@ export function PatientDoctorDetail() {
 
   return (
     <div className="pb-28">
-      <div className="mx-auto max-w-md space-y-5 px-4">
+      <div className="mx-auto max-w-md space-y-6 px-4">
         <div className="flex items-start gap-2">
           <Link
             to="/patient/doctors"
@@ -406,7 +406,7 @@ export function PatientDoctorDetail() {
           <section
             ref={bookingSectionRef}
             id="patient-booking"
-            className="scroll-mt-6 space-y-4"
+            className="scroll-mt-6 space-y-6"
           >
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Pick a time</h2>
@@ -451,7 +451,7 @@ export function PatientDoctorDetail() {
             !booking.slotsLoading &&
             !booking.slotsError &&
             booking.slots.length === 0 && (
-              <div className="space-y-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm" role="status">
+              <div className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-md relative z-0" role="status">
                 <p className="text-sm font-medium text-foreground">No slots on this day</p>
                 {!nextAfterNoSlotsLoading && nextAfterNoSlots?.start && (
                   <>

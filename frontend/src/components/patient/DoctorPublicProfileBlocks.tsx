@@ -54,7 +54,7 @@ export function DoctorProfileNextAvailableBanner({
 
   if (doctor.has_availability_windows === false) {
     return (
-      <div className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.06] p-4 shadow-sm">
+      <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-4 shadow-md relative z-0">
         <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hours not online yet</p>
         <p className="mt-1 text-sm text-muted-foreground">Call the clinic or try another verified provider.</p>
       </div>
@@ -62,7 +62,7 @@ export function DoctorProfileNextAvailableBanner({
   }
 
   return (
-    <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.12] via-background to-background p-4 shadow-sm">
+    <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.12] via-background to-background p-4 shadow-md relative z-0">
       {loading && !phrase ? (
         <div className="space-y-4" aria-busy aria-label="Loading next slot">
           <div className="h-3 w-28 animate-pulse rounded bg-muted" />
@@ -101,7 +101,7 @@ export function DoctorProfileHero({ doctor }: { doctor: PublicDoctorProfile }) {
   const synthetic = doctor.metrics_are_synthetic !== false;
 
   return (
-    <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+    <div className="rounded-xl border border-border/80 bg-card p-4 shadow-md relative z-0">
       <div className="space-y-3">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border text-xl font-semibold">
@@ -143,7 +143,7 @@ export function DoctorProfileHero({ doctor }: { doctor: PublicDoctorProfile }) {
           </div>
         </div>
         <div
-          className="space-y-2 rounded-xl border border-border bg-white p-3 shadow-sm dark:bg-card"
+          className="relative z-0 space-y-2 rounded-xl border border-border bg-white p-3 shadow-md dark:bg-card"
           aria-label="Trust signals"
         >
           {doctor.verified ? (
@@ -176,7 +176,7 @@ export function DoctorProfileAbout({ doctor }: { doctor: PublicDoctorProfile }) 
   const spec = doctor.specialization.trim();
   const an = /^[aeiou]/i.test(spec) ? 'an' : 'a';
   return (
-    <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+    <section className="relative z-0 rounded-xl border border-border/80 bg-card p-4 shadow-md">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <GraduationCap className="h-4 w-4 text-primary" aria-hidden />
         About this doctor
@@ -213,7 +213,7 @@ export function DoctorProfileClinic({ doctor }: { doctor: PublicDoctorProfile })
   if (!hasAny) return null;
 
   return (
-    <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+    <section className="relative z-0 rounded-xl border border-border/80 bg-card p-4 shadow-md">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <Building2 className="h-4 w-4 text-primary" aria-hidden />
         Clinic info
@@ -290,7 +290,7 @@ export function DoctorProfileAvailabilitySummary({
   const showViewAllToday = t.length > previewToday.length;
 
   return (
-    <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+    <section className="relative z-0 rounded-xl border border-border/80 bg-card p-4 shadow-md">
       <h2 className="text-base font-semibold tracking-tight text-foreground">Availability</h2>
 
       {error ? (

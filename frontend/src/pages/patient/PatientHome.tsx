@@ -137,7 +137,7 @@ export function PatientHome() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="sticky top-0 z-20 -mx-4 mb-2 border-b border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md transition-shadow duration-200 sm:mx-0 sm:mb-3 sm:rounded-2xl sm:border sm:shadow-sm">
         <PatientSearchCombobox tenants={tenants} allDoctors={allDoctors} className="w-full min-w-0" />
       </div>
@@ -179,7 +179,7 @@ export function PatientHome() {
             <button
               type="button"
               onClick={() => navigate(`/patient/doctor/${familyDoctor.id}`)}
-              className="group relative w-full overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/15 via-primary/5 to-background p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              className="group relative z-0 w-full rounded-xl border border-primary/25 bg-gradient-to-br from-primary/15 via-primary/5 to-background p-5 text-left shadow-md transition hover:border-primary/40 hover:shadow-lg"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 ring-1 ring-primary/20">
@@ -242,10 +242,10 @@ export function PatientHome() {
           ) : (
             <div className="relative -mx-1">
               <div
-                className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent sm:hidden"
+                className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-muted/30 to-transparent sm:hidden"
                 aria-hidden
               />
-              <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent sm:hidden" aria-hidden />
+              <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-muted/30 to-transparent sm:hidden" aria-hidden />
               <div
                 className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
               >
