@@ -320,3 +320,182 @@ async def test_inventory_bulk_stock_merges_with_items_list(
         "doctor_id": None,
         "quantity": 120,
     }
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_deducts_clinic_inventory(
+    client: AsyncClient, db_session: Session,
+) -> None:
+    from tests.factories import create_user, seed_bookable_doctor_and_patient
+
+    db = db_session
+    doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password="DocPass123!",
+        patient_email=pat_email,
+        patient_password="PatPass123!",
+    )
+    tenant_id = doctor.tenant_id
+    assert tenant_id is not None
+    adm_email = f"adm_{uuid.uuid4().hex[:8]}@e2e.test"
+    create_user(
+        db,
+        email=adm_email,
+        password="AdmPass9!",
+        role=UserRole.admin,
+        tenant_id=tenant_id,
+    )
+    db.commit()
+
+    adm_login = await client.post(
+        "/api/v1/login",
+        data={"username": adm_email, "password": "AdmPass9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert adm_login.status_code == 200
+    adm_h = {
+        "Authorization": f"Bearer {adm_login.json()['access_token']}",
+        "X-Tenant-ID": str(tenant_id),
+    }
+
+    item_r = await client.post(
+        "/api/v1/inventory/items",
+        json={
+            "name": "Bandage roll",
+            "type": "consumable",
+            "unit": "roll",
+            "cost_price": 10.0,
+            "selling_price": 18.0,
+        },
+        headers=adm_h,
+    )
+    assert item_r.status_code == 201
+    item_id = item_r.json()["id"]
+    add_r = await client.post(
+        "/api/v1/inventory/stock/add",
+        json={"item_id": item_id, "quantity": 30, "doctor_id": None},
+        headers=adm_h,
+    )
+    assert add_r.status_code == 200
+
+    login_pat = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": "PatPass123!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login_pat.status_code == 200
+    pat_h = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
+    created = await client.post(
+        "/api/v1/appointments",
+        json={
+            "patient_id": str(patient.id),
+            "doctor_id": str(doctor.id),
+            "appointment_time": slot.isoformat(),
+        },
+        headers=pat_h,
+    )
+    assert created.status_code == 201
+    appt_id = created.json()["id"]
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": "DocPass123!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_h = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(tenant_id),
+    }
+    ok = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json={
+            "completion_notes": "Applied dressing.",
+            "items": [{"item_id": item_id, "quantity": 8}],
+        },
+        headers=doc_h,
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "completed"
+    assert ok.json().get("completion_notes") == "Applied dressing."
+
+    bulk = await client.get(
+        "/api/v1/inventory/stock/bulk",
+        params={"as_map": "true", "tenant_stock_only": "true"},
+        headers=adm_h,
+    )
+    assert bulk.status_code == 200
+    assert bulk.json()[item_id] == 22
+
+    again = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json={"completion_notes": None, "items": []},
+        headers=doc_h,
+    )
+    assert again.status_code == 200
+    assert again.json()["status"] == "completed"
+
+    bulk2 = await client.get(
+        "/api/v1/inventory/stock/bulk",
+        params={"as_map": "true", "tenant_stock_only": "true"},
+        headers=adm_h,
+    )
+    assert bulk2.status_code == 200
+    assert bulk2.json()[item_id] == 22
+
+
+@pytest.mark.asyncio
+async def test_inventory_doctor_stock_adjust_forbidden(
+    client: AsyncClient, db_session: Session,
+) -> None:
+    db = db_session
+    tenant = create_tenant(db, name="inv-adj-doc")
+    doc_email = f"inv_adj_{uuid.uuid4().hex[:8]}@example.com"
+    doc_user = create_user(
+        db,
+        email=doc_email,
+        password="InvPass9!",
+        role=UserRole.doctor,
+        tenant_id=tenant.id,
+    )
+    create_doctor_profile(db, tenant_id=tenant.id, user_id=doc_user.id)
+    db.commit()
+
+    login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": "InvPass9!"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200
+    auth = {
+        "Authorization": f"Bearer {login.json()['access_token']}",
+        "X-Tenant-ID": str(tenant.id),
+    }
+
+    create_item = await client.post(
+        "/api/v1/inventory/items",
+        json={
+            "name": "Tape",
+            "type": "consumable",
+            "unit": "roll",
+            "cost_price": 1.0,
+            "selling_price": 3.0,
+        },
+        headers=auth,
+    )
+    assert create_item.status_code == 201
+    item_id = create_item.json()["id"]
+    await client.post(
+        "/api/v1/inventory/stock/add",
+        json={"item_id": item_id, "quantity": 10, "doctor_id": None},
+        headers=auth,
+    )
+    bad = await client.post(
+        "/api/v1/inventory/stock/adjust",
+        json={"item_id": item_id, "quantity": 1, "doctor_id": None},
+        headers=auth,
+    )
+    assert bad.status_code == 403

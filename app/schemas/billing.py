@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.billing import BillingStatus
 from app.schemas.patient import PatientRead
@@ -39,6 +39,13 @@ class BillingCreate(BaseModel):
     idempotency_key: str | None = None
     description: str | None = None
     due_date: datetime | str | None = None
+    include_appointment_inventory_selling_total: bool = Field(
+        False,
+        description=(
+            "When true and appointment_id is set, adds sum(qty × item selling_price) "
+            "from visit inventory usage to amount and summarizes in description."
+        ),
+    )
 
     @field_validator("due_date", mode="before")
     @classmethod

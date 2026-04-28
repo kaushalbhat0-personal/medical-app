@@ -32,4 +32,5 @@ export {
   type InventoryItemDTO,
   type InventoryItemCreatePayload,
   type InventoryItemType,
+  type InventoryItemWithStockDTO,
 } from './inventory';

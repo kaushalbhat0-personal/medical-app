@@ -24,16 +24,15 @@ import {
   type InventoryItemType,
 } from '../services/inventory';
 import { cn } from '@/lib/utils';
-
-const LOW_STOCK_THRESHOLD = 10;
+import { DEFAULT_LOW_STOCK_FALLBACK } from '../utils/inventoryLowStock';
 
 type MergedItem = InventoryItemDTO & { stock: number };
 
 function sortItemsForDisplay(items: MergedItem[]): MergedItem[] {
   return [...items].sort((a, b) => {
-    const tier = (s: number) => (s === 0 ? 0 : s < LOW_STOCK_THRESHOLD ? 1 : 2);
-    const ta = tier(a.stock);
-    const tb = tier(b.stock);
+    const tier = (stock: number, th: number) => (stock === 0 ? 0 : stock <= th ? 1 : 2);
+    const ta = tier(a.stock, a.low_stock_threshold ?? DEFAULT_LOW_STOCK_FALLBACK);
+    const tb = tier(b.stock, b.low_stock_threshold ?? DEFAULT_LOW_STOCK_FALLBACK);
     if (ta !== tb) return ta - tb;
     return a.name.localeCompare(b.name);
   });
@@ -91,12 +90,13 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
     const q = search.trim().toLowerCase();
     let list = merged;
     if (q) list = list.filter((i) => i.name.toLowerCase().includes(q));
-    if (lowOnly) list = list.filter((i) => i.stock < LOW_STOCK_THRESHOLD);
+    if (lowOnly)
+      list = list.filter((i) => i.stock <= (i.low_stock_threshold ?? DEFAULT_LOW_STOCK_FALLBACK));
     return sortItemsForDisplay(list);
   }, [merged, search, lowOnly]);
 
   const lowCount = useMemo(
-    () => merged.filter((i) => i.stock < LOW_STOCK_THRESHOLD).length,
+    () => merged.filter((i) => i.stock <= (i.low_stock_threshold ?? DEFAULT_LOW_STOCK_FALLBACK)).length,
     [merged]
   );
 
@@ -620,6 +620,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
                 >
                   <option value="medicine">Medicine</option>
                   <option value="consumable">Consumable</option>
+                  <option value="equipment">Equipment</option>
                 </select>
               </div>
               <div>

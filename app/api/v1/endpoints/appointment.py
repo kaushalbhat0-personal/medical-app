@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Response, Body
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -20,7 +20,12 @@ from app.core.database import get_db
 from app.models.appointment import AppointmentStatus
 from app.models.doctor import Doctor
 from app.models.user import User
-from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentRead,
+    AppointmentUpdate,
+    MarkAppointmentCompletedRequest,
+)
 from app.services import appointment_service
 
 router = APIRouter(
@@ -56,7 +61,7 @@ def create_appointment(
     )
     if idempotent_replay:
         response.headers["X-Idempotent-Replay"] = "1"
-    return appt
+    return appointment_service.appointment_to_read(db, appt)
 
 
 @router.get("", response_model=list[AppointmentRead])
@@ -91,20 +96,29 @@ def read_appointments(
 @router.post("/{appointment_id}/mark-completed", response_model=AppointmentRead)
 def mark_appointment_completed(
     appointment_id: UUID,
+    response: Response,
+    data: MarkAppointmentCompletedRequest | None = Body(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> AppointmentRead:
-    return appointment_service.mark_appointment_completed(
+    effective = data if data is not None else MarkAppointmentCompletedRequest()
+    appt, idempotent_replay = appointment_service.mark_appointment_completed(
         db,
         appointment_id,
         current_user,
         tenant_id,
         acting_doctor=acting_doctor,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
+        completion=effective,
+        idempotency_key=idempotency_key,
     )
+    if idempotent_replay:
+        response.headers["X-Idempotent-Replay"] = "1"
+    return appointment_service.appointment_to_read(db, appt)
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
@@ -126,7 +140,7 @@ def read_appointment(
         rbac_action="read_appointment",
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
-    return appointment
+    return appointment_service.appointment_to_read(db, appointment)
 
 
 @router.put("/{appointment_id}", response_model=AppointmentRead)
@@ -139,7 +153,7 @@ def update_appointment(
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> AppointmentRead:
-    return appointment_service.update_appointment(
+    updated = appointment_service.update_appointment(
         db,
         appointment_id,
         payload,
@@ -148,6 +162,7 @@ def update_appointment(
         acting_doctor=acting_doctor,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
+    return appointment_service.appointment_to_read(db, updated)
 
 
 @router.delete("/{appointment_id}", response_model=AppointmentRead)
@@ -159,7 +174,7 @@ def delete_appointment(
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> AppointmentRead:
-    return appointment_service.delete_appointment(
+    deleted = appointment_service.delete_appointment(
         db,
         appointment_id,
         current_user,
@@ -167,3 +182,4 @@ def delete_appointment(
         acting_doctor=acting_doctor,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
+    return appointment_service.appointment_to_read(db, deleted)

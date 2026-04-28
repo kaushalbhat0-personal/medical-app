@@ -252,12 +252,24 @@ export interface Appointment {
   scheduled_at?: string;
   /** `pending` is client-only until refetch replaces with server status. */
   status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  /** Saved when the visit is marked complete (doctor). */
+  completion_notes?: string | null;
   notes?: string;
   // Backend returns flat structure, no nested objects
   patient?: Patient;
   doctor?: Doctor;
+  /** From GET /appointments/:id — materials tied to completion */
+  inventory_usages?: AppointmentInventoryUsageLine[];
+  /** Σ quantity × selling_price — billing parity */
+  inventory_materials_selling_total?: string | number | null;
   created_by?: number | string;
   created_at?: string;
+}
+
+export interface AppointmentInventoryUsageLine {
+  item_id: string;
+  quantity: number;
+  item_name?: string;
 }
 
 export interface Bill {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { X, Stethoscope, UserRound } from 'lucide-react';
 import type { User } from '../../types';
 import { getEffectiveRoles, normalizeRoles } from '../../utils/roles';
@@ -8,6 +9,9 @@ import {
 } from '../../utils/doctorVerification';
 import { NavItem } from './NavItem';
 import { DOCTOR_PRACTICE_NAV } from './doctorNav';
+import { inventoryApi } from '../../services/inventory';
+import { TENANT_ID_STORAGE_EVENT } from '../../utils/tenantIdForRequest';
+import { countLowStockRows } from '../../utils/inventoryLowStock';
 
 interface DoctorSidebarProps {
   user: User | null;
@@ -19,6 +23,29 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
   const eff = getEffectiveRoles(user, token);
   const roles = normalizeRoles(eff);
   const isDoctor = roles.includes('doctor');
+  const [inventoryLowBadge, setInventoryLowBadge] = useState(0);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    let cancelled = false;
+    const load = () => {
+      inventoryApi
+        .listWithStock({ active_only: true, limit: 400 })
+        .then((rows) => {
+          if (!cancelled) setInventoryLowBadge(countLowStockRows(rows));
+        })
+        .catch(() => {
+          if (!cancelled) setInventoryLowBadge(0);
+        });
+    };
+    load();
+    window.addEventListener(TENANT_ID_STORAGE_EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(TENANT_ID_STORAGE_EVENT, load);
+    };
+  }, [isDoctor]);
+
   const baseLinks = isDoctor
     ? DOCTOR_PRACTICE_NAV
     : DOCTOR_PRACTICE_NAV.filter((l) => l.path !== '/doctor/availability');
@@ -58,6 +85,7 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
               onNavigate={onClose}
               disabled={isDoctorNavItemLocked(user, token, item.path)}
               title={doctorNavItemHint(user, item.path)}
+              badgeCount={item.path === '/doctor/inventory' ? inventoryLowBadge : undefined}
             />
           ))}
         </ul>

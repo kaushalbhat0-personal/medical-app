@@ -3,9 +3,15 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, delete, or_, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.appointment import Appointment, AppointmentCreationIdempotency, AppointmentStatus
+from app.models.appointment import (
+    Appointment,
+    AppointmentCompletionIdempotency,
+    AppointmentCreationIdempotency,
+    AppointmentStatus,
+)
+from app.models.inventory import AppointmentInventoryUsage
 from app.models.patient import Patient
 from app.utils.appointment_datetime import normalize_appointment_time_utc
 
@@ -67,6 +73,41 @@ def record_appointment_idempotency(
     return row
 
 
+def get_appointment_completion_idempotency_record(
+    db: Session,
+    *,
+    appointment_id: UUID,
+    user_id: UUID,
+    idempotency_key: str,
+) -> AppointmentCompletionIdempotency | None:
+    stmt = select(AppointmentCompletionIdempotency).where(
+        AppointmentCompletionIdempotency.appointment_id == appointment_id,
+        AppointmentCompletionIdempotency.user_id == user_id,
+        AppointmentCompletionIdempotency.idempotency_key == idempotency_key,
+    )
+    return db.scalars(stmt).first()
+
+
+def record_appointment_completion_idempotency(
+    db: Session,
+    *,
+    appointment_id: UUID,
+    user_id: UUID,
+    idempotency_key: str,
+    request_hash: str,
+) -> AppointmentCompletionIdempotency:
+    row = AppointmentCompletionIdempotency(
+        appointment_id=appointment_id,
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    db.add(row)
+    db.flush()
+    db.refresh(row)
+    return row
+
+
 def get_appointment(
     db: Session,
     appointment_id: UUID,
@@ -79,10 +120,27 @@ def get_appointment(
         .options(
             joinedload(Appointment.patient),
             joinedload(Appointment.doctor),
+            selectinload(Appointment.inventory_usages).joinedload(
+                AppointmentInventoryUsage.item
+            ),
         )
     )
     if not include_deleted:
         stmt = stmt.where(Appointment.is_deleted == False)
+    return db.scalars(stmt).first()
+
+
+def get_appointment_for_update_locked(
+    db: Session,
+    appointment_id: UUID,
+) -> Appointment | None:
+    """Row lock (``FOR UPDATE``) for serializing mark-complete and avoiding double charge."""
+    stmt = (
+        select(Appointment)
+        .where(Appointment.id == appointment_id)
+        .where(Appointment.is_deleted == False)
+        .with_for_update(of=Appointment)
+    )
     return db.scalars(stmt).first()
 
 
@@ -97,6 +155,9 @@ def get_appointments_by_ids(
         .options(
             joinedload(Appointment.patient),
             joinedload(Appointment.doctor),
+            selectinload(Appointment.inventory_usages).joinedload(
+                AppointmentInventoryUsage.item
+            ),
         )
     )
     rows = db.scalars(stmt).unique().all()
@@ -127,6 +188,9 @@ def get_appointments(
         .options(
             joinedload(Appointment.patient),
             joinedload(Appointment.doctor),
+            selectinload(Appointment.inventory_usages).joinedload(
+                AppointmentInventoryUsage.item
+            ),
         )
     )
 

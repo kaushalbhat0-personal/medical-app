@@ -12,6 +12,8 @@ interface NavItemProps {
   disabled?: boolean;
   /** Native tooltip (e.g. pending verification read-mostly hint). */
   title?: string;
+  /** Small numeric badge (e.g. low-stock count). Hidden when 0 or unset. */
+  badgeCount?: number;
 }
 
 export function NavItem({
@@ -22,6 +24,7 @@ export function NavItem({
   onNavigate,
   disabled = false,
   title,
+  badgeCount,
 }: NavItemProps) {
   const location = useLocation();
   const isActive = location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -40,13 +43,20 @@ export function NavItem({
         >
           <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary opacity-0" />
           <Icon className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden />
-          <span
-            className={cn(
-              'text-sm whitespace-nowrap transition-all duration-300',
-              isCollapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'w-auto translate-x-0 opacity-100'
-            )}
-          >
-            {label}
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap transition-all duration-300',
+                isCollapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'w-auto translate-x-0 opacity-100'
+              )}
+            >
+              {label}
+            </span>
+            {!isCollapsed && badgeCount != null && badgeCount > 0 ? (
+              <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-950 dark:text-amber-100 shrink-0">
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </span>
+            ) : null}
           </span>
         </div>
       </li>
@@ -76,21 +86,26 @@ export function NavItem({
         />
 
         {/* Icon */}
-        <Icon
-          className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${
+        <Icon className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${
             isCollapsed ? 'mx-auto' : ''
           } ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
         />
 
-        {/* Label */}
-        <span
-          className={`text-sm whitespace-nowrap transition-all duration-300 ${
-            isCollapsed
-              ? 'opacity-0 w-0 overflow-hidden translate-x-2'
-              : 'opacity-100 w-auto translate-x-0'
-          }`}
-        >
-          {label}
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span
+            className={`text-sm whitespace-nowrap transition-all duration-300 ${
+              isCollapsed
+                ? 'opacity-0 w-0 overflow-hidden translate-x-2'
+                : 'opacity-100 w-auto translate-x-0'
+            }`}
+          >
+            {label}
+          </span>
+          {!isCollapsed && badgeCount != null && badgeCount > 0 ? (
+            <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-950 dark:text-amber-100 shrink-0">
+              {badgeCount > 99 ? '99+' : badgeCount}
+            </span>
+          ) : null}
         </span>
 
         {/* Tooltip for collapsed state */}

@@ -2,6 +2,9 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from decimal import Decimal
+
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,6 +14,7 @@ from app.core.tenancy import DEFAULT_TENANT_ID
 from app.crud import crud_billing
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, BillingStatus
+from app.models.inventory import AppointmentInventoryUsage, InventoryItem
 from app.models.doctor import Doctor
 from app.models.user import User, UserRole
 from app.schemas.billing import BillingCreate, BillingEventRead, BillingUpdate
@@ -23,6 +27,35 @@ from app.services.security_audit import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _inventory_selling_addon_for_appointment(
+    db: Session, appointment_id: UUID
+) -> tuple[Decimal, str]:
+    stmt = (
+        select(
+            AppointmentInventoryUsage.quantity,
+            InventoryItem.selling_price,
+            InventoryItem.name,
+        )
+        .join(InventoryItem, InventoryItem.id == AppointmentInventoryUsage.item_id)
+        .where(AppointmentInventoryUsage.appointment_id == appointment_id)
+    )
+    total = Decimal("0.00")
+    parts: list[str] = []
+    for qty, sell, name in db.execute(stmt):
+        sub = Decimal(str(sell)) * int(qty)
+        total += sub
+        parts.append(f"{name} ×{qty} ({sell} each)")
+    return total, "; ".join(parts)[:450]
+
+
+def appointment_inventory_materials_selling_total(
+    db: Session, appointment_id: UUID
+) -> Decimal:
+    """Sum of ``quantity × selling_price`` for inventory tied to a completed visit (billing parity)."""
+    total, _ = _inventory_selling_addon_for_appointment(db, appointment_id)
+    return total
 
 
 def _validate_billing_patient_matches_appointment_tenant(
@@ -248,7 +281,9 @@ def create_bill(
         _validate_appointment_completed_for_billing(appointment)
     _validate_idempotency_key(db, billing_in.idempotency_key)
 
-    billing_data = billing_in.model_dump()
+    billing_data = billing_in.model_dump(
+        exclude={"include_appointment_inventory_selling_total"},
+    )
     billing_data["created_by"] = current_user.id
     if appointment is not None:
         if appointment.tenant_id is None:
@@ -273,6 +308,23 @@ def create_bill(
             tenant_id,
             resource_tenant_id=billing_data["tenant_id"],
         )
+
+    if (
+        appointment is not None
+        and billing_in.appointment_id is not None
+        and billing_in.include_appointment_inventory_selling_total
+    ):
+        inv_total, inv_snip = _inventory_selling_addon_for_appointment(
+            db, billing_in.appointment_id
+        )
+        if inv_total > 0:
+            base_amt = Decimal(str(billing_data["amount"]))
+            billing_data["amount"] = base_amt + inv_total
+            prev = (billing_data.get("description") or "").strip()
+            materials = f"[Materials] {inv_snip}" if inv_snip else "[Materials]"
+            billing_data["description"] = (
+                f"{prev}; {materials}"[:500] if prev else materials[:500]
+            )
 
     try:
         bill = crud_billing.create_bill(db, billing_data)

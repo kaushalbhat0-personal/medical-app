@@ -39,7 +39,7 @@ import { DoctorAppointmentDetailPage } from './pages/doctor/DoctorAppointmentDet
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
-import { AdminInventoryPage, DoctorInventoryPage } from './pages/InventoryPage';
+import { PatientInventory } from './pages/doctor/PatientInventory';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
 import { Signup } from './pages/Signup';
@@ -442,7 +442,7 @@ function AnimatedRoutes() {
             path="inventory"
             element={
               <AnimatedPage>
-                <DoctorInventoryPage />
+                <PatientInventory />
               </AnimatedPage>
             }
           />

@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, desc, func, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, UniqueConstraint, desc, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -87,10 +87,16 @@ class Appointment(Base):
         default=False,
         server_default="false",
     )
+    completion_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
     billing = relationship("Billing", back_populates="appointment", uselist=False)
+    inventory_usages = relationship(
+        "AppointmentInventoryUsage",
+        back_populates="appointment",
+        cascade="all, delete-orphan",
+    )
 
 
 class AppointmentCreationIdempotency(Base):
@@ -120,6 +126,45 @@ class AppointmentCreationIdempotency(Base):
         ForeignKey("appointments.id", ondelete="CASCADE"),
         nullable=False,
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class AppointmentCompletionIdempotency(Base):
+    """Idempotency-Key + body hash for POST .../mark-completed deduplication."""
+
+    __tablename__ = "appointment_completion_idempotency"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "appointment_id",
+            "user_id",
+            "idempotency_key",
+            name="uq_appt_completion_idempotency_appt_user_key",
+        ),
+        Index("ix_appt_completion_idempotency_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

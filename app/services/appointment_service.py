@@ -14,7 +14,7 @@ from app.crud import crud_appointment
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
 from app.models.user import User, UserRole
-from app.services import doctor_service, doctor_slot_service, patient_service
+from app.services import doctor_service, doctor_slot_service, inventory_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
@@ -22,7 +22,12 @@ from app.services.security_audit import (
     log_audit_mutation,
     log_rbac_mutation_violation,
 )
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentRead,
+    AppointmentUpdate,
+    MarkAppointmentCompletedRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -397,6 +402,20 @@ def get_appointments(
     return appointments
 
 
+def _completion_payload_hash(data: MarkAppointmentCompletedRequest) -> str:
+    body = data.model_dump(mode="json")
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def appointment_to_read(db: Session, appt: Appointment) -> AppointmentRead:
+    from app.services.billing_service import appointment_inventory_materials_selling_total
+
+    total = appointment_inventory_materials_selling_total(db, appt.id)
+    base = AppointmentRead.model_validate(appt)
+    return base.model_copy(update={"inventory_materials_selling_total": total})
+
+
 def mark_appointment_completed(
     db: Session,
     appointment_id: UUID,
@@ -405,9 +424,14 @@ def mark_appointment_completed(
     *,
     acting_doctor: Doctor | None = None,
     restrict_to_doctor_id: UUID | None = None,
-) -> Appointment:
-    """Set status to completed; only the assigned doctor may call this."""
-    appointment = get_appointment_or_404(db, appointment_id)
+    completion: MarkAppointmentCompletedRequest | None = None,
+    idempotency_key: str | None = None,
+) -> tuple[Appointment, bool]:
+    """Returns (appointment, idempotent_replay). Replay is True when Idempotency-Key matched a prior body."""
+    appointment = crud_appointment.get_appointment_for_update_locked(db, appointment_id)
+    if appointment is None:
+        raise NotFoundError("Appointment not found")
+
     authorize_appointment_access(
         db,
         appointment,
@@ -422,10 +446,62 @@ def mark_appointment_completed(
     doc = acting_doctor or doctor_service.require_doctor_profile(db, current_user)
     if appointment.doctor_id != doc.id:
         raise ForbiddenError("Not your appointment")
+
+    data = completion or MarkAppointmentCompletedRequest()
+    ih = idempotency_key.strip() if idempotency_key else ""
+    ih = ih or None
+    req_hash = _completion_payload_hash(data) if ih else None
+
+    if ih:
+        existing = crud_appointment.get_appointment_completion_idempotency_record(
+            db,
+            appointment_id=appointment_id,
+            user_id=current_user.id,
+            idempotency_key=ih,
+        )
+        if existing is not None:
+            if existing.request_hash != req_hash:
+                raise ConflictError(
+                    "Idempotency key reused with different request payload"
+                )
+            db.commit()
+            reloaded = crud_appointment.get_appointment(db, appointment_id)
+            if reloaded is None:
+                raise NotFoundError("Appointment not found")
+            return reloaded, True
+
+    if appointment.status == AppointmentStatus.completed:
+        db.commit()
+        reloaded = crud_appointment.get_appointment(db, appointment_id)
+        if reloaded is None:
+            raise NotFoundError("Appointment not found")
+        return reloaded, False
+
     if appointment.status != AppointmentStatus.scheduled:
         raise ValidationError("Only scheduled visits can be completed")
+
+    if data.items:
+        inventory_service.consume_inventory_for_appointment(
+            db,
+            appointment,
+            data.items,
+            current_user,
+            tenant_id,
+        )
+    if data.completion_notes is not None:
+        appointment.completion_notes = data.completion_notes
+
     appointment.status = AppointmentStatus.completed
     db.add(appointment)
+    if ih:
+        assert req_hash is not None
+        crud_appointment.record_appointment_completion_idempotency(
+            db,
+            appointment_id=appointment.id,
+            user_id=current_user.id,
+            idempotency_key=ih,
+            request_hash=req_hash,
+        )
     db.commit()
     slot_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     doctor_slot_service.invalidate_slots_cache_for_appointment(
@@ -441,7 +517,7 @@ def mark_appointment_completed(
     reloaded = crud_appointment.get_appointment(db, appointment_id)
     if reloaded is None:
         raise NotFoundError("Appointment not found")
-    return reloaded
+    return reloaded, False
 
 
 def authorize_appointment_access(
