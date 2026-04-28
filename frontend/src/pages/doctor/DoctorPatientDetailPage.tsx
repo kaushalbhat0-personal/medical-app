@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -117,7 +117,11 @@ export function DoctorPatientDetailPage() {
   const navigate = useNavigate();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
   const pageRootRef = useRef<HTMLDivElement>(null);
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [headerCollapsed, setHeaderCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.scrollY > 80;
+  });
+  const [ready, setReady] = useState(false);
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -166,6 +170,25 @@ export function DoctorPatientDetailPage() {
     setNotesDraft(patient?.clinical_notes ?? '');
   }, [patient?.id, patient?.clinical_notes]);
 
+  useLayoutEffect(() => {
+    const root = pageRootRef.current;
+    if (!root) {
+      setReady(true);
+      return;
+    }
+    const scrollTarget = getScrollParent(root);
+    if (!scrollTarget) {
+      setReady(true);
+      return;
+    }
+
+    const readY = () =>
+      scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
+
+    setHeaderCollapsed(readY() > 80);
+    setReady(true);
+  }, [id]);
+
   useEffect(() => {
     const root = pageRootRef.current;
     if (!root) return;
@@ -180,8 +203,8 @@ export function DoctorPatientDetailPage() {
     const applyScroll = () => {
       const y = readY();
       setHeaderCollapsed((prev) => {
-        if (y > 100 && !prev) return true;
-        if (y < 60 && prev) return false;
+        if (y > 80 && !prev) return true;
+        if (y < 48 && prev) return false;
         return prev;
       });
     };
@@ -196,7 +219,6 @@ export function DoctorPatientDetailPage() {
       }
     };
 
-    applyScroll();
     scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollTarget.removeEventListener('scroll', handleScroll);
   }, [id]);
@@ -392,7 +414,8 @@ export function DoctorPatientDetailPage() {
 
   const showActions = isIndependent && !isReadOnly;
   const inHeaderSkeleton = loading && !patient;
-  const collapsed = headerCollapsed && !inHeaderSkeleton;
+  const isCollapsed = ready ? headerCollapsed : false;
+  const collapsed = isCollapsed && !inHeaderSkeleton;
 
   return (
     <div ref={pageRootRef} className="min-h-full bg-muted/30">
