@@ -44,13 +44,13 @@ function DoctorLayoutInner() {
   return (
     <div
       className={cn(
-        'flex min-h-screen w-full overflow-y-auto text-foreground',
+        'flex h-dvh min-h-0 w-full overflow-hidden text-foreground',
         resolvedMode === 'practice' &&
           'bg-gradient-to-b from-sky-50/50 via-background to-emerald-50/30 dark:from-sky-950/20 dark:via-background dark:to-emerald-950/20',
         resolvedMode === 'admin' && 'bg-background'
       )}
     >
-      <div className="hidden w-64 flex-shrink-0 self-stretch lg:block">
+      <div className="hidden h-full min-h-0 w-64 flex-shrink-0 lg:block">
         <DoctorSidebar user={user} />
       </div>
 
@@ -67,7 +67,7 @@ function DoctorLayoutInner() {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Header
           user={user}
           onLogout={logout}
@@ -190,7 +190,7 @@ function DoctorLayoutInner() {
           </div>
         )}
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-5xl flex-1 min-h-0 overflow-y-auto px-4 py-6 md:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>

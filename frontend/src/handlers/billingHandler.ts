@@ -79,6 +79,7 @@ export const fetchPatientAppointmentsHandler = async (patientId: string): Promis
     limit: 100,
   });
   const list = safeArray<Appointment>(appointments);
+  const completedOnly = list.filter((a) => a.status === 'completed');
   if (import.meta.env.DEV) {
     const unexpected = list.filter((a) => a.status !== 'completed');
     if (unexpected.length > 0) {
@@ -88,5 +89,5 @@ export const fetchPatientAppointmentsHandler = async (patientId: string): Promis
       );
     }
   }
-  return list;
+  return completedOnly;
 };

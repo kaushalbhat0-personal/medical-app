@@ -994,10 +994,14 @@ export function DayCalendar({
 
       {isInteractive && (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-sm md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] md:hidden"
           style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
         >
-          <Button type="button" className="h-11 w-full min-h-[44px] text-base font-semibold" onClick={openNewAppointment}>
+          <Button
+            type="button"
+            className="h-12 w-full rounded-xl text-base font-semibold"
+            onClick={openNewAppointment}
+          >
             + New Appointment
           </Button>
         </div>

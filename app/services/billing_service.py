@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
@@ -28,6 +29,7 @@ def _validate_billing_patient_matches_appointment_tenant(
     db: Session,
     appointment: Appointment,
     patient_id: UUID,
+    current_user: User,
 ) -> None:
     patient = patient_service.get_patient_or_404(db, patient_id)
     if (
@@ -36,10 +38,13 @@ def _validate_billing_patient_matches_appointment_tenant(
         and appointment.tenant_id != patient.tenant_id
     ):
         logger.warning(
-            "Billing blocked: patient and appointment tenant mismatch",
+            "Cross-tenant billing attempt",
             extra={
                 "appointment_id": str(appointment.id),
-                "patient_id": str(patient_id),
+                "patient_id": str(patient.id),
+                "appointment_tenant": str(appointment.tenant_id),
+                "patient_tenant": str(patient.tenant_id),
+                "user_id": str(current_user.id),
             },
         )
         raise ForbiddenError("Cross-tenant billing not allowed")
@@ -70,7 +75,7 @@ def _validate_appointment_not_cancelled(db: Session, appointment_id: UUID) -> No
 def _validate_no_duplicate_bill(db: Session, appointment_id: UUID) -> None:
     existing_bill = crud_billing.get_bill_by_appointment(db, appointment_id)
     if existing_bill is not None:
-        raise ConflictError("Bill already exists for this appointment")
+        raise ValidationError("Bill already exists for this appointment")
 
 
 def _validate_idempotency_key(db: Session, idempotency_key: str | None) -> None:
@@ -238,7 +243,7 @@ def create_bill(
             appointment_id=billing_in.appointment_id,
         )
         _validate_billing_patient_matches_appointment_tenant(
-            db, appointment, billing_in.patient_id
+            db, appointment, billing_in.patient_id, current_user
         )
         _validate_appointment_completed_for_billing(appointment)
     _validate_idempotency_key(db, billing_in.idempotency_key)
@@ -271,6 +276,16 @@ def create_bill(
 
     try:
         bill = crud_billing.create_bill(db, billing_data)
+    except IntegrityError as e:
+        msg = str(getattr(e, "orig", e))
+        msg_compact_lower = msg.lower().replace(" ", "")
+        if (
+            "uq_billing_active_appointment" in msg
+            or "uniq_bill_per_appointment" in msg
+            or ("billings.appointment_id" in msg_compact_lower and "unique" in msg_compact_lower)
+        ):
+            raise ValidationError("Bill already exists for this appointment") from e
+        raise
     except Exception as e:
         logger.exception("[BILLING SERVICE] DB ERROR")
         raise
@@ -625,7 +640,7 @@ def update_bill(
         _validate_appointment_not_cancelled(db, new_appointment_id)
         existing_bill = crud_billing.get_bill_by_appointment(db, new_appointment_id)
         if existing_bill is not None and existing_bill.id != bill_id:
-            raise ConflictError("Bill already exists for this appointment")
+            raise ValidationError("Bill already exists for this appointment")
 
     if new_appointment_id is not None and (
         "patient_id" in update_data or "appointment_id" in update_data

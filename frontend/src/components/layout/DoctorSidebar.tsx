@@ -25,7 +25,7 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
   const links = baseLinks.filter((item) => isDoctorNavItemVisible(user, token, item.path));
 
   return (
-    <div className="flex h-full min-h-screen w-full flex-col border-r border-border/80 bg-white">
+    <div className="flex h-full min-h-0 w-full flex-col border-r border-border/80 bg-white">
       <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border/80 px-4">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm">

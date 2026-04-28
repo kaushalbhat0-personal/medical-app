@@ -20,7 +20,7 @@ class Billing(Base):
     __tablename__ = "billings"
 
     __table_args__ = (
-        # One non-deleted bill per appointment (DB-enforced)
+        # One non-deleted bill per appointment (DB + service). Same as uniq_bill_per_appointment pattern.
         Index(
             "uq_billing_active_appointment",
             "appointment_id",

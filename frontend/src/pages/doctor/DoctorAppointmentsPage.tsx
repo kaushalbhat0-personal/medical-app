@@ -59,6 +59,8 @@ export function DoctorAppointmentsPage() {
 
   const list = appointments;
 
+  const showMobileBookingBar =
+    isIndependent && selfDoctor != null && selfDoctor.has_availability_windows !== false;
 
   const clearApptPageNavState = useCallback(() => {
     if (
@@ -149,7 +151,13 @@ export function DoctorAppointmentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn(
+        'space-y-6',
+        /* Reserve space for DayCalendar fixed mobile CTA (~h-12 + bar padding + safe area) */
+        showMobileBookingBar && 'pb-24 md:pb-0'
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Appointments</h1>

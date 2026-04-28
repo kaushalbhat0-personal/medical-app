@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, time
+from datetime import date, time, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.crud.crud_appointment import add_appointment
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.user import UserRole
 from tests.factories import (
     BOOKING_ANCHOR_DATE_ISO,
@@ -334,3 +337,35 @@ async def test_get_appointments_type_past_and_upcoming(
     row = next((r for r in past2.json() if r["id"] == appt_id), None)
     assert row is not None
     assert row["status"] == "completed"
+
+
+def test_appointment_tenant_always_matches_patient_invariant(
+    db_session: Session,
+) -> None:
+    doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_{uuid.uuid4().hex[:8]}@e2e.test"
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password="DocPass123!",
+        patient_email=pat_email,
+        patient_password="PatPass123!",
+    )
+    tenant_id = doctor.tenant_id
+    assert tenant_id is not None
+    add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": slot + timedelta(hours=2),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": tenant_id,
+        },
+    )
+    db_session.commit()
+
+    for a in db_session.scalars(select(Appointment)).all():
+        if a.patient_id and a.tenant_id:
+            assert a.tenant_id == a.patient.tenant_id

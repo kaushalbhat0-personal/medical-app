@@ -32,6 +32,8 @@ class Appointment(Base):
             desc("created_at"),
             postgresql_where=text("is_deleted = false"),
         ),
+        # Same-doctor/same-time uniqueness for active visits (~scheduled/completed):
+        # Postgres predicates omit cancelled rows so reused slots after cancellation stay usable.
         Index(
             "uq_appointments_doctor_time_active",
             "doctor_id",

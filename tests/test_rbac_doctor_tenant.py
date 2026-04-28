@@ -317,6 +317,22 @@ def test_doctor_create_bill_persists_for_completed_appointment(
     assert bill.patient_id == billing_in.patient_id
 
 
+def test_doctor_create_bill_rejects_second_bill_same_appointment(
+    db_session: Session,
+) -> None:
+    tenant = _tenant(db_session, TenantType.organization)
+    doc_user, billing_in = _doctor_user_and_billing_for_tenant(
+        db_session, tenant, "dupbill"
+    )
+    billing_service.create_bill(
+        db_session, billing_in, doc_user, tenant_id=tenant.id
+    )
+    with pytest.raises(ValidationError, match="already exists"):
+        billing_service.create_bill(
+            db_session, billing_in, doc_user, tenant_id=tenant.id
+        )
+
+
 def test_doctor_create_bill_rejects_scheduled_appointment(
     db_session: Session,
 ) -> None:

@@ -269,6 +269,10 @@ def create_appointment(
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
 
+    if appointment_data.get("tenant_id") is None:
+        raise ValidationError("Appointment tenant must be set")
+    assert appointment_data["tenant_id"] is not None
+
     try:
         appointment = crud_appointment.add_appointment(db, appointment_data)
         if idempotency_key:
