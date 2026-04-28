@@ -88,12 +88,15 @@ function billStatusLabel(status: Bill['status']): { label: string; className: st
 
 function HeaderLoadingSkeleton() {
   return (
-    <div className="space-y-2 animate-pulse" aria-hidden>
-      <div className="h-6 w-48 rounded-md bg-muted" />
-      <div className="h-4 w-40 rounded-md bg-muted" />
+    <div className="flex h-full min-h-0 flex-col justify-between" aria-hidden>
+      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+      <div className="min-w-0 flex-1 space-y-2 py-1">
+        <div className="h-5 w-48 max-w-full rounded-md bg-muted animate-pulse" />
+        <div className="h-4 w-40 max-w-full rounded-md bg-muted animate-pulse" />
+      </div>
       <div className="flex gap-2 pt-1">
-        <div className="h-8 flex-1 rounded-md bg-muted" />
-        <div className="h-8 flex-1 rounded-md bg-muted" />
+        <div className="h-8 flex-1 rounded-md bg-muted animate-pulse" />
+        <div className="h-8 flex-1 rounded-md bg-muted animate-pulse" />
       </div>
     </div>
   );
@@ -389,91 +392,107 @@ export function DoctorPatientDetailPage() {
 
   const showActions = isIndependent && !isReadOnly;
   const inHeaderSkeleton = loading && !patient;
-  const expandedHeaderVisible = !headerCollapsed || inHeaderSkeleton;
-  const collapsedHeaderVisible = headerCollapsed && !inHeaderSkeleton;
+  const collapsed = headerCollapsed && !inHeaderSkeleton;
 
   return (
     <div ref={pageRootRef} className="min-h-full bg-muted/30">
       <div className="mx-auto max-w-md">
         <div
           className={cn(
-            'sticky top-0 z-30 min-h-[110px] border-b border-border bg-white/80 backdrop-blur transition-all duration-200',
-            'supports-[backdrop-filter]:bg-white/70 dark:bg-background/80 dark:supports-[backdrop-filter]:bg-background/70'
+            'sticky top-0 z-30 border-b border-border/80 shadow-sm backdrop-blur transition-all duration-200 ease-out',
+            'bg-gradient-to-b from-white/90 to-white/70',
+            'supports-[backdrop-filter]:from-white/[0.82] supports-[backdrop-filter]:to-white/60',
+            'dark:bg-gradient-to-b dark:from-background/92 dark:to-background/72',
+            'dark:supports-[backdrop-filter]:from-background/85 dark:supports-[backdrop-filter]:to-background/65'
           )}
         >
-          <div className="relative h-[110px] overflow-hidden px-4">
+          <div className="relative h-[104px] overflow-hidden">
+            {/* Expanded */}
             <div
               className={cn(
-                'transition-all duration-200 ease-out transform-gpu will-change-transform',
-                expandedHeaderVisible
-                  ? 'opacity-100 translate-y-0 scale-100'
-                  : 'pointer-events-none opacity-0 -translate-y-2 scale-95'
+                'absolute inset-0 flex flex-col justify-between px-4 py-3 transition-all duration-200 ease-out',
+                collapsed ? 'pointer-events-none opacity-0 -translate-y-2' : 'translate-y-0 opacity-100'
               )}
             >
-              <div className="flex h-[110px] min-h-0 flex-col justify-center gap-1.5">
-                {inHeaderSkeleton ? (
-                  <HeaderLoadingSkeleton />
-                ) : (
-                  <>
+              {inHeaderSkeleton ? (
+                <HeaderLoadingSkeleton />
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link
                       to="/doctor/patients"
                       className={cn(
                         buttonVariants({ variant: 'ghost', size: 'sm' }),
-                        'h-8 w-fit gap-1.5 px-2 -ml-2 text-muted-foreground'
+                        '-ml-2 h-8 gap-1.5 px-2 text-muted-foreground'
                       )}
                     >
                       <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
                       Patients
                     </Link>
+                  </div>
+
+                  <div className="min-w-0">
                     <div className="truncate text-lg font-semibold tracking-tight text-foreground">
                       {patient?.name || 'Patient'}
                     </div>
                     <div className="truncate text-sm text-muted-foreground">
                       {contactLine || 'No phone or email on file'}
                     </div>
-                    {showActions && (
-                      <div className="flex gap-2 pt-0.5">
-                        <Button type="button" size="sm" className="flex-1" onClick={goBook}>
-                          Book appointment
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
-                          Create bill
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+                  </div>
+
+                  {showActions ? (
+                    <div className="flex gap-2 pt-1">
+                      <Button type="button" size="sm" className="flex-1" onClick={goBook}>
+                        Book appointment
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
+                        Create bill
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="shrink-0" aria-hidden />
+                  )}
+                </>
+              )}
             </div>
 
+            {/* Collapsed — compact */}
             <div
               className={cn(
-                'absolute inset-0 flex items-center justify-between gap-2 px-4',
-                'transition-all duration-200 ease-out transform-gpu will-change-transform',
-                collapsedHeaderVisible
-                  ? 'opacity-100 translate-y-0 scale-100'
-                  : 'pointer-events-none opacity-0 translate-y-2 scale-95'
+                'absolute inset-0 flex items-center justify-between px-4 transition-all duration-200 ease-out',
+                collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
               )}
             >
-              <div className="flex min-w-0 flex-1 items-center gap-1">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <Link
                   to="/doctor/patients"
                   className={cn(
                     buttonVariants({ variant: 'ghost', size: 'icon' }),
-                    'h-8 w-8 shrink-0 text-muted-foreground'
+                    'h-8 w-8 shrink-0 rounded-full text-muted-foreground'
                   )}
                   aria-label="Back to patients"
                 >
-                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  <ArrowLeft className="h-5 w-5" aria-hidden />
                 </Link>
-                <span className="truncate font-medium text-foreground">{patient?.name || 'Patient'}</span>
+                <span className="max-w-[140px] truncate font-medium text-foreground">
+                  {patient?.name || 'Patient'}
+                </span>
               </div>
               {showActions ? (
                 <div className="flex shrink-0 gap-2">
-                  <Button type="button" size="sm" onClick={goBook}>
+                  <Button
+                    type="button"
+                    className="h-8 shrink-0 rounded-full px-3 text-sm"
+                    onClick={goBook}
+                  >
                     Book
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={goCreateBill}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 shrink-0 rounded-full border px-3 text-sm"
+                    onClick={goCreateBill}
+                  >
                     Bill
                   </Button>
                 </div>
