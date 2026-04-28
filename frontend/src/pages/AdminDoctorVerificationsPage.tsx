@@ -65,7 +65,7 @@ function VerificationStats({ data }: { data: DoctorVerificationQueuePage | null 
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {cards.map(({ key, label, value }) => (
         <Card key={key} className="border-border/80 shadow-sm">
-          <CardContent className="p-4">
+          <CardContent>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
           </CardContent>

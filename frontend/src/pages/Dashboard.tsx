@@ -91,7 +91,7 @@ export function Dashboard() {
             >
               <motion.div variants={staggerItem}>
                 <Card>
-                  <CardContent className="flex items-center gap-4 p-6">
+                  <CardContent className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Users className="w-5 h-5 text-primary" />
                     </div>
@@ -105,7 +105,7 @@ export function Dashboard() {
 
               <motion.div variants={staggerItem}>
                 <Card>
-                  <CardContent className="flex items-center gap-4 p-6">
+                  <CardContent className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Stethoscope className="w-5 h-5 text-primary" />
                     </div>
@@ -119,7 +119,7 @@ export function Dashboard() {
 
               <motion.div variants={staggerItem}>
                 <Card>
-                  <CardContent className="flex items-center gap-4 p-6">
+                  <CardContent className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Calendar className="w-5 h-5 text-primary" />
                     </div>
@@ -133,7 +133,7 @@ export function Dashboard() {
 
               <motion.div variants={staggerItem}>
                 <Card>
-                  <CardContent className="flex items-center gap-4 p-6">
+                  <CardContent className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <DollarSign className="w-5 h-5 text-primary" />
                     </div>

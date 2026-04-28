@@ -45,7 +45,7 @@ export function DoctorDoctorsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {doctors.map((d) => (
             <Card key={String(d.id)}>
-              <CardContent className="flex items-start gap-4 p-5">
+              <CardContent className="flex items-start gap-4">
                 <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold shrink-0">
                   {formatDoctorInitials(d)}
                 </div>

@@ -331,14 +331,14 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
       )}
 
       {!loading && loadError && (
-        <Card className="border-destructive/40">
-          <CardContent className="py-6 text-sm text-destructive">{loadError}</CardContent>
+          <Card className="border-destructive/40">
+          <CardContent className="text-sm text-destructive">{loadError}</CardContent>
         </Card>
       )}
 
       {!loading && !loadError && filtered.length === 0 && (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="text-center text-sm text-muted-foreground">
             No items match your filters.
           </CardContent>
         </Card>
@@ -356,7 +356,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
                     !item.is_active && 'opacity-55'
                   )}
                 >
-                  <CardContent className="p-3 sm:p-4">
+                  <CardContent>
                     <div className="flex gap-2 items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

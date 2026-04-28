@@ -291,7 +291,7 @@ export function Doctors() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {doctors.map((doctor) => (
             <Card key={doctor.id}>
-              <CardContent className="flex items-start gap-4 p-6">
+              <CardContent className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold flex-shrink-0">
                   {formatDoctorInitials(doctor)}
                 </div>

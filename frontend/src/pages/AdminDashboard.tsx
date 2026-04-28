@@ -135,7 +135,7 @@ export function AdminDashboard() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
             <Card className="rounded-xl border border-border shadow-sm">
-              <CardContent className="flex items-center gap-3 p-5">
+              <CardContent className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <Wallet className="h-5 w-5 text-primary" />
                 </div>
@@ -148,7 +148,7 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
             <Card className="rounded-xl border border-border shadow-sm">
-              <CardContent className="flex items-center gap-3 p-5">
+              <CardContent className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <CircleDollarSign className="h-5 w-5 text-primary" />
                 </div>
@@ -161,7 +161,7 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
             <Card className="rounded-xl border border-border shadow-sm">
-              <CardContent className="flex items-center gap-3 p-5">
+              <CardContent className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <BarChart3 className="h-5 w-5 text-primary" />
                 </div>
@@ -172,7 +172,7 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
             <Card className="rounded-xl border border-border shadow-sm">
-              <CardContent className="flex items-center gap-3 p-5">
+              <CardContent className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <CalendarCheck className="h-5 w-5 text-primary" />
                 </div>
@@ -183,7 +183,7 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
             <Card className="rounded-xl border border-border shadow-sm sm:col-span-2 lg:col-span-1">
-              <CardContent className="flex items-center gap-3 p-5">
+              <CardContent className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <Receipt className="h-5 w-5 text-primary" />
                 </div>
@@ -223,9 +223,9 @@ export function AdminDashboard() {
               <CardTitle className="text-lg">Doctor performance</CardTitle>
               <p className="text-sm text-muted-foreground">Last 7 days, sorted by revenue</p>
             </CardHeader>
-            <CardContent className="px-0 sm:px-6">
+            <CardContent className="space-y-2">
               {noDoctors ? (
-                <div className="px-6 py-4">
+                <div className="py-2">
                   <EmptyState
                     title="No doctors"
                     description="Add doctors to see performance metrics for your tenant."

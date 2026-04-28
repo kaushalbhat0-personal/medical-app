@@ -322,7 +322,7 @@ export function Billing() {
         </CommonCard>
       )}
 
-      <Card>
+      <Card className="p-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

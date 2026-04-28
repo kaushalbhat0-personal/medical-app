@@ -347,7 +347,7 @@ export function DoctorPatientDetailPage() {
     <div className="space-y-6">
       <div
         className={cn(
-          'sticky z-30 -mx-4 px-4 py-3 border-b border-border',
+          'sticky z-30 w-full px-0 py-3 border-b border-border',
           'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80',
           'top-14'
         )}
@@ -356,7 +356,7 @@ export function DoctorPatientDetailPage() {
           to="/doctor/patients"
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'sm' }),
-            '-ml-2 mb-1 gap-1.5 h-8 text-muted-foreground'
+            'mb-1 gap-1.5 h-8 px-2 text-muted-foreground'
           )}
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -374,11 +374,11 @@ export function DoctorPatientDetailPage() {
                 </p>
               </div>
               {isIndependent && !isReadOnly && (
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  <Button type="button" size="sm" onClick={goBook}>
+                <div className="flex w-full min-w-0 gap-2 sm:w-auto sm:max-w-md">
+                  <Button type="button" size="sm" className="flex-1" onClick={goBook}>
                     Book appointment
                   </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={goCreateBill}>
+                  <Button type="button" size="sm" variant="outline" className="flex-1" onClick={goCreateBill}>
                     Create bill
                   </Button>
                 </div>
@@ -386,24 +386,30 @@ export function DoctorPatientDetailPage() {
             </div>
 
             {!loading && patient && (
-              <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-                  <dt className="text-xs text-muted-foreground">Total visits</dt>
-                  <dd className="font-semibold tabular-nums">{stats.totalVisits}</dd>
-                </div>
-                <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-                  <dt className="text-xs text-muted-foreground">Last visit</dt>
-                  <dd className="font-semibold">{stats.lastVisitLabel}</dd>
-                </div>
-                <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-                  <dt className="text-xs text-muted-foreground">Outstanding bills</dt>
-                  <dd className="font-semibold tabular-nums">
-                    {stats.outstanding > 0
-                      ? `${stats.outstandingCurrency} ${stats.outstanding.toFixed(0)}`
-                      : '—'}
-                  </dd>
-                </div>
-              </dl>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Card>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-sm text-muted-foreground">Total visits</div>
+                    <div className="text-lg font-semibold tabular-nums">{stats.totalVisits}</div>
+                  </div>
+                </Card>
+                <Card>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-sm text-muted-foreground">Last visit</div>
+                    <div className="text-lg font-semibold">{stats.lastVisitLabel}</div>
+                  </div>
+                </Card>
+                <Card>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-sm text-muted-foreground">Outstanding bills</div>
+                    <div className="text-lg font-semibold tabular-nums">
+                      {stats.outstanding > 0
+                        ? `${stats.outstandingCurrency} ${stats.outstanding.toFixed(0)}`
+                        : '—'}
+                    </div>
+                  </div>
+                </Card>
+              </div>
             )}
           </>
         )}
@@ -434,7 +440,7 @@ export function DoctorPatientDetailPage() {
       )}
 
       {!loading && section === 'activity' && (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {patient && (
             <Card>
               <CardHeader className="pb-2">
@@ -484,17 +490,14 @@ export function DoctorPatientDetailPage() {
           )}
 
           {dayOrder.length > 0 && (
-            <div className="space-y-0">
+            <div className="space-y-4">
               {dayOrder.map((dayKey, dayIdx) => {
                 const list = timelineByDay.get(dayKey) ?? [];
                 const sampleIso = list[0]?.iso;
                 return (
                   <div
                     key={dayKey}
-                    className={cn(
-                      'pb-8',
-                      dayIdx > 0 && 'border-t border-border/50 pt-8 mt-2'
-                    )}
+                    className={cn(dayIdx > 0 && 'border-t border-border/50 pt-4')}
                   >
                     <h2 className="text-lg font-semibold tracking-tight text-foreground border-b border-border/60 pb-2 mb-4">
                       {sampleIso ? relativeCalendarDayTitleInZone(sampleIso, DISPLAY_TIMEZONE) : ''}
@@ -671,7 +674,7 @@ export function DoctorPatientDetailPage() {
                 : null;
               return (
                 <Card key={String(b.id)}>
-                  <CardContent className="p-4 flex flex-wrap items-start justify-between gap-3 text-sm">
+                  <CardContent className="flex flex-wrap items-start justify-between gap-3 text-sm">
                     <div className="space-y-1 min-w-0">
                       <p className="font-medium tabular-nums">
                         {b.currency} {Number(b.amount).toFixed(2)}

@@ -238,7 +238,7 @@ export function DoctorBillsPage() {
         <div className="space-y-3">
           {bills.map((b) => (
             <Card key={b.id} id={b.id ? `bill-${b.id}` : undefined}>
-              <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/doctor/bills/${b.id}`}

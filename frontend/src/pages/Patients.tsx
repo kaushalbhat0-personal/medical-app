@@ -235,7 +235,7 @@ export function Patients() {
           )}
 
           {/* Table */}
-          <Card>
+          <Card className="p-0">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
