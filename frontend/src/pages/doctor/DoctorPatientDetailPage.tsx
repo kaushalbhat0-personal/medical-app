@@ -112,15 +112,14 @@ function getScrollParent(from: HTMLElement | null): HTMLElement | Window | null 
   return typeof window !== 'undefined' ? window : null;
 }
 
+const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
+
 export function DoctorPatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
   const pageRootRef = useRef<HTMLDivElement>(null);
-  const [headerCollapsed, setHeaderCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.scrollY > 80;
-  });
+  const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [section, setSection] = useState<Section>('activity');
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -185,7 +184,9 @@ export function DoctorPatientDetailPage() {
     const readY = () =>
       scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
 
-    setHeaderCollapsed(readY() > 80);
+    const threshold = 100;
+    const y = readY();
+    setProgress(Math.min(Math.max(y / threshold, 0), 1));
     setReady(true);
   }, [id]);
 
@@ -195,28 +196,15 @@ export function DoctorPatientDetailPage() {
     const scrollTarget = getScrollParent(root);
     if (!scrollTarget) return;
 
-    let ticking = false;
-
     const readY = () =>
       scrollTarget === window ? window.scrollY : (scrollTarget as HTMLElement).scrollTop;
 
-    const applyScroll = () => {
-      const y = readY();
-      setHeaderCollapsed((prev) => {
-        if (y > 80 && !prev) return true;
-        if (y < 48 && prev) return false;
-        return prev;
-      });
-    };
+    const threshold = 100;
 
     const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          applyScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
+      const y = readY();
+      const p = Math.min(Math.max(y / threshold, 0), 1);
+      setProgress(p);
     };
 
     scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
@@ -414,35 +402,41 @@ export function DoctorPatientDetailPage() {
 
   const showActions = isIndependent && !isReadOnly;
   const inHeaderSkeleton = loading && !patient;
-  const isCollapsed = ready ? headerCollapsed : false;
-  const collapsed = isCollapsed && !inHeaderSkeleton;
-  /** Expanded header needs >104px when actions/skeleton rows exist; fixed 104px was clipping primary CTAs */
+  /** Expanded header needs extra height when actions/skeleton rows exist */
   const headerExpandedNeedsTallRow = showActions || inHeaderSkeleton;
+  const scrollProgress = ready ? progress : 0;
+  /** While the header skeleton shows, stay fully expanded (same as old `!collapsed || inHeaderSkeleton`) */
+  const t = inHeaderSkeleton ? 0 : scrollProgress;
+
+  const expandedHeight = headerExpandedNeedsTallRow ? 184 : 132;
+  const height = lerp(expandedHeight, 56, t);
+  const nameSize = lerp(18, 15, t);
+  const buttonScale = lerp(1, 0.85, t);
+  const expandedOpacity = 1 - t;
+  const collapsedOpacity = t;
+  const layerTransition =
+    'transform 0.1s linear, opacity 0.1s linear';
 
   return (
     <div ref={pageRootRef} className="min-h-full bg-muted/30">
       <div className="mx-auto max-w-md">
         <div
-          className={cn(
-            'sticky top-0 z-30 border-b border-border/80 shadow-sm backdrop-blur transition-all duration-200 ease-out',
-            'bg-gradient-to-b from-white/90 to-white/70',
-            'supports-[backdrop-filter]:from-white/[0.82] supports-[backdrop-filter]:to-white/60',
-            'dark:bg-gradient-to-b dark:from-background/92 dark:to-background/72',
-            'dark:supports-[backdrop-filter]:from-background/85 dark:supports-[backdrop-filter]:to-background/65'
-          )}
+          className="sticky top-0 z-30 border-b border-border/80 backdrop-blur bg-white/80 supports-[backdrop-filter]:bg-white/70 dark:bg-background/80 dark:supports-[backdrop-filter]:bg-background/70 shadow-sm dark:shadow-black/10"
+          style={{
+            height: `${height}px`,
+            transition: 'height 0.1s linear',
+          }}
         >
-          <div
-            className={cn(
-              'relative overflow-hidden transition-[height] duration-200 ease-out',
-              collapsed ? 'h-16' : headerExpandedNeedsTallRow ? 'h-[184px]' : 'h-[132px]'
-            )}
-          >
+          <div className="relative h-full overflow-hidden">
             {/* Expanded */}
             <div
-              className={cn(
-                'absolute inset-0 flex flex-col justify-between px-4 py-3 transition-all duration-200 ease-out',
-                collapsed ? 'pointer-events-none opacity-0 -translate-y-2' : 'translate-y-0 opacity-100'
-              )}
+              className="absolute inset-0 flex flex-col justify-between px-4 py-3"
+              style={{
+                opacity: expandedOpacity,
+                transform: `translateY(${lerp(0, -10, t)}px)`,
+                transition: layerTransition,
+                pointerEvents: expandedOpacity < 0.02 ? 'none' : 'auto',
+              }}
             >
               {inHeaderSkeleton ? (
                 <HeaderLoadingSkeleton />
@@ -462,7 +456,10 @@ export function DoctorPatientDetailPage() {
                   </div>
 
                   <div className="min-w-0">
-                    <div className="truncate text-lg font-semibold tracking-tight text-foreground">
+                    <div
+                      className="truncate font-semibold tracking-tight text-foreground"
+                      style={{ fontSize: `${nameSize}px` }}
+                    >
                       {patient?.name || 'Patient'}
                     </div>
                     <div className="truncate text-sm text-muted-foreground">
@@ -471,7 +468,14 @@ export function DoctorPatientDetailPage() {
                   </div>
 
                   {showActions ? (
-                    <div className="flex gap-2 pt-1">
+                    <div
+                      className="flex gap-2 pt-1"
+                      style={{
+                        transform: `scale(${buttonScale})`,
+                        transition: 'transform 0.1s linear',
+                        transformOrigin: 'center bottom',
+                      }}
+                    >
                       <Button type="button" size="sm" className="flex-1" onClick={goBook}>
                         Book appointment
                       </Button>
@@ -488,10 +492,13 @@ export function DoctorPatientDetailPage() {
 
             {/* Collapsed — compact */}
             <div
-              className={cn(
-                'absolute inset-0 flex items-center justify-between px-4 transition-all duration-200 ease-out',
-                collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
-              )}
+              className="absolute inset-0 flex items-center justify-between px-4"
+              style={{
+                opacity: collapsedOpacity,
+                transform: `translateY(${lerp(10, 0, t)}px)`,
+                transition: layerTransition,
+                pointerEvents: collapsedOpacity < 0.02 ? 'none' : 'auto',
+              }}
             >
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <Link
@@ -504,12 +511,21 @@ export function DoctorPatientDetailPage() {
                 >
                   <ArrowLeft className="h-5 w-5" aria-hidden />
                 </Link>
-                <span className="max-w-[140px] truncate font-medium text-foreground">
+                <span
+                  className="max-w-[140px] truncate font-medium text-foreground"
+                  style={{ fontSize: `${nameSize}px` }}
+                >
                   {patient?.name || 'Patient'}
                 </span>
               </div>
               {showActions ? (
-                <div className="flex shrink-0 gap-2">
+                <div
+                  className="flex shrink-0 gap-2"
+                  style={{
+                    transform: `scale(${buttonScale})`,
+                    transition: 'transform 0.1s linear',
+                  }}
+                >
                   <Button
                     type="button"
                     className="h-8 shrink-0 rounded-full px-3 text-sm"
