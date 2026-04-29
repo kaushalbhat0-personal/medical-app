@@ -37,22 +37,119 @@ export interface StockOperationResultDTO {
   movement_id: string;
 }
 
+/** Server rejects `limit` above this value (`le=200`). */
+export const MAX_LIMIT = 200;
+export const DEFAULT_LIMIT = 100;
+
+export function capInventoryLimit(limit?: number): number {
+  return Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+}
+
+/** GET /inventory — items with per-location stock counts. */
+export async function getInventory(params?: {
+  skip?: number;
+  limit?: number;
+  active_only?: boolean;
+  search?: string;
+}) {
+  const limit = capInventoryLimit(params?.limit);
+
+  return api.get<InventoryItemWithStockDTO[]>('/inventory', {
+    params: {
+      skip: params?.skip ?? 0,
+      limit,
+      active_only: params?.active_only,
+      search: params?.search,
+    },
+  });
+}
+
+export async function getInventoryItems(params?: {
+  skip?: number;
+  limit?: number;
+  active_only?: boolean;
+  type?: InventoryItemType;
+}) {
+  const limit = capInventoryLimit(params?.limit);
+
+  return api.get<InventoryItemDTO[]>('/inventory/items', {
+    params: {
+      skip: params?.skip ?? 0,
+      limit,
+      active_only: params?.active_only,
+      type: params?.type,
+    },
+  });
+}
+
+async function fetchAllInventoryWithStockImpl(opts?: { active_only?: boolean; search?: string }) {
+  const pageSize = capInventoryLimit(DEFAULT_LIMIT);
+  const accumulated: InventoryItemWithStockDTO[] = [];
+  let skip = 0;
+  while (true) {
+    const rows = await retryRequest(() =>
+      getInventory({
+        skip,
+        limit: pageSize,
+        active_only: opts?.active_only,
+        search: opts?.search,
+      }).then((r) => r.data)
+    );
+    accumulated.push(...rows);
+    if (rows.length < pageSize) break;
+    skip += pageSize;
+  }
+  return accumulated;
+}
+
+async function fetchAllInventoryItemsImpl(opts?: {
+  active_only?: boolean;
+  type?: InventoryItemType;
+}) {
+  const pageSize = capInventoryLimit(DEFAULT_LIMIT);
+  const accumulated: InventoryItemDTO[] = [];
+  let skip = 0;
+  while (true) {
+    const rows = await retryRequest(() =>
+      getInventoryItems({
+        skip,
+        limit: pageSize,
+        active_only: opts?.active_only,
+        type: opts?.type,
+      }).then((r) => r.data)
+    );
+    accumulated.push(...rows);
+    if (rows.length < pageSize) break;
+    skip += pageSize;
+  }
+  return accumulated;
+}
+
 export const inventoryApi = {
   /** Items with clinic (tenant) stock counts — for doctor read-only list. */
-  listWithStock(params?: { skip?: number; limit?: number; active_only?: boolean; search?: string }) {
-    return retryRequest(() =>
-      api.get<InventoryItemWithStockDTO[]>('/inventory', {
-        params: { limit: 200, ...params },
-      })
-    ).then((r) => r.data);
+  listWithStock(params?: {
+    skip?: number;
+    limit?: number;
+    active_only?: boolean;
+    search?: string;
+  }) {
+    return retryRequest(() => getInventory(params).then((r) => r.data));
   },
 
-  listItems(params?: { skip?: number; limit?: number; active_only?: boolean }) {
-    return retryRequest(() =>
-      api.get<InventoryItemDTO[]>('/inventory/items', {
-        params: { limit: 200, ...params },
-      })
-    ).then((r) => r.data);
+  /**
+   * Load every page from GET /inventory until a short page is returned.
+   * Use instead of a single oversized `limit`.
+   */
+  listAllWithStock(opts?: { active_only?: boolean; search?: string }) {
+    return fetchAllInventoryWithStockImpl(opts);
+  },
+
+  listItems(params?: { skip?: number; limit?: number; active_only?: boolean; type?: InventoryItemType }) {
+    return retryRequest(() => getInventoryItems(params).then((r) => r.data));
+  },
+
+  listAllItems(opts?: { active_only?: boolean; type?: InventoryItemType }) {
+    return fetchAllInventoryItemsImpl(opts);
   },
 
   /** Single bulk fetch; merge with items on the client. */

@@ -101,7 +101,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
   );
 
   const fetchItems = useCallback(async () => {
-    const data = await inventoryApi.listItems({ limit: 200, active_only: false });
+    const data = await inventoryApi.listAllItems({ active_only: false });
     setItems(data);
   }, []);
 
@@ -110,25 +110,34 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
     setStockMap(map);
   }, [doctorStockScopeId]);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (opts?: { isMounted?: () => boolean }) => {
+    const alive = opts?.isMounted ?? (() => true);
     setLoadError(null);
     setLoading(true);
     try {
       await fetchItems();
+      if (!alive()) return;
       await fetchStockMap();
+      if (!alive()) return;
+      setLoadError(null);
     } catch (e) {
+      if (!alive()) return;
       const msg =
         axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
           ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not load inventory')
           : 'Could not load inventory';
       setLoadError(msg);
     } finally {
-      setLoading(false);
+      if (alive()) setLoading(false);
     }
   }, [fetchItems, fetchStockMap]);
 
   useEffect(() => {
-    void loadAll();
+    let mounted = true;
+    void loadAll({ isMounted: () => mounted });
+    return () => {
+      mounted = false;
+    };
   }, [loadAll]);
 
   useEffect(() => {

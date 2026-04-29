@@ -49,6 +49,7 @@ export function DoctorAppointmentDetailPage() {
   const [invLoading, setInvLoading] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const completionIdempotencyRef = useRef('');
+  const inventoryLoadErrorToastShown = useRef(false);
 
   useModalFocusTrap(modalRef, completeOpen);
 
@@ -101,9 +102,10 @@ export function DoctorAppointmentDetailPage() {
     let cancelled = false;
     setInvLoading(true);
     void inventoryApi
-      .listWithStock({ active_only: true, limit: 300 })
+      .listAllWithStock({ active_only: true })
       .then((rows) => {
         if (!cancelled) {
+          inventoryLoadErrorToastShown.current = false;
           setInvItems(rows);
           setTenantInventoryCache(rows);
         }
@@ -111,7 +113,10 @@ export function DoctorAppointmentDetailPage() {
       .catch(() => {
         if (!cancelled) {
           setInvItems([]);
-          toast.error('Could not load clinic inventory');
+          if (!inventoryLoadErrorToastShown.current) {
+            toast.error('Could not load clinic inventory');
+            inventoryLoadErrorToastShown.current = true;
+          }
         }
       })
       .finally(() => {

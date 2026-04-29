@@ -30,7 +30,7 @@ export function DoctorSidebar({ user, onClose }: DoctorSidebarProps) {
     let cancelled = false;
     const load = () => {
       inventoryApi
-        .listWithStock({ active_only: true, limit: 400 })
+        .listAllWithStock({ active_only: true })
         .then((rows) => {
           if (!cancelled) setInventoryLowBadge(countLowStockRows(rows));
         })

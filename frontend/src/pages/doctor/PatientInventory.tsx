@@ -33,25 +33,33 @@ export function PatientInventory() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { isMounted?: () => boolean }) => {
+    const alive = opts?.isMounted ?? (() => true);
     setError(null);
     setLoading(true);
     try {
-      const data = await inventoryApi.listWithStock({ limit: 200, active_only: false });
+      const data = await inventoryApi.listAllWithStock({ active_only: false });
+      if (!alive()) return;
       setRows(data);
+      setError(null);
     } catch (e) {
+      if (!alive()) return;
       const msg =
         axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
           ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not load inventory')
           : 'Could not load inventory';
       setError(msg);
     } finally {
-      setLoading(false);
+      if (alive()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    let mounted = true;
+    void load({ isMounted: () => mounted });
+    return () => {
+      mounted = false;
+    };
   }, [load]);
 
   useEffect(() => {
