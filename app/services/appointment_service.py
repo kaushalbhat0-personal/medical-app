@@ -17,6 +17,7 @@ from app.models.doctor import Doctor
 from app.models.user import User, UserRole
 from app.services import doctor_service, doctor_slot_service, inventory_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
+from app.core.tenancy import non_nil_tenant_id
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
     assert_authorized,
@@ -31,15 +32,6 @@ from app.schemas.appointment import (
 )
 
 logger = logging.getLogger(__name__)
-
-_NIL_UUID = UUID("00000000-0000-0000-0000-000000000000")
-
-
-def _non_nil_tenant_id(value: UUID | None) -> UUID | None:
-    """Treat NULL and the all-zero UUID sentinel as missing for tenant resolution."""
-    if value is None or value == _NIL_UUID:
-        return None
-    return value
 
 
 def _appointment_payload_hash(appointment_in: AppointmentCreate) -> str:
@@ -242,9 +234,9 @@ def create_appointment(
     doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
     patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
-    patient_tid = _non_nil_tenant_id(patient_row.tenant_id)
-    doctor_tid = _non_nil_tenant_id(doctor.tenant_id)
-    request_tid = _non_nil_tenant_id(tenant_id)
+    patient_tid = non_nil_tenant_id(patient_row.tenant_id)
+    doctor_tid = non_nil_tenant_id(doctor.tenant_id)
+    request_tid = non_nil_tenant_id(tenant_id)
 
     if patient_tid and doctor_tid and patient_tid != doctor_tid:
         raise ForbiddenError("Cross-tenant appointment not allowed")

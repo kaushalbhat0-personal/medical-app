@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
+from app.core.tenancy import non_nil_tenant_id
 from app.crud import crud_patient
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
@@ -49,12 +50,16 @@ def _resolve_patient_tenant_id_for_create(
     *,
     acting_doctor: Doctor | None = None,
 ) -> UUID:
-    if request_tenant_id is not None:
-        return request_tenant_id
-    if acting_doctor is not None and acting_doctor.tenant_id is not None:
-        return acting_doctor.tenant_id
-    if current_user.tenant_id is not None:
-        return current_user.tenant_id
+    req = non_nil_tenant_id(request_tenant_id)
+    if req is not None:
+        return req
+    if acting_doctor is not None:
+        doc_tid = non_nil_tenant_id(acting_doctor.tenant_id)
+        if doc_tid is not None:
+            return doc_tid
+    user_tid = non_nil_tenant_id(current_user.tenant_id)
+    if user_tid is not None:
+        return user_tid
     raise ValidationError("Tenant scope is required to create a patient")
 
 

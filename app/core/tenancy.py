@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 
 from sqlalchemy import text
 
@@ -7,6 +8,16 @@ from app.models.tenant import TenantType
 from app.utils.db_uuids import as_db_uuid
 
 DEFAULT_TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+# Sentinel sometimes stored by mistake; treat as “no tenant” like NULL.
+NIL_TENANT_UUID_SENTINEL = UUID("00000000-0000-0000-0000-000000000000")
+
+
+def non_nil_tenant_id(value: UUID | None) -> UUID | None:
+    """Map NULL and the all-zero UUID sentinel to None for tenant resolution."""
+    if value is None or value == NIL_TENANT_UUID_SENTINEL:
+        return None
+    return value
 DEFAULT_TENANT_NAME = "Default"
 
 

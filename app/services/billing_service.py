@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.permissions import has_tenant_admin_privileges
-from app.core.tenancy import DEFAULT_TENANT_ID
+from app.core.tenancy import DEFAULT_TENANT_ID, non_nil_tenant_id
 from app.crud import crud_billing
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, BillingStatus
@@ -65,11 +65,9 @@ def _validate_billing_patient_matches_appointment_tenant(
     current_user: User,
 ) -> None:
     patient = patient_service.get_patient_or_404(db, patient_id)
-    if (
-        appointment.tenant_id is not None
-        and patient.tenant_id is not None
-        and appointment.tenant_id != patient.tenant_id
-    ):
+    apt_tid = non_nil_tenant_id(appointment.tenant_id)
+    pat_tid = non_nil_tenant_id(patient.tenant_id)
+    if apt_tid is not None and pat_tid is not None and apt_tid != pat_tid:
         logger.warning(
             "Cross-tenant billing attempt",
             extra={
@@ -254,10 +252,12 @@ def create_bill(
                 extra={"appointment_id": str(appointment.id)},
             )
             raise ValidationError("Missing patient for this visit")
+        req_tid = non_nil_tenant_id(tenant_id)
+        ap_tid = non_nil_tenant_id(appointment.tenant_id)
         if (
-            tenant_id is not None
-            and appointment.tenant_id is not None
-            and appointment.tenant_id != tenant_id
+            req_tid is not None
+            and ap_tid is not None
+            and ap_tid != req_tid
         ):
             logger.warning(
                 "Billing failed: invalid tenant access",
