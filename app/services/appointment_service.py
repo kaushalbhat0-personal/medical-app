@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import logging
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -493,6 +494,36 @@ def mark_appointment_completed(
 
     appointment.status = AppointmentStatus.completed
     db.add(appointment)
+    db.flush()
+
+    if data.generate_bill:
+        from app.schemas.billing import BillingCreate
+        from app.services import billing_service
+
+        mats = billing_service.appointment_inventory_materials_selling_total(
+            db, appointment.id
+        )
+        base_fee = data.bill_consultation_amount
+        if mats + base_fee <= Decimal("0"):
+            raise ValidationError(
+                "Cannot generate a bill: add medicines or enter a consultation fee greater than zero"
+            )
+        desc = "Consultation" if base_fee > Decimal("0") else None
+        billing_service.create_bill(
+            db,
+            BillingCreate(
+                patient_id=appointment.patient_id,
+                appointment_id=appointment.id,
+                amount=base_fee,
+                currency="INR",
+                description=desc,
+                include_appointment_inventory_selling_total=True,
+            ),
+            current_user,
+            tenant_id,
+            acting_doctor=acting_doctor,
+        )
+
     if ih:
         assert req_hash is not None
         crud_appointment.record_appointment_completion_idempotency(

@@ -80,6 +80,8 @@ export const appointmentsApi = {
     payload?: {
       completion_notes?: string | null;
       items?: { item_id: string; quantity: number }[];
+      generate_bill?: boolean;
+      bill_consultation_amount?: number | string;
     },
     options?: { idempotencyKey?: string }
   ): Promise<Appointment> => {

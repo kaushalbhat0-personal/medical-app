@@ -401,6 +401,85 @@ async def test_mark_completed_only_assigned_doctor(
     assert ok.json()["patient_id"] == str(patient.id)
 
 
+@pytest.mark.asyncio
+async def test_mark_completed_generate_bill_consultation_only(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_gb_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_gb_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    login_pat = await client.post(
+        "/api/v1/login",
+        data={"username": pat_email, "password": pat_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login_pat.status_code == 200
+    pat_headers = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
+    created = await client.post(
+        "/api/v1/appointments",
+        json={
+            "patient_id": str(patient.id),
+            "doctor_id": str(doctor.id),
+            "appointment_time": slot.isoformat(),
+        },
+        headers=pat_headers,
+    )
+    assert created.status_code == 201, created.text
+    appt_id = created.json()["id"]
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    bad = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json={"generate_bill": True, "bill_consultation_amount": "0", "items": []},
+        headers=doc_headers,
+    )
+    assert bad.status_code == 400
+
+    ok = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json={
+            "generate_bill": True,
+            "bill_consultation_amount": "250.50",
+            "completion_notes": "Visit complete",
+            "items": [],
+        },
+        headers=doc_headers,
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "completed"
+
+    bills = await client.get(
+        "/api/v1/bills",
+        params={"appointment_id": appt_id, "limit": 5},
+        headers=doc_headers,
+    )
+    assert bills.status_code == 200
+    rows = bills.json()
+    assert len(rows) == 1
+    assert float(rows[0]["amount"]) == pytest.approx(250.50)
+
+
 def test_appointment_tenant_always_matches_patient_invariant(
     db_session: Session,
 ) -> None:

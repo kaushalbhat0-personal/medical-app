@@ -43,7 +43,7 @@ class BillingCreate(BaseModel):
         False,
         description=(
             "When true and appointment_id is set, adds sum(qty × item selling_price) "
-            "from visit inventory usage to amount and summarizes in description."
+            "from visit inventory usage to amount and lists per-line medicines in description."
         ),
     )
 

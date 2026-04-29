@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -45,6 +45,8 @@ export function DoctorAppointmentDetailPage() {
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completionNotes, setCompletionNotes] = useState('');
   const [usageRows, setUsageRows] = useState<UsageRow[]>([]);
+  const [generateBill, setGenerateBill] = useState(false);
+  const [consultationFeeInput, setConsultationFeeInput] = useState('');
   const [invItems, setInvItems] = useState<InventoryItemWithStockDTO[]>([]);
   const [invLoading, setInvLoading] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -132,6 +134,13 @@ export function DoctorAppointmentDetailPage() {
     [invItems]
   );
 
+  const sellingById = useMemo(
+    () => Object.fromEntries(invItems.map((i) => [i.id, i.selling_price])),
+    [invItems]
+  );
+
+  const quickAddSuggestions = useMemo(() => invItems.slice(0, 3), [invItems]);
+
   const openCompleteModal = () => {
     completionIdempotencyRef.current =
       typeof crypto !== 'undefined' && crypto.randomUUID
@@ -139,6 +148,8 @@ export function DoctorAppointmentDetailPage() {
         : `${Date.now()}-${Math.random()}`;
     setCompletionNotes('');
     setUsageRows([{ key: crypto.randomUUID(), item_id: '', quantity: '1' }]);
+    setGenerateBill(false);
+    setConsultationFeeInput('');
     setCompleteOpen(true);
   };
 
@@ -161,26 +172,64 @@ export function DoctorAppointmentDetailPage() {
     return lines;
   }, [usageRows, stockById]);
 
+  const medicinesSellingPreview = useMemo(() => {
+    if (validUsagePayload === null) return null;
+    let sum = 0;
+    for (const line of validUsagePayload) {
+      const p = sellingById[line.item_id];
+      if (p == null) return null;
+      sum += p * line.quantity;
+    }
+    return sum;
+  }, [validUsagePayload, sellingById]);
+
+  const rawConsultation = consultationFeeInput.trim();
+  const consultationFeeNumber =
+    rawConsultation === '' ? 0 : parseFloat(rawConsultation.replace(/,/g, ''));
+  const consultationFeeValid =
+    Number.isFinite(consultationFeeNumber) && consultationFeeNumber >= 0;
+
+  const billWouldBePositive =
+    (medicinesSellingPreview ?? 0) + (consultationFeeValid ? consultationFeeNumber : 0) > 0;
+
+  const canSubmitComplete =
+    validUsagePayload !== null &&
+    (!generateBill ? true : consultationFeeValid && billWouldBePositive);
+
+  const submitCompleteDisabled =
+    markBusy || appointment?.status !== 'scheduled' || !canSubmitComplete;
+
+  const addQuickMedicineRow = useCallback((itemId: string) => {
+    setUsageRows((prev) => [...prev, { key: crypto.randomUUID(), item_id: itemId, quantity: '1' }]);
+  }, []);
+
   const submitComplete = async () => {
     if (!appointmentId) return;
-    if (validUsagePayload === null) {
-      toast.error('Fix item rows and quantities (must not exceed clinic stock).');
+    if (!canSubmitComplete) {
+      toast.error(
+        generateBill
+          ? 'Bill needs a consultation fee or at least one medicine line with a sale price.'
+          : 'Fix item rows and quantities (must not exceed clinic stock).'
+      );
       return;
     }
     setMarkBusy(true);
     try {
+      const fee = generateBill && consultationFeeValid ? consultationFeeNumber : undefined;
       const a = await appointmentsApi.markCompleted(
         appointmentId,
         {
           completion_notes: completionNotes.trim() || null,
-          items: validUsagePayload,
+          items: validUsagePayload ?? [],
+          generate_bill: generateBill,
+          bill_consultation_amount: fee,
         },
         { idempotencyKey: completionIdempotencyRef.current }
       );
       setAppointment(a);
       invalidateTenantInventoryCache();
       setCompleteOpen(false);
-      toast.success('Visit marked complete');
+      toast.success(generateBill ? 'Visit completed and bill created' : 'Visit marked complete');
       const forAppt = await billingApi.getAll({ appointment_id: String(a.id), limit: 5 });
       setLinkedBill(forAppt.length > 0 ? forAppt[0] : null);
     } catch (e) {
@@ -219,7 +268,11 @@ export function DoctorAppointmentDetailPage() {
 
   const pid = appointment.patient_id != null ? String(appointment.patient_id) : '';
 
-  const canSubmitComplete = validUsagePayload !== null;
+  const completeButtonLabel = markBusy
+    ? 'Saving…'
+    : generateBill
+      ? 'Complete & generate bill'
+      : 'Complete visit';
 
   return (
     <div className="space-y-6" id={appointmentId ? `appt-${appointmentId}` : undefined}>
@@ -274,7 +327,7 @@ export function DoctorAppointmentDetailPage() {
             appointment.inventory_usages &&
             appointment.inventory_usages.length > 0 && (
               <div className="border-t border-border pt-2 mt-2 space-y-1.5">
-                <p className="font-medium text-foreground text-sm">Items used</p>
+                <p className="font-medium text-foreground text-sm">Medicines given</p>
                 <ul className="list-disc pl-5 space-y-0.5">
                   {appointment.inventory_usages.map((u) => (
                     <li key={u.item_id}>
@@ -286,7 +339,7 @@ export function DoctorAppointmentDetailPage() {
                 {appointment.inventory_materials_selling_total != null &&
                   Number(appointment.inventory_materials_selling_total) > 0 && (
                     <p className="text-sm text-muted-foreground pt-0.5">
-                      Total materials:{' '}
+                      Total medicines (selling):{' '}
                       <span className="font-medium text-foreground tabular-nums">
                         ₹{Number(appointment.inventory_materials_selling_total).toFixed(2)}
                       </span>
@@ -352,8 +405,26 @@ export function DoctorAppointmentDetailPage() {
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">
-                  Medicines / consumables used (clinic stock)
+                  Give medicines (optional)
                 </p>
+                {quickAddSuggestions.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-xs text-muted-foreground">Quick add:</span>
+                    {quickAddSuggestions.map((it) => (
+                      <Button
+                        key={it.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs rounded-full border-dashed"
+                        disabled={invLoading || markBusy}
+                        onClick={() => addQuickMedicineRow(it.id)}
+                      >
+                        {it.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 {invLoading ? (
                   <p className="text-sm text-muted-foreground">Loading inventory…</p>
                 ) : (
@@ -461,17 +532,81 @@ export function DoctorAppointmentDetailPage() {
                   }
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Add line
+                  Add medicine
                 </Button>
               </div>
+
+              <label className="flex items-start gap-2 rounded-lg border border-border p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={generateBill}
+                  disabled={markBusy}
+                  className="mt-1 h-4 w-4 shrink-0"
+                  onChange={(e) => setGenerateBill(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-medium">Generate bill</span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Includes medicines from this completion; inventory is deducted here, not when billing separately.
+                  </span>
+                </span>
+              </label>
+
+              {generateBill && (
+                <div>
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="consultation-fee"
+                  >
+                    Consultation fee (optional, ₹)
+                  </label>
+                  <Input
+                    id="consultation-fee"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    placeholder="0"
+                    className={cn(
+                      'mt-1',
+                      generateBill &&
+                        consultationFeeValid &&
+                        !rawConsultation &&
+                        (medicinesSellingPreview ?? 0) <= 0 &&
+                        'border-destructive/60'
+                    )}
+                    disabled={markBusy}
+                    value={consultationFeeInput}
+                    onChange={(e) => setConsultationFeeInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Bill total preview: ₹
+                    {(
+                      (Number.isFinite(consultationFeeNumber) ? consultationFeeNumber : 0) +
+                      (medicinesSellingPreview ?? 0)
+                    ).toFixed(2)}
+                  </p>
+                  {generateBill && !consultationFeeValid && (
+                    <p className="text-xs text-destructive mt-1">Enter a valid non-negative fee.</p>
+                  )}
+                  {generateBill &&
+                    consultationFeeValid &&
+                    (medicinesSellingPreview ?? 0) <= 0 &&
+                    consultationFeeNumber <= 0 && (
+                      <p className="text-xs text-destructive mt-1">
+                        Add medicines or enter a consultation fee so the bill amount is greater than zero.
+                      </p>
+                    )}
+                </div>
+              )}
 
               <Button
                 type="button"
                 className="w-full"
-                disabled={markBusy || !canSubmitComplete || appointment?.status !== 'scheduled'}
+                disabled={submitCompleteDisabled}
                 onClick={() => void submitComplete()}
               >
-                {markBusy ? 'Saving…' : 'Submit & mark complete'}
+                {completeButtonLabel}
               </Button>
             </div>
           </div>

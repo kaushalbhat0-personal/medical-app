@@ -44,9 +44,9 @@ def _inventory_selling_addon_for_appointment(
     total = Decimal("0.00")
     parts: list[str] = []
     for qty, sell, name in db.execute(stmt):
-        sub = Decimal(str(sell)) * int(qty)
+        sub = (Decimal(str(sell)) * int(qty)).quantize(Decimal("0.01"))
         total += sub
-        parts.append(f"{name} ×{qty} ({sell} each)")
+        parts.append(f"{name} × {int(qty)} → ₹{sub}")
     return total, "; ".join(parts)[:450]
 
 
@@ -321,7 +321,7 @@ def create_bill(
             base_amt = Decimal(str(billing_data["amount"]))
             billing_data["amount"] = base_amt + inv_total
             prev = (billing_data.get("description") or "").strip()
-            materials = f"[Materials] {inv_snip}" if inv_snip else "[Materials]"
+            materials = f"[Medicines] {inv_snip}" if inv_snip else "[Medicines]"
             billing_data["description"] = (
                 f"{prev}; {materials}"[:500] if prev else materials[:500]
             )

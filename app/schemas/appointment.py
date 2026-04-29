@@ -85,6 +85,12 @@ class AppointmentRead(BaseModel):
 class MarkAppointmentCompletedRequest(BaseModel):
     completion_notes: str | None = Field(None, max_length=50_000)
     items: list[InventoryUseLine] = Field(default_factory=list)
+    generate_bill: bool = False
+    bill_consultation_amount: Decimal = Field(
+        default_factory=lambda: Decimal("0"),
+        ge=0,
+        description="Base consultation fee (INR) when generate_bill is true (materials are added separately).",
+    )
 
 
 class AppointmentUpdate(BaseModel):
