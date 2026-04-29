@@ -40,6 +40,7 @@ import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
 import { PatientInventory } from './pages/doctor/PatientInventory';
+import { AdminInventoryPage } from './pages/InventoryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
 import { Signup } from './pages/Signup';

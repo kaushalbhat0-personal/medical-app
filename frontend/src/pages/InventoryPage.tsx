@@ -348,6 +348,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
         <ul className="space-y-2">
           {filtered.map((item) => {
             const disabled = !item.is_active || !canMutate;
+            const lowTh = item.low_stock_threshold ?? DEFAULT_LOW_STOCK_FALLBACK;
             return (
               <li key={item.id}>
                 <Card
@@ -377,7 +378,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
                               🔴
                             </span>
                           )}
-                          {item.stock > 0 && item.stock < LOW_STOCK_THRESHOLD && (
+                          {item.stock > 0 && item.stock <= lowTh && (
                             <span className="text-lg" title="Low stock" aria-hidden>
                               ⚠️
                             </span>
@@ -387,7 +388,7 @@ function InventoryList({ title, doctorStockScopeId, canMutate, canCreateItem }: 
                               Out
                             </Badge>
                           )}
-                          {item.stock > 0 && item.stock < LOW_STOCK_THRESHOLD && (
+                          {item.stock > 0 && item.stock <= lowTh && (
                             <Badge
                               variant="outline"
                               className="text-[10px] bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950/50 dark:text-amber-100 dark:border-amber-800"
