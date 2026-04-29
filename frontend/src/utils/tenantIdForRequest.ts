@@ -1,5 +1,8 @@
 import { roleFromToken, rolesFromToken, tenantIdFromToken } from './jwtPayload';
 
+/** Postgres nil / sentinel UUID — must never be sent as `X-Tenant-ID`. */
+export const NIL_TENANT_UUID = '00000000-0000-0000-0000-000000000000';
+
 /** Canonical localStorage key for the org switcher (super admin) and aligned tenant header for staff. */
 export const ACTIVE_TENANT_ID_STORAGE_KEY = 'activeTenantId';
 
@@ -18,9 +21,14 @@ export const TENANT_ID_STORAGE_EVENT = 'tenant_id_changed';
 /** @deprecated Use ACTIVE_TENANT_ID_STORAGE_KEY */
 export const TENANT_ID_STORAGE_KEY = ACTIVE_TENANT_ID_STORAGE_KEY;
 
+function isUsableTenantString(id: string | null | undefined): id is string {
+  const t = id?.trim();
+  return !!t && t !== NIL_TENANT_UUID;
+}
+
 export function getActiveTenantId(): string | null {
   const primary = localStorage.getItem(ACTIVE_TENANT_ID_STORAGE_KEY)?.trim();
-  if (primary) {
+  if (isUsableTenantString(primary)) {
     if (localStorage.getItem(ACTIVE_TENANT_ID_ALIAS_KEY) !== primary) {
       try {
         localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, primary);
@@ -31,12 +39,12 @@ export function getActiveTenantId(): string | null {
     return primary;
   }
   const alias = localStorage.getItem(ACTIVE_TENANT_ID_ALIAS_KEY)?.trim();
-  if (alias) {
+  if (isUsableTenantString(alias)) {
     localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, alias);
     return alias;
   }
   const legacy = localStorage.getItem(TENANT_ID_LEGACY_STORAGE_KEY)?.trim();
-  if (legacy) {
+  if (isUsableTenantString(legacy)) {
     localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, legacy);
     try {
       localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, legacy);
@@ -46,7 +54,7 @@ export function getActiveTenantId(): string | null {
     return legacy;
   }
   const adminPick = localStorage.getItem(ADMIN_SELECTED_TENANT_STORAGE_KEY)?.trim();
-  if (adminPick) {
+  if (isUsableTenantString(adminPick)) {
     localStorage.setItem(ACTIVE_TENANT_ID_STORAGE_KEY, adminPick);
     try {
       localStorage.setItem(ACTIVE_TENANT_ID_ALIAS_KEY, adminPick);
@@ -119,18 +127,22 @@ export function getTenantIdForRequest(): string | undefined {
     return active;
   }
 
-  const fromEnv = import.meta.env.VITE_DEV_TENANT_ID as string | undefined;
-
   if (userStr) {
     try {
       const user = JSON.parse(userStr) as { role?: string; tenant_id?: string | null };
-      if (user.tenant_id) {
-        return String(user.tenant_id);
+      const fromUser = user.tenant_id != null ? String(user.tenant_id) : undefined;
+      if (isUsableTenantString(fromUser)) {
+        return fromUser;
       }
     } catch {
       // fall through
     }
   }
 
-  return tenantIdFromToken(token) || fromEnv || undefined;
+  const fromJwt = tenantIdFromToken(token);
+  if (isUsableTenantString(fromJwt)) {
+    return fromJwt;
+  }
+  const fromEnvRaw = import.meta.env.VITE_DEV_TENANT_ID as string | undefined;
+  return isUsableTenantString(fromEnvRaw) ? fromEnvRaw : undefined;
 }

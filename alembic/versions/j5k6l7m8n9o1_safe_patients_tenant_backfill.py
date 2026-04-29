@@ -18,7 +18,7 @@ _BACKFILL_PG = """
 UPDATE patients p
 SET tenant_id = sub.tenant_id
 FROM (
-    SELECT a.patient_id, MIN(d.tenant_id) AS tenant_id
+    SELECT a.patient_id, MIN(d.tenant_id::text)::uuid AS tenant_id
     FROM appointments a
     JOIN doctors d ON a.doctor_id = d.id
     WHERE a.is_deleted = false
@@ -32,7 +32,7 @@ _BACKFILL_SQLITE = """
 UPDATE patients AS p
 SET tenant_id = sub.tenant_id
 FROM (
-    SELECT a.patient_id, MIN(d.tenant_id) AS tenant_id
+    SELECT a.patient_id, MIN(d.tenant_id::text)::uuid AS tenant_id
     FROM appointments a
     JOIN doctors d ON a.doctor_id = d.id
     WHERE a.is_deleted = 0

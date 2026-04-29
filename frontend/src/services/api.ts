@@ -20,7 +20,11 @@ import toast from 'react-hot-toast';
 import { handleApiError, type ApiErrorResponse } from '../utils/errors';
 import { cleanParams } from '../utils/api';
 import { navigateTo } from '../utils/navigation';
-import { getActiveTenantId, getTenantIdForRequest } from '../utils/tenantIdForRequest';
+import {
+  getActiveTenantId,
+  getTenantIdForRequest,
+  NIL_TENANT_UUID,
+} from '../utils/tenantIdForRequest';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -65,15 +69,19 @@ api.interceptors.request.use(
       // Multi-tenant: X-Tenant-ID = active org; X-Data-Scope = doctor (practice) vs tenant (admin).
       const ext = config as TenantScopedRequestConfig;
       const rawHeader = config.headers['X-Tenant-ID'];
-      const hasExplicit =
-        rawHeader != null && rawHeader !== '' && String(rawHeader).trim() !== '';
+      const rawStr =
+        rawHeader != null && rawHeader !== '' ? String(rawHeader).trim() : '';
+      if (rawStr === NIL_TENANT_UUID) {
+        delete (config.headers as Record<string, unknown>)['X-Tenant-ID'];
+      }
+      const hasExplicit = rawStr !== '' && rawStr !== NIL_TENANT_UUID;
 
       if (ext.__allTenantsDoctorVerification) {
         delete (config.headers as Record<string, unknown>)['X-Tenant-ID'];
       } else if (!hasExplicit) {
         const activeTenantId = getActiveTenantId();
         const tenantId = activeTenantId ?? getTenantIdForRequest();
-        if (tenantId) {
+        if (tenantId && tenantId !== NIL_TENANT_UUID) {
           config.headers['X-Tenant-ID'] = tenantId;
         }
       }

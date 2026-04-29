@@ -242,16 +242,17 @@ def create_appointment(
     doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
     patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
-    if (
-        patient_row.tenant_id is not None
-        and doctor.tenant_id is not None
-        and patient_row.tenant_id != doctor.tenant_id
-    ):
+    patient_tid = _non_nil_tenant_id(patient_row.tenant_id)
+    doctor_tid = _non_nil_tenant_id(doctor.tenant_id)
+    request_tid = _non_nil_tenant_id(tenant_id)
+
+    if patient_tid and doctor_tid and patient_tid != doctor_tid:
         raise ForbiddenError("Cross-tenant appointment not allowed")
 
-    if patient_row.tenant_id is None and doctor.tenant_id is not None:
-        patient_row.tenant_id = doctor.tenant_id
+    if not patient_tid and doctor_tid:
+        patient_row.tenant_id = doctor_tid
         db.add(patient_row)
+        patient_tid = doctor_tid
 
     logger.info(
         "[BOOKING_FLOW_V2] patient_id=%s patient_tenant=%s doctor_tenant=%s",
@@ -276,17 +277,10 @@ def create_appointment(
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
 
-    scoped = _non_nil_tenant_id(tenant_id)
-    patient_tid = _non_nil_tenant_id(patient_row.tenant_id)
-    doctor_tid = _non_nil_tenant_id(doctor.tenant_id)
-    if scoped:
-        appointment_data["tenant_id"] = scoped
-    elif patient_tid:
-        appointment_data["tenant_id"] = patient_tid
-    elif doctor_tid:
-        appointment_data["tenant_id"] = doctor_tid
-    else:
+    final_tid = request_tid or patient_tid or doctor_tid
+    if not final_tid:
         raise ValidationError("Tenant cannot be resolved")
+    appointment_data["tenant_id"] = final_tid
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
 
