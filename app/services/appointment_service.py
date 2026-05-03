@@ -430,6 +430,25 @@ def mark_appointment_completed(
     if appointment is None:
         raise NotFoundError("Appointment not found")
 
+    # DEBUG: Identity resolution before authorization check
+    doc = doctor_service.get_current_doctor(db, current_user)
+
+    print("========== COMPLETE VISIT DEBUG ==========")
+    print("CURRENT_USER_ID:", current_user.id)
+    print("CURRENT_USER_ROLE:", current_user.role)
+
+    if doc:
+        print("RESOLVED_DOCTOR_ID:", doc.id)
+        print("RESOLVED_DOCTOR_USER_ID:", doc.user_id)
+        print("RESOLVED_DOCTOR_TENANT:", doc.tenant_id)
+    else:
+        print("RESOLVED_DOCTOR: None")
+
+    print("APPOINTMENT_ID:", appointment.id)
+    print("APPOINTMENT_DOCTOR_ID:", appointment.doctor_id)
+    print("APPOINTMENT_TENANT_ID:", appointment.tenant_id)
+    print("==========================================")
+
     authorize_appointment_access(
         db,
         appointment,
