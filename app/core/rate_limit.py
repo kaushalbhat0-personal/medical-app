@@ -9,6 +9,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
+from app.core.config import settings
 from app.core.security import decode_access_token
 
 
@@ -183,3 +184,74 @@ class AuthenticatedWritePostRateLimitMiddleware(BaseHTTPMiddleware):
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response
 
+
+class IntegrityScanGetRateLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Expensive admin integrity scan: throttle GET /api/v1/admin/integrity-scan per JWT user or IP.
+    """
+
+    def __init__(self, app) -> None:
+        super().__init__(app)
+        self._hits: dict[str, Deque[float]] = {}
+
+    def _client_ip(self, request: Request) -> str:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()
+        if request.client and request.client.host:
+            return request.client.host
+        return "unknown"
+
+    def _user_id_from_auth_header(self, request: Request) -> str | None:
+        auth = request.headers.get("authorization")
+        if not auth or not auth.lower().startswith("bearer "):
+            return None
+        parts = auth.split(None, 1)
+        if len(parts) < 2:
+            return None
+        payload = decode_access_token(parts[1])
+        if not payload or payload.get("type") != "access":
+            return None
+        sub = payload.get("sub")
+        return str(sub) if isinstance(sub, str) else None
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        path = request.url.path or "/"
+        if request.method != "GET" or path != "/api/v1/admin/integrity-scan":
+            return await call_next(request)
+
+        limit_val = max(1, int(settings.INTEGRITY_SCAN_RATE_LIMIT_PER_MINUTE))
+        rule = RateLimitRule(window_seconds=60, max_requests=limit_val)
+
+        uid = self._user_id_from_auth_header(request)
+        bucket_key = f"integrity-scan:user:{uid}" if uid else f"integrity-scan:ip:{self._client_ip(request)}"
+        now = time.time()
+        window_start = now - rule.window_seconds
+
+        q = self._hits.get(bucket_key)
+        if q is None:
+            q = deque()
+            self._hits[bucket_key] = q
+
+        while q and q[0] < window_start:
+            q.popleft()
+
+        limit = rule.max_requests
+        if len(q) >= limit:
+            retry_after = int(q[0] + rule.window_seconds - now) + 1
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Integrity scan rate limit exceeded"},
+                headers={
+                    "Retry-After": str(max(1, retry_after)),
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+
+        q.append(now)
+        remaining = max(0, limit - len(q))
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(limit)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        return response

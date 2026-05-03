@@ -244,7 +244,7 @@ def test_doctor_without_profile_cannot_create_patient(db_session: Session) -> No
     )
     db_session.commit()
 
-    with pytest.raises(ForbiddenError, match="Doctor profile not found for this user"):
+    with pytest.raises(ForbiddenError, match="Doctor profile not found"):
         patient_service.authorize_patient_create(db_session, doc_user, tenant_id=tenant.id)
 
 
@@ -297,7 +297,7 @@ def test_doctor_without_profile_cannot_create_bill(db_session: Session) -> None:
         amount=Decimal("100.00"),
     )
 
-    with pytest.raises(ForbiddenError, match="Doctor profile not found for this user"):
+    with pytest.raises(ForbiddenError, match="Doctor profile not found"):
         billing_service.authorize_bill_create(
             db_session, billing_in, doc_user_no_profile, tenant_id=tenant.id
         )

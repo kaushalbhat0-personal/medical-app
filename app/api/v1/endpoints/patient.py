@@ -4,8 +4,6 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_acting_doctor_optional,
-    get_acting_doctor_optional_active,
     get_current_active_user,
     get_current_user,
     get_optional_scoped_tenant_id,
@@ -16,7 +14,6 @@ from app.api.deps import (
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
-from app.models.doctor import Doctor
 from app.models.user import User
 from app.schemas.patient import (
     PatientCreate,
@@ -47,12 +44,11 @@ def create_patient(
     payload: PatientCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional_active),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
     _verified: None = Depends(require_doctor_verification_approved),
 ) -> PatientRead:
     return patient_service.create_patient(
-        db, payload, current_user, tenant_id, acting_doctor=acting_doctor
+        db, payload, current_user, tenant_id
     )
 
 
@@ -63,7 +59,6 @@ def read_patients(
     search: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     _verified: None = Depends(require_doctor_verification_approved),
@@ -75,7 +70,6 @@ def read_patients(
         limit=limit,
         search=search,
         tenant_id=tenant_id,
-        acting_doctor=acting_doctor,
         data_scope=data_scope,
     )
 
@@ -85,7 +79,6 @@ def read_patient(
     patient_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     _verified: None = Depends(require_doctor_verification_approved),
@@ -96,7 +89,6 @@ def read_patient(
         patient,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         rbac_action="read_patient",
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
@@ -109,7 +101,6 @@ def update_patient(
     payload: PatientUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     _verified: None = Depends(require_doctor_verification_approved),
@@ -120,7 +111,6 @@ def update_patient(
         payload,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 
@@ -130,7 +120,6 @@ def delete_patient(
     patient_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     _verified: None = Depends(require_doctor_verification_approved),
@@ -140,7 +129,6 @@ def delete_patient(
         patient_id,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

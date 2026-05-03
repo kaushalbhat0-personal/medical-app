@@ -20,7 +20,8 @@ class Billing(Base):
     __tablename__ = "billings"
 
     __table_args__ = (
-        # One non-deleted bill per appointment (DB + service). Same as uniq_bill_per_appointment pattern.
+        # One active (non-deleted) bill per appointment — partial unique index equivalent to
+        # ``CREATE UNIQUE INDEX ... ON billings (appointment_id) WHERE appointment_id IS NOT NULL AND is_deleted = false``.
         Index(
             "uq_billing_active_appointment",
             "appointment_id",

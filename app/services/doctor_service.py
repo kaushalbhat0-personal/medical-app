@@ -325,9 +325,11 @@ def authorize_doctor_read(
     if current_user.role == UserRole.doctor:
         require_doctor_profile(db, current_user)
 
-    if tenant_id is not None:
+    if tenant_id is None:
+        log_rbac_mutation_violation(current_user, "doctor", action="read_doctor")
+        raise ForbiddenError("Tenant context required")
 
-        assert_authorized(
+    assert_authorized(
 
             "read",
 
@@ -733,29 +735,22 @@ def get_doctor_or_404_with_tenant(db: Session, doctor_id: UUID) -> Doctor:
     return doctor
 
 
-def require_doctor_profile(db: Session, current_user: User) -> Doctor:
-    """Linked `Doctor` row for this user; requires structured profile completion for doctor-role access."""
+def get_current_doctor(db: Session, current_user: User) -> Doctor:
+    """Single source of truth: doctor row for this login, with tenant and structured profile enforced."""
     doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
     if doctor is None:
-        raise ForbiddenError("Doctor profile not found for this user")
+        raise ForbiddenError("Doctor profile not found")
     if doctor.tenant is None:
         raise ForbiddenError("Doctor tenant is not set")
     prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
     if prof is None or not prof.is_profile_complete:
-        raise ForbiddenError("Complete your profile to continue")
+        raise ForbiddenError("Doctor profile incomplete")
     return doctor
 
 
-def get_acting_doctor_or_none(db: Session, current_user: User) -> Doctor | None:
-    """Doctor roster row for this login (no structured-profile completion check — used for scope headers)."""
-    if current_user.role != UserRole.doctor:
-        return None
-    doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
-    if doctor is None:
-        return None
-    if doctor.tenant is None:
-        raise ForbiddenError("Doctor tenant is not set")
-    return doctor
+def require_doctor_profile(db: Session, current_user: User) -> Doctor:
+    """Backward-compatible alias for doctor-only routes that require a complete structured profile."""
+    return get_current_doctor(db, current_user)
 
 
 def get_doctor_by_user_id(db: Session, user_id: UUID) -> Doctor:

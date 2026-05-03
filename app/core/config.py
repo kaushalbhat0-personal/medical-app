@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     # Slot read cache: disable for debugging; backend "memory" is default (Redis reserved for future).
     DOCTOR_SLOT_CACHE_ENABLED: bool = True
 
+    # When true, POST mark-completed requires ``Idempotency-Key`` (strict dedupe of completion side effects).
+    REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY: bool = False
+    #: Short-lived cache for GET /admin/integrity-scan responses (seconds; 0 disables).
+    INTEGRITY_SCAN_CACHE_SECONDS: int = 0
+    #: Per client identity (JWT sub or IP) sliding window budget for integrity scans.
+    INTEGRITY_SCAN_RATE_LIMIT_PER_MINUTE: int = 12
+    #: Optional Slack/Discord webhook for integrity scan issues and idempotency drift alerts.
+    INTEGRITY_ALERT_WEBHOOK_URL: str | None = None
+
     # CORS settings - EXPLICIT ORIGINS ONLY (FastAPI CORSMiddleware doesn't support wildcards)
     # For Vercel preview URLs, add them explicitly or set ALLOWED_ORIGINS=* in .env for development only
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -82,6 +91,11 @@ class Settings(BaseSettings):
             if self.SECRET_KEY == _DEV_SECRET_FALLBACK:
                 raise ValueError(
                     "SECRET_KEY must be set to a strong secret in production (not the dev fallback)."
+                )
+            if not self.REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY:
+                raise ValueError(
+                    "REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY must be true in production "
+                    "so appointment completion persists idempotent outcomes."
                 )
         return self
 

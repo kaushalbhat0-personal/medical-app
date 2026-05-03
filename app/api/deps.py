@@ -123,22 +123,6 @@ def get_current_auth_context(
     return auth_ctx
 
 
-def get_acting_doctor_optional(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> Doctor | None:
-    """At most one doctor-profile load per request (doctor-role users only)."""
-    return doctor_service.get_acting_doctor_or_none(db, current_user)
-
-
-def get_acting_doctor_optional_active(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> Doctor | None:
-    """Same as ``get_acting_doctor_optional`` but for routes that require an active user."""
-    return doctor_service.get_acting_doctor_or_none(db, current_user)
-
-
 def get_linked_doctor_profile_optional(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -162,7 +146,7 @@ def get_current_doctor(
     current_user: User = Depends(get_current_active_user),
 ) -> Doctor:
     """Doctor profile for the current user; use on doctor-only routes."""
-    return doctor_service.require_doctor_profile(db, current_user)
+    return doctor_service.get_current_doctor(db, current_user)
 
 
 def require_structured_profile_complete(

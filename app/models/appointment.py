@@ -71,10 +71,10 @@ class Appointment(Base):
         UUID(as_uuid=True),
         nullable=False,
     )
-    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="SET NULL"),
-        nullable=True,
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -141,9 +141,8 @@ class AppointmentCompletionIdempotency(Base):
     __table_args__ = (
         UniqueConstraint(
             "appointment_id",
-            "user_id",
             "idempotency_key",
-            name="uq_appt_completion_idempotency_appt_user_key",
+            name="uq_completion_idempotency",
         ),
         Index("ix_appt_completion_idempotency_created_at", "created_at"),
     )
@@ -165,6 +164,13 @@ class AppointmentCompletionIdempotency(Base):
     )
     idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: SHA256 of canonical JSON `{appointment_id, status, billing_id}` after successful completion.
+    result_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    billing_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("billings.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

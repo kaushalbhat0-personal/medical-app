@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_acting_doctor_optional,
     get_current_active_user,
     get_current_user,
     get_optional_scoped_tenant_id,
@@ -14,7 +13,6 @@ from app.api.deps import (
 )
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
-from app.models.doctor import Doctor
 from app.models.inventory import InventoryItemType
 from app.models.user import User
 from app.schemas.inventory import (
@@ -79,7 +77,6 @@ def inventory_use(
     current_user: User = Depends(get_current_active_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
-    acting_doctor: Doctor | None = Depends(get_acting_doctor_optional),
 ) -> dict[str, bool | UUID]:
     appt = appointment_service.get_appointment_or_404(db, body.appointment_id)
     appointment_service.authorize_appointment_access(
@@ -87,7 +84,6 @@ def inventory_use(
         appt,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         rbac_action="consume_inventory",
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )

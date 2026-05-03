@@ -170,11 +170,12 @@ def add_weekly_availability(
 def create_patient_profile(
     db: Session,
     *,
-    tenant_id: UUID | None,
+    tenant_id: UUID | None = None,
     user_id: UUID,
     created_by: UUID,
     name: str = "E2E Patient",
 ) -> Patient:
+    _ = tenant_id
     p = Patient(
         name=name,
         age=30,
@@ -182,7 +183,7 @@ def create_patient_profile(
         phone="555-0100",
         user_id=user_id,
         created_by=created_by,
-        tenant_id=tenant_id,
+        tenant_id=None,
     )
     db.add(p)
     db.flush()

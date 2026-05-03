@@ -239,7 +239,7 @@ def test_doctor_read_requires_appointment_not_created_by(
         role=UserRole.doctor,
         tenant_id=tenant.id,
     )
-    d_a = create_doctor_profile(
+    _ = create_doctor_profile(
         db_session, tenant_id=tenant.id, user_id=doc_a.id, timezone_name="UTC"
     )
     doc_b = create_user(
@@ -283,14 +283,12 @@ def test_doctor_read_requires_appointment_not_created_by(
             patient,
             doc_a,
             tenant_id=tenant.id,
-            acting_doctor=d_a,
         )
     patient_service.authorize_patient_read(
         db_session,
         patient,
         doc_b,
         tenant_id=tenant.id,
-        acting_doctor=d_b,
     )
 
 

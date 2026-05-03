@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,9 +11,11 @@ from sqlalchemy import text
 from app.api.v1.router import api_router
 from app.core.config import settings
 import app.core.slot_cache_invalidation  # noqa: F401 — register after_commit / rollback slot cache hooks
+from app.core.request_context import bind_request_id, reset_request_id
 from app.core.tenancy import ensure_default_tenant_exists
 from app.core.rate_limit import (
     AuthenticatedWritePostRateLimitMiddleware,
+    IntegrityScanGetRateLimitMiddleware,
     PublicEndpointRateLimitMiddleware,
     RateLimitRule,
 )
@@ -79,6 +82,19 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def request_trace_middleware(request: Request, call_next):
+    raw = request.headers.get("x-request-id") or request.headers.get("X-Request-ID")
+    rid = str(raw).strip() if raw and str(raw).strip() else str(uuid.uuid4())
+    token = bind_request_id(rid)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+    finally:
+        reset_request_id(token)
+
+
 # Debug: Log incoming Origin header for CORS troubleshooting
 @app.middleware("http")
 async def debug_cors_origin(request: Request, call_next):
@@ -116,6 +132,7 @@ app.add_middleware(
     rule=RateLimitRule(window_seconds=60, max_requests=100),
 )
 app.add_middleware(AuthenticatedWritePostRateLimitMiddleware)
+app.add_middleware(IntegrityScanGetRateLimitMiddleware)
 
 
 @app.exception_handler(ServiceError)

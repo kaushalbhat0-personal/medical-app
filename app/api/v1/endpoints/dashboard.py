@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -12,6 +12,8 @@ from app.api.deps import (
 )
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.database import get_db
+from app.core.metrics import get_counters_snapshot
+from app.core.permissions import has_tenant_admin_privileges
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
 from app.models.user import User
 from app.schemas.dashboard import (
@@ -20,7 +22,8 @@ from app.schemas.dashboard import (
     DoctorPerformanceItem,
     RevenueTrendItem,
 )
-from app.services import dashboard_service
+from app.schemas.integrity_scan import IntegrityScanResponse
+from app.services import dashboard_service, integrity_scan_service
 
 router = APIRouter(dependencies=[Depends(require_structured_profile_complete)])
 admin_router = APIRouter(
@@ -157,3 +160,42 @@ def get_admin_doctor_performance(
     )
     rows = dashboard_service.get_doctor_performance(db, tenant_id, doctor_id=doc_id)
     return [DoctorPerformanceItem.model_validate(x) for x in rows]
+
+
+@admin_router.get("/observability/metrics")
+def get_observability_metrics(
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Process-local counters (appointments completed, inventory deductions, idempotency, RBAC)."""
+    if not has_tenant_admin_privileges(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return {"counters": get_counters_snapshot()}
+
+
+@admin_router.get("/integrity-scan", response_model=IntegrityScanResponse)
+def run_integrity_scan(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    x_tenant_id: UUID | None = Header(
+        default=None,
+        alias="X-Tenant-ID",
+        description="Organization to scan (required unless all_tenants and super admin)",
+    ),
+    all_tenants: bool = Query(
+        default=False,
+        description="Super admin only: scan every organization in one request",
+    ),
+) -> IntegrityScanResponse:
+    integrity_scan_service.authorize_integrity_scan(current_user, all_tenants=all_tenants)
+    if all_tenants:
+        result = integrity_scan_service.scan_system_invariants_cached(db, all_tenants=True)
+        db.commit()
+        return result
+    if x_tenant_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=MISSING_X_TENANT_ID_MSG)
+    resolved = dashboard_service.resolve_admin_metrics_tenant_id(
+        db, current_user, x_tenant_id
+    )
+    result = integrity_scan_service.scan_system_invariants_cached(db, tenant_id=resolved)
+    db.commit()
+    return result

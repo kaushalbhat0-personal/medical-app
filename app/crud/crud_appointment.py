@@ -3,6 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, delete, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.appointment import (
@@ -77,12 +78,10 @@ def get_appointment_completion_idempotency_record(
     db: Session,
     *,
     appointment_id: UUID,
-    user_id: UUID,
     idempotency_key: str,
 ) -> AppointmentCompletionIdempotency | None:
     stmt = select(AppointmentCompletionIdempotency).where(
         AppointmentCompletionIdempotency.appointment_id == appointment_id,
-        AppointmentCompletionIdempotency.user_id == user_id,
         AppointmentCompletionIdempotency.idempotency_key == idempotency_key,
     )
     return db.scalars(stmt).first()
@@ -95,17 +94,32 @@ def record_appointment_completion_idempotency(
     user_id: UUID,
     idempotency_key: str,
     request_hash: str,
+    result_hash: str | None = None,
+    billing_id: UUID | None = None,
 ) -> AppointmentCompletionIdempotency:
-    row = AppointmentCompletionIdempotency(
-        appointment_id=appointment_id,
-        user_id=user_id,
-        idempotency_key=idempotency_key,
-        request_hash=request_hash,
-    )
-    db.add(row)
-    db.flush()
-    db.refresh(row)
-    return row
+    try:
+        with db.begin_nested():
+            row = AppointmentCompletionIdempotency(
+                appointment_id=appointment_id,
+                user_id=user_id,
+                idempotency_key=idempotency_key,
+                request_hash=request_hash,
+                result_hash=result_hash,
+                billing_id=billing_id,
+            )
+            db.add(row)
+            db.flush()
+            db.refresh(row)
+        return row
+    except IntegrityError:
+        existing = get_appointment_completion_idempotency_record(
+            db,
+            appointment_id=appointment_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is None:
+            raise
+        return existing
 
 
 def get_appointment(

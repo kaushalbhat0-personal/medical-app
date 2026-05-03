@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, time
+from datetime import date, time, timedelta
 from uuid import UUID
 
 import pytest
@@ -79,7 +79,7 @@ async def test_slots_update_after_availability_change(
 ) -> None:
     doctor = doctor_factory()
 
-    slot_date = date(2026, 4, 28)
+    slot_date = date.today() + timedelta(days=14)
     availability_factory(
         doctor_id=doctor.id,
         day_of_week=slot_date.weekday(),

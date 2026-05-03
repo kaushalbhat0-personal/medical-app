@@ -216,7 +216,7 @@ export function DoctorAppointmentDetailPage() {
     setMarkBusy(true);
     try {
       const fee = generateBill && consultationFeeValid ? consultationFeeNumber : undefined;
-      const a = await appointmentsApi.markCompleted(
+      const { appointment: updated } = await appointmentsApi.markCompleted(
         appointmentId,
         {
           completion_notes: completionNotes.trim() || null,
@@ -226,11 +226,11 @@ export function DoctorAppointmentDetailPage() {
         },
         { idempotencyKey: completionIdempotencyRef.current }
       );
-      setAppointment(a);
+      setAppointment(updated);
       invalidateTenantInventoryCache();
       setCompleteOpen(false);
       toast.success(generateBill ? 'Visit completed and bill created' : 'Visit marked complete');
-      const forAppt = await billingApi.getAll({ appointment_id: String(a.id), limit: 5 });
+      const forAppt = await billingApi.getAll({ appointment_id: String(updated.id), limit: 5 });
       setLinkedBill(forAppt.length > 0 ? forAppt[0] : null);
     } catch (e) {
       const msg =

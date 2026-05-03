@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.metrics import inc_counter
+from app.core.tenancy import non_nil_tenant_id
 from app.models.tenant import Tenant, UserTenant
 from app.models.user import User, UserRole
 from app.services.exceptions import ForbiddenError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 MISSING_X_TENANT_ID_MSG = "X-Tenant-ID header is required for scoped operations"
 
@@ -171,3 +176,34 @@ def resolve_tenant_id_for_scoped_request(
     if scope_row.is_deleted:
         raise ValidationError("Organization is deactivated")
     return chosen
+
+
+def align_operation_tenant_with_resource(
+    current_user: User,
+    request_tenant_id: UUID | None,
+    resource_tenant_id: UUID | None,
+) -> UUID | None:
+    """
+    For mutations on an existing tenant-scoped row, enforce that the scoped request org matches
+    the resource org instead of trusting the header alone (especially ``super_admin``).
+
+    Non-super admins keep ``request_tenant_id`` unchanged; they are already constrained by
+    ``resolve_tenant_id_for_scoped_request``.
+    """
+    if current_user.role != UserRole.super_admin:
+        return request_tenant_id
+    rt = non_nil_tenant_id(resource_tenant_id)
+    if rt is None:
+        return request_tenant_id
+    rq = non_nil_tenant_id(request_tenant_id)
+    if rq is not None and rq != rt:
+        inc_counter("cross_tenant_blocked_total")
+        logger.warning(
+            "[AUDIT] cross_tenant_blocked user=%s role=%s resource_org=%s request_org=%s",
+            current_user.id,
+            current_user.role,
+            rt,
+            rq,
+        )
+        raise ForbiddenError("Tenant scope does not match this resource organization")
+    return rt

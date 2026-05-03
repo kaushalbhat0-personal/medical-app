@@ -3,9 +3,11 @@ from collections import defaultdict
 from uuid import UUID
 
 from sqlalchemy import Select, and_, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
+from app.core.metrics import inc_counter
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing
 from app.models.doctor import Doctor
@@ -30,7 +32,11 @@ from app.schemas.inventory import (
 )
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
 from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
-from app.services.security_audit import assert_authorized, log_rbac_mutation_violation
+from app.services.security_audit import (
+    assert_authorized,
+    log_audit_mutation,
+    log_rbac_mutation_violation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +75,7 @@ def _resolve_effective_doctor_id_for_stock(
 ) -> UUID | None:
     """Doctors are forced to their own stock scope; other roles use the request scope."""
     if current_user.role == UserRole.doctor:
-        doc = doctor_service.require_doctor_profile(db, current_user)
+        doc = doctor_service.get_current_doctor(db, current_user)
         if doctor_id is not None and doctor_id != doc.id:
             log_rbac_mutation_violation(
                 current_user, "inventory", action="stock_scope"
@@ -137,17 +143,29 @@ def get_stock(
     return int(row.quantity) if row is not None else 0
 
 
-def _appointment_item_same_tenant(
-    db: Session,
-    appointment: Appointment,
+def _enforce_inventory_item_matches_appointment_tenant(
     item: InventoryItem,
-) -> bool:
-    if appointment.tenant_id is not None:
-        return item.tenant_id == appointment.tenant_id
-    doctor = db.get(Doctor, appointment.doctor_id)
-    if doctor is None or doctor.tenant_id is None:
-        return False
-    return item.tenant_id == doctor.tenant_id
+    appointment: Appointment,
+) -> None:
+    apt_tid = appointment.tenant_id
+    if apt_tid is None:
+        logger.error(
+            "[INVENTORY_INVARIANT_VIOLATION] appointment tenant missing appointment_id=%s",
+            appointment.id,
+        )
+        raise ValidationError("Appointment organization is not set")
+    if item.tenant_id != apt_tid:
+        logger.error(
+            "[INVENTORY_INVARIANT_VIOLATION] item.tenant_id=%s appointment.tenant_id=%s "
+            "item_id=%s appointment_id=%s",
+            item.tenant_id,
+            apt_tid,
+            item.id,
+            appointment.id,
+        )
+        raise ValidationError(
+            "Inventory item organization must match the visit organization"
+        )
 
 
 def get_bulk_stock(
@@ -175,7 +193,7 @@ def get_bulk_stock(
         eff_doctor_id: UUID | None = None
         filter_tenant = tenant_id
         if current_user.role == UserRole.doctor:
-            doc = doctor_service.require_doctor_profile(db, current_user)
+            doc = doctor_service.get_current_doctor(db, current_user)
             if doc.tenant_id != tenant_id:
                 log_rbac_mutation_violation(
                     current_user, "inventory", action="tenant_stock_scope"
@@ -268,18 +286,6 @@ def _get_or_create_stock_row(
     db.flush()
     locked = db.scalars(_stock_query(item_id, doctor_id).with_for_update(of=InventoryStock)).first()
     return locked if locked is not None else row
-
-
-def _effective_visit_inventory_tenant_id(db: Session, appointment: Appointment) -> UUID:
-    """Resolved tenant for matching clinic inventory items (nullable appointment.tenant_id via doctor)."""
-    if appointment.tenant_id is not None:
-        return appointment.tenant_id
-    doctor = db.get(Doctor, appointment.doctor_id)
-    if doctor is None or doctor.tenant_id is None:
-        raise ValidationError(
-            "Cannot resolve organization for this visit; inventory usage blocked."
-        )
-    return doctor.tenant_id
 
 
 def _subtract_stock_atomic_out(
@@ -606,7 +612,7 @@ def _query_inventory_items_with_tenant_scope(
     if tenant_id is None:
         raise ValidationError(MISSING_X_TENANT_ID_MSG)
     if current_user.role == UserRole.doctor:
-        doc = doctor_service.require_doctor_profile(db, current_user)
+        doc = doctor_service.get_current_doctor(db, current_user)
         if doc.tenant_id != tenant_id:
             raise ForbiddenError("Tenant scope does not match your practice")
     q = select(InventoryItem).where(InventoryItem.tenant_id == tenant_id)
@@ -626,8 +632,14 @@ def _record_visit_inventory_deductions(
     current_user: User,
     tenant_id: UUID | None,
 ) -> None:
-    """Validate all lines, then deduct stock and insert usage rows (one flush)."""
-    eff_tid = _effective_visit_inventory_tenant_id(db, appointment)
+    """Validate all lines, then deduct stock and insert usage rows (per item; replay-safe)."""
+    existing_item_ids = set(
+        db.scalars(
+            select(AppointmentInventoryUsage.item_id).where(
+                AppointmentInventoryUsage.appointment_id == appointment.id
+            )
+        ).all()
+    )
 
     validated: list[tuple[InventoryItem, int]] = []
     for item_id in sorted(totals.keys()):
@@ -635,16 +647,16 @@ def _record_visit_inventory_deductions(
         item = db.get(InventoryItem, item_id)
         if item is None:
             raise NotFoundError("Inventory item not found")
-        if item.tenant_id != eff_tid:
-            raise ValidationError(
-                "Item does not belong to the same organization as this visit"
-            )
+        _enforce_inventory_item_matches_appointment_tenant(item, appointment)
         _authorize_item_tenant(item, current_user, tenant_id)
         if not item.is_active:
             raise ValidationError("Cannot use an inactive inventory item")
         validated.append((item, need))
 
     for item, need in validated:
+        if item.id in existing_item_ids:
+            continue
+
         _apply_movement(
             db,
             item,
@@ -658,15 +670,30 @@ def _record_visit_inventory_deductions(
             created_by_role=current_user.role.value,
         )
 
-    for item_id in sorted(totals.keys()):
-        db.add(
-            AppointmentInventoryUsage(
-                appointment_id=appointment.id,
-                item_id=item_id,
-                quantity=totals[item_id],
-            )
-        )
+        try:
+            with db.begin_nested():
+                db.add(
+                    AppointmentInventoryUsage(
+                        appointment_id=appointment.id,
+                        item_id=item.id,
+                        quantity=need,
+                    )
+                )
+                db.flush()
+        except IntegrityError:
+            pass
+        else:
+            inc_counter("inventory_deductions_total")
+
+        existing_item_ids.add(item.id)
     db.flush()
+    log_audit_mutation(
+        "consume_inventory",
+        current_user,
+        "appointment_inventory",
+        appointment.id,
+        appointment.tenant_id,
+    )
 
 
 def consume_inventory_for_appointment(
@@ -682,8 +709,8 @@ def consume_inventory_for_appointment(
     Deduct clinic (tenant-level) stock, write movements and ``appointment_inventory_usage``
     rows. Caller must commit.
 
-    Idempotent: if usage rows already exist for this appointment, returns without altering
-    stock (safe for retries and duplicate submissions).
+    Idempotent per ``(appointment_id, item_id)``: existing lines are skipped; concurrent duplicate
+    inserts are tolerated without double-counting metrics.
     """
     if not items:
         return
@@ -692,7 +719,7 @@ def consume_inventory_for_appointment(
             current_user, "inventory", action="consume_inventory"
         )
         raise ForbiddenError("Only doctors can record visit inventory usage")
-    doc = doctor_service.require_doctor_profile(db, current_user)
+    doc = doctor_service.get_current_doctor(db, current_user)
     if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
         raise ForbiddenError("Cross-tenant access not allowed")
     if appointment.doctor_id != doc.id:
@@ -705,18 +732,6 @@ def consume_inventory_for_appointment(
         and appointment.tenant_id != tenant_id
     ):
         raise ForbiddenError("Appointment does not belong to the selected organization")
-
-    existing = db.scalars(
-        select(AppointmentInventoryUsage.id).where(
-            AppointmentInventoryUsage.appointment_id == appointment.id
-        ).limit(1)
-    ).first()
-    if existing is not None:
-        logger.info(
-            "[INVENTORY] idempotent skip: usage already recorded appointment_id=%s",
-            appointment.id,
-        )
-        return
 
     totals: dict[UUID, int] = defaultdict(int)
     for row in items:
@@ -744,18 +759,6 @@ def consume_inventory_admin_manual(
     ):
         raise ForbiddenError("Only administrators can use this legacy inventory endpoint")
     if not items:
-        return
-
-    existing = db.scalars(
-        select(AppointmentInventoryUsage.id).where(
-            AppointmentInventoryUsage.appointment_id == appointment.id
-        ).limit(1)
-    ).first()
-    if existing is not None:
-        logger.info(
-            "[INVENTORY] idempotent skip (admin manual): appointment_id=%s",
-            appointment.id,
-        )
         return
 
     if appointment.status != AppointmentStatus.scheduled:

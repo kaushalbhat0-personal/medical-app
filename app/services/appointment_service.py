@@ -10,18 +10,25 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
+from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
-from app.crud import crud_appointment
+from app.crud import crud_appointment, crud_billing
 from app.models.appointment import Appointment, AppointmentStatus
-from app.models.doctor import Doctor
 from app.models.user import User, UserRole
 from app.services import doctor_service, doctor_slot_service, inventory_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
 from app.core.tenancy import non_nil_tenant_id
+from app.services.appointment_invariant_enforcement import (
+    AppointmentInvariantGuard,
+    revalidate_appointment_invariants,
+)
+from app.services.appointment_invariants import validate_appointment_invariants
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.services.integrity_webhook import maybe_post_integrity_alert_webhook
 from app.services.security_audit import (
     assert_authorized,
     log_audit_mutation,
+    log_structured_audit_event,
     log_rbac_mutation_violation,
 )
 from app.schemas.appointment import (
@@ -32,6 +39,13 @@ from app.schemas.appointment import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _appointment_audit_ctx(appt: Appointment) -> dict[str, str]:
+    return {
+        "doctor_id": str(appt.doctor_id),
+        "patient_id": str(appt.patient_id),
+    }
 
 
 def _appointment_payload_hash(appointment_in: AppointmentCreate) -> str:
@@ -130,8 +144,6 @@ def authorize_appointment_create(
     appointment_in: AppointmentCreate,
     current_user: User,
     tenant_id: UUID | None,
-    *,
-    acting_doctor: Doctor | None = None,
 ) -> None:
     if current_user.role == UserRole.super_admin:
         return
@@ -139,22 +151,19 @@ def authorize_appointment_create(
     if current_user.role in (UserRole.admin, UserRole.staff) or (
         current_user.role == UserRole.doctor and current_user.is_owner
     ):
-        if tenant_id is not None:
-            doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
-            assert_authorized(
-                "create",
-                "appointment",
-                current_user,
-                tenant_id,
-                resource_tenant_id=doctor.tenant_id,
-            )
+        doctor = doctor_service.get_doctor_or_404(db, appointment_in.doctor_id)
+        assert_authorized(
+            "create",
+            "appointment",
+            current_user,
+            tenant_id,
+            resource_tenant_id=doctor.tenant_id,
+        )
         return
 
     if current_user.role == UserRole.doctor:
         try:
-            doc = acting_doctor or doctor_service.require_doctor_profile(
-                db, current_user
-            )
+            doc = doctor_service.get_current_doctor(db, current_user)
         except ForbiddenError:
             log_rbac_mutation_violation(
                 current_user, "appointment", action="create_appointment"
@@ -191,8 +200,6 @@ def create_appointment(
     current_user: User,
     tenant_id: UUID | None,
     idempotency_key: str | None = None,
-    *,
-    acting_doctor: Doctor | None = None,
 ) -> tuple[Appointment, bool]:
     """Returns (appointment, idempotent_replay) where idempotent_replay is True if this response replays a prior create."""
     logger.info(f"[RBAC] role={current_user.role}, user={current_user.id}")
@@ -207,7 +214,6 @@ def create_appointment(
         appt_in,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
     )
 
     if idempotency_key is not None:
@@ -223,7 +229,10 @@ def create_appointment(
                 raise ConflictError(
                     "Idempotency key reused with different request payload"
                 )
-            return (get_appointment_or_404(db, existing.appointment_id), True)
+            ap = get_appointment_or_404(db, existing.appointment_id)
+            revalidate_appointment_invariants(db, ap)
+            inc_counter("idempotency_replays_total")
+            return (ap, True)
 
     _validate_patient_and_doctor_exist(
         db,
@@ -265,6 +274,7 @@ def create_appointment(
 
     try:
         appointment = crud_appointment.add_appointment(db, appointment_data)
+        validate_appointment_invariants(appointment, doctor)
         if idempotency_key:
             crud_appointment.record_appointment_idempotency(
                 db,
@@ -283,22 +293,27 @@ def create_appointment(
                 db, current_user.id, idempotency_key
             )
             if existing is not None and existing.request_hash == body_hash:
-                return (get_appointment_or_404(db, existing.appointment_id), True)
+                ap = get_appointment_or_404(db, existing.appointment_id)
+                revalidate_appointment_invariants(db, ap)
+                inc_counter("idempotency_replays_total")
+                return (ap, True)
         msg = str(getattr(e, "orig", e))
         if "uq_appointments_doctor_time_active" in msg or "uq_doctor_time" in msg:
             raise ValidationError("Slot already booked") from e
         raise
 
+    reloaded = crud_appointment.get_appointment(db, appointment.id)
+    if reloaded is None:
+        raise NotFoundError("Appointment not found")
+    revalidate_appointment_invariants(db, reloaded)
     log_audit_mutation(
         "create",
         current_user,
         "appointment",
-        appointment.id,
-        appointment.tenant_id,
+        reloaded.id,
+        reloaded.tenant_id,
+        extra=_appointment_audit_ctx(reloaded),
     )
-    reloaded = crud_appointment.get_appointment(db, appointment.id)
-    if reloaded is None:
-        raise NotFoundError("Appointment not found")
     return (reloaded, False)
 
 
@@ -318,7 +333,6 @@ def get_appointments(
     patient_id: UUID | None = None,
     tenant_id: UUID | None = None,
     *,
-    acting_doctor: Doctor | None = None,
     list_type: str | None = None,
     appt_status: AppointmentStatus | None = None,
     data_scope: ResolvedDataScope,
@@ -337,9 +351,7 @@ def get_appointments(
             eff_doctor_id = doctor_id
             eff_patient_id = None
         else:
-            doc = acting_doctor or doctor_service.require_doctor_profile(
-                db, current_user
-            )
+            doc = doctor_service.get_current_doctor(db, current_user)
             eff_doctor_id = doc.id
             eff_patient_id = None
     elif current_user.role == UserRole.patient:
@@ -380,6 +392,21 @@ def _completion_payload_hash(data: MarkAppointmentCompletedRequest) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _appointment_completion_result_hash(
+    *,
+    appointment_id: UUID,
+    appointment_status_value: str,
+    billing_id: UUID | None,
+) -> str:
+    body = {
+        "appointment_id": str(appointment_id),
+        "status": appointment_status_value,
+        "billing_id": str(billing_id) if billing_id is not None else None,
+    }
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def appointment_to_read(db: Session, appt: Appointment) -> AppointmentRead:
     from app.services.billing_service import appointment_inventory_materials_selling_total
 
@@ -394,7 +421,6 @@ def mark_appointment_completed(
     current_user: User,
     tenant_id: UUID | None,
     *,
-    acting_doctor: Doctor | None = None,
     restrict_to_doctor_id: UUID | None = None,
     completion: MarkAppointmentCompletedRequest | None = None,
     idempotency_key: str | None = None,
@@ -409,28 +435,15 @@ def mark_appointment_completed(
         appointment,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         rbac_action="mark_appointment_completed",
         restrict_to_doctor_id=restrict_to_doctor_id,
+        require_assigned_doctor=True,
     )
     if current_user.role != UserRole.doctor:
         raise ForbiddenError("Only the assigned doctor can mark a visit complete")
-    doc = doctor_service.require_doctor_profile(db, current_user)
-    if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
-        log_rbac_mutation_violation(
-            current_user,
-            "appointment",
-            action="mark_appointment_completed",
-        )
-        raise ForbiddenError("Cross-tenant access not allowed")
-    if doc.id != appointment.doctor_id:
-        log_rbac_mutation_violation(
-            current_user,
-            "appointment",
-            action="mark_appointment_completed",
-            tenant_type=doc.tenant.type if doc.tenant else None,
-        )
-        raise ForbiddenError("Only the assigned doctor can mark a visit complete")
+
+    assigned_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
+    validate_appointment_invariants(appointment, assigned_doctor)
 
     data = completion or MarkAppointmentCompletedRequest()
     ih = idempotency_key.strip() if idempotency_key else ""
@@ -441,7 +454,6 @@ def mark_appointment_completed(
         existing = crud_appointment.get_appointment_completion_idempotency_record(
             db,
             appointment_id=appointment_id,
-            user_id=current_user.id,
             idempotency_key=ih,
         )
         if existing is not None:
@@ -450,17 +462,38 @@ def mark_appointment_completed(
                     "Idempotency key reused with different request payload"
                 )
             db.commit()
-            reloaded = crud_appointment.get_appointment(db, appointment_id)
-            if reloaded is None:
-                raise NotFoundError("Appointment not found")
+            reloaded = AppointmentInvariantGuard.finalize(db, appointment_id)
+            bill_row = crud_billing.get_bill_by_appointment(db, appointment_id)
+            current_billing_id = bill_row.id if bill_row else None
+            current_outcome_hash = _appointment_completion_result_hash(
+                appointment_id=reloaded.id,
+                appointment_status_value=reloaded.status.value,
+                billing_id=current_billing_id,
+            )
+            if existing.result_hash and current_outcome_hash != existing.result_hash:
+                inc_counter("idempotency_outcome_hash_mismatch_total")
+                logger.error(
+                    "[APM_IDEMPOTENCY] replay outcome differs from stored snapshot (possible data "
+                    "drift); appointment=%s stored=%s current=%s",
+                    appointment_id,
+                    existing.result_hash,
+                    current_outcome_hash,
+                )
+                maybe_post_integrity_alert_webhook(
+                    {
+                        "alert": "idempotency_outcome_hash_mismatch",
+                        "appointment_id": str(appointment_id),
+                        "stored_result_hash": existing.result_hash,
+                        "current_result_hash": current_outcome_hash,
+                    }
+                )
+            inc_counter("appointments_completed_total")
+            inc_counter("idempotency_replays_total")
             return reloaded, True
 
     if appointment.status == AppointmentStatus.completed:
         db.commit()
-        reloaded = crud_appointment.get_appointment(db, appointment_id)
-        if reloaded is None:
-            raise NotFoundError("Appointment not found")
-        return reloaded, False
+        return AppointmentInvariantGuard.finalize(db, appointment_id), False
 
     if appointment.status != AppointmentStatus.scheduled:
         raise ValidationError("Only scheduled visits can be completed")
@@ -505,34 +538,75 @@ def mark_appointment_completed(
             ),
             current_user,
             tenant_id,
-            acting_doctor=acting_doctor,
         )
+
+    bill_for_snapshot = crud_billing.get_bill_by_appointment(db, appointment.id)
+    billing_id_snapshot = bill_for_snapshot.id if bill_for_snapshot else None
+    outcome_hash = _appointment_completion_result_hash(
+        appointment_id=appointment.id,
+        appointment_status_value=AppointmentStatus.completed.value,
+        billing_id=billing_id_snapshot,
+    )
 
     if ih:
         assert req_hash is not None
-        crud_appointment.record_appointment_completion_idempotency(
+        idem_row = crud_appointment.record_appointment_completion_idempotency(
             db,
             appointment_id=appointment.id,
             user_id=current_user.id,
             idempotency_key=ih,
             request_hash=req_hash,
+            result_hash=outcome_hash,
+            billing_id=billing_id_snapshot,
         )
+        if idem_row.request_hash != req_hash:
+            raise ConflictError(
+                "Idempotency key reused with different request payload"
+            )
     db.commit()
     slot_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     doctor_slot_service.invalidate_slots_cache_for_appointment(
         db, slot_doctor, appointment.appointment_time
     )
-    log_audit_mutation(
-        "update",
-        current_user,
-        "appointment",
-        appointment.id,
-        appointment.tenant_id,
+    reloaded = AppointmentInvariantGuard.finalize(db, appointment_id)
+    log_structured_audit_event(
+        event="appointment_completed",
+        tenant_id=reloaded.tenant_id,
+        resource_id=str(reloaded.id),
+        actor_id=str(current_user.id),
+        appointment_id=str(reloaded.id),
+        doctor_id=str(reloaded.doctor_id),
+        patient_id=str(reloaded.patient_id),
+        idempotency_key=ih,
+        status="success",
     )
-    reloaded = crud_appointment.get_appointment(db, appointment_id)
-    if reloaded is None:
-        raise NotFoundError("Appointment not found")
+    inc_counter("appointments_completed_total")
     return reloaded, False
+
+
+def _assert_doctor_assigned_to_appointment(
+    db: Session,
+    current_user: User,
+    appointment: Appointment,
+    *,
+    rbac_action: str,
+) -> None:
+    doc = doctor_service.get_current_doctor(db, current_user)
+    if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
+        log_rbac_mutation_violation(
+            current_user,
+            "appointment",
+            action=rbac_action,
+        )
+        raise ForbiddenError("Cross-tenant access not allowed")
+    if appointment.doctor_id != doc.id:
+        log_rbac_mutation_violation(
+            current_user,
+            "appointment",
+            action=rbac_action,
+            tenant_type=doc.tenant.type if doc.tenant else None,
+        )
+        raise ForbiddenError("Not allowed to access this appointment")
 
 
 def authorize_appointment_access(
@@ -541,10 +615,13 @@ def authorize_appointment_access(
     current_user: User,
     tenant_id: UUID | None,
     *,
-    acting_doctor: Doctor | None = None,
     rbac_action: str = "appointment_access",
     restrict_to_doctor_id: UUID | None = None,
+    require_assigned_doctor: bool = False,
 ) -> None:
+    if appointment.tenant_id is None:
+        raise ValidationError("Appointment tenant is not set")
+
     if current_user.role == UserRole.super_admin:
         if (
             restrict_to_doctor_id is not None
@@ -553,6 +630,17 @@ def authorize_appointment_access(
             log_rbac_mutation_violation(
                 current_user, "appointment", action=rbac_action
             )
+            raise ForbiddenError("Not allowed to access this appointment")
+        return
+
+    if current_user.role == UserRole.patient:
+        try:
+            acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        except NotFoundError:
+            log_rbac_mutation_violation(current_user, "appointment")
+            raise ForbiddenError("Patient profile not found for this user")
+        if appointment.patient_id != acting_patient.id:
+            log_rbac_mutation_violation(current_user, "appointment")
             raise ForbiddenError("Not allowed to access this appointment")
         return
 
@@ -576,6 +664,11 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
+        if require_assigned_doctor:
+            _assert_doctor_assigned_to_appointment(
+                db, current_user, appointment, rbac_action=rbac_action
+            )
+            return
         if restrict_to_doctor_id is None:
             return
         if appointment.doctor_id == restrict_to_doctor_id:
@@ -586,33 +679,9 @@ def authorize_appointment_access(
         raise ForbiddenError("Not allowed to access this appointment")
 
     if current_user.role == UserRole.doctor:
-        doc = doctor_service.require_doctor_profile(db, current_user)
-        if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
-            log_rbac_mutation_violation(
-                current_user,
-                "appointment",
-                action=rbac_action,
-            )
-            raise ForbiddenError("Cross-tenant access not allowed")
-        if appointment.doctor_id != doc.id:
-            log_rbac_mutation_violation(
-                current_user,
-                "appointment",
-                action=rbac_action,
-                tenant_type=doc.tenant.type if doc.tenant else None,
-            )
-            raise ForbiddenError("Not allowed to access this appointment")
-        return
-
-    if current_user.role == UserRole.patient:
-        try:
-            acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
-        except NotFoundError:
-            log_rbac_mutation_violation(current_user, "appointment")
-            raise ForbiddenError("Patient profile not found for this user")
-        if appointment.patient_id != acting_patient.id:
-            log_rbac_mutation_violation(current_user, "appointment")
-            raise ForbiddenError("Not allowed to access this appointment")
+        _assert_doctor_assigned_to_appointment(
+            db, current_user, appointment, rbac_action=rbac_action
+        )
         return
 
     log_rbac_mutation_violation(current_user, "appointment")
@@ -639,7 +708,6 @@ def update_appointment(
     current_user: User,
     tenant_id: UUID | None,
     *,
-    acting_doctor: Doctor | None = None,
     restrict_to_doctor_id: UUID | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
@@ -648,7 +716,6 @@ def update_appointment(
         appointment,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         rbac_action="update_appointment",
         restrict_to_doctor_id=restrict_to_doctor_id,
     )
@@ -666,6 +733,7 @@ def update_appointment(
         update_data["tenant_id"] = doctor_tenant_id
 
     if not update_data:
+        revalidate_appointment_invariants(db, appointment)
         return appointment
 
     new_status = update_data.get("status")
@@ -717,10 +785,12 @@ def update_appointment(
         "appointment",
         updated.id,
         updated.tenant_id,
+        extra=_appointment_audit_ctx(updated),
     )
     reloaded = crud_appointment.get_appointment(db, updated.id)
     if reloaded is None:
         raise NotFoundError("Appointment not found")
+    revalidate_appointment_invariants(db, reloaded)
     return reloaded
 
 
@@ -730,7 +800,6 @@ def delete_appointment(
     current_user: User,
     tenant_id: UUID | None,
     *,
-    acting_doctor: Doctor | None = None,
     restrict_to_doctor_id: UUID | None = None,
 ) -> Appointment:
     appointment = get_appointment_or_404(db, appointment_id)
@@ -739,7 +808,6 @@ def delete_appointment(
         appointment,
         current_user,
         tenant_id,
-        acting_doctor=acting_doctor,
         rbac_action="delete_appointment",
         restrict_to_doctor_id=restrict_to_doctor_id,
     )
@@ -747,6 +815,7 @@ def delete_appointment(
     if appointment.status == AppointmentStatus.completed:
         raise ValidationError("Completed appointment cannot be deleted")
 
+    revalidate_appointment_invariants(db, appointment)
     slot_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     slot_time = appointment.appointment_time
     deleted = crud_appointment.soft_delete_appointment(db, appointment)
@@ -757,6 +826,7 @@ def delete_appointment(
         "appointment",
         deleted.id,
         deleted.tenant_id,
+        extra=_appointment_audit_ctx(deleted),
     )
     reloaded = crud_appointment.get_appointment(db, deleted.id, include_deleted=True)
     if reloaded is None:

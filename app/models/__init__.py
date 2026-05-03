@@ -6,6 +6,7 @@ from app.models.appointment import (
 from app.models.billing import Billing, BillingEvent
 from app.models.doctor import Doctor, DoctorCreationIdempotency
 from app.models.doctor_profile import DoctorProfile
+from app.models.integrity_scan_state import IntegrityScanState
 from app.models.doctor_verification_log import DoctorVerificationLog
 from app.models.inventory import (
     AppointmentInventoryUsage,
@@ -33,6 +34,7 @@ __all__ = [
     "Doctor",
     "DoctorProfile",
     "DoctorVerificationLog",
+    "IntegrityScanState",
     "DoctorCreationIdempotency",
     "DoctorAvailability",
     "DoctorTimeOff",

@@ -84,15 +84,20 @@ export const appointmentsApi = {
       bill_consultation_amount?: number | string;
     },
     options?: { idempotencyKey?: string }
-  ): Promise<Appointment> => {
-    const headers: Record<string, string> = {};
-    if (options?.idempotencyKey) {
-      headers['Idempotency-Key'] = options.idempotencyKey;
-    }
-    const response = await api.post<Appointment>(`/appointments/${id}/mark-completed`, payload ?? {}, {
-      headers,
-    });
-    return response.data;
+  ): Promise<{ appointment: Appointment; idempotentReplay: boolean }> => {
+    const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
+    const response = await api.post<Appointment>(
+      `/appointments/${id}/mark-completed`,
+      payload ?? {},
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }
+    );
+    const idempotentReplay =
+      String(
+        (response.headers as { 'x-idempotent-replay'?: string })['x-idempotent-replay'] ?? ''
+      ) === '1';
+    return { appointment: response.data, idempotentReplay };
   },
   delete: async (id: string): Promise<void> => {
     try {

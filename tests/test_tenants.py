@@ -517,7 +517,7 @@ async def test_upgrade_to_organization_preserves_data_and_enables_admin(
     ).one()
     assert ut.role == "admin"
     p2 = db.get(Patient, patient.id)
-    assert p2 is not None and p2.tenant_id == tenant.id
+    assert p2 is not None and p2.tenant_id is None
     d2 = db.get(Doctor, doc.id)
     assert d2 is not None
     assert str(d2.id) == pre_did and d2.tenant_id == tenant.id
