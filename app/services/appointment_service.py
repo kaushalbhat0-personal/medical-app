@@ -233,8 +233,8 @@ def create_appointment(
     doctor = doctor_service.get_doctor_or_404(db, appt_in.doctor_id)
     doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
-    final_tid = non_nil_tenant_id(doctor.tenant_id)
-    if not final_tid:
+    doctor_tenant_id = non_nil_tenant_id(doctor.tenant_id)
+    if not doctor_tenant_id:
         raise ValidationError("Tenant cannot be resolved")
 
     logger.info(
@@ -259,11 +259,9 @@ def create_appointment(
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
 
-    appointment_data["tenant_id"] = final_tid
+    appointment_data["tenant_id"] = doctor_tenant_id
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
-
-    assert appointment_data["tenant_id"] is not None
 
     try:
         appointment = crud_appointment.add_appointment(db, appointment_data)
@@ -656,27 +654,28 @@ def update_appointment(
     )
 
     update_data = appointment_in.model_dump(exclude_unset=True)
+
+    patient_id = update_data.get("patient_id", appointment.patient_id)
+    doctor_id = update_data.get("doctor_id", appointment.doctor_id)
+    doctor_for_slot = doctor_service.get_doctor_or_404(db, doctor_id)
+    doctor_service.require_doctor_tenant_for_scheduling(doctor_for_slot)
+    doctor_tenant_id = non_nil_tenant_id(doctor_for_slot.tenant_id)
+    if not doctor_tenant_id:
+        raise ValidationError("Tenant cannot be resolved")
+    if appointment.tenant_id != doctor_tenant_id:
+        update_data["tenant_id"] = doctor_tenant_id
+
     if not update_data:
         return appointment
 
     new_status = update_data.get("status")
     _validate_status_regression(appointment.status, new_status)
 
-    patient_id = update_data.get("patient_id", appointment.patient_id)
-    doctor_id = update_data.get("doctor_id", appointment.doctor_id)
-    if "doctor_id" in update_data:
-        doctor_for_tenant = doctor_service.get_doctor_or_404(db, doctor_id)
-        doctor_service.require_doctor_tenant_for_scheduling(doctor_for_tenant)
-        appt_tid = non_nil_tenant_id(doctor_for_tenant.tenant_id)
-        if not appt_tid:
-            raise ValidationError("Tenant cannot be resolved")
-        update_data["tenant_id"] = appt_tid
     appointment_time = update_data.get("appointment_time", appointment.appointment_time)
     prev_doctor_id = appointment.doctor_id
     prev_appointment_time = appointment.appointment_time
 
     _validate_patient_and_doctor_exist(db, patient_id=patient_id, doctor_id=doctor_id)
-    doctor_for_slot = doctor_service.get_doctor_or_404(db, doctor_id)
     if appointment_time != prev_appointment_time or doctor_id != prev_doctor_id:
         doctor_slot_service.assert_appointment_time_matches_doctor_slots(
             db, doctor_for_slot, appointment_time
