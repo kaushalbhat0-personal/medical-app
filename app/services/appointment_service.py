@@ -417,9 +417,22 @@ def mark_appointment_completed(
     )
     if current_user.role != UserRole.doctor:
         raise ForbiddenError("Only the assigned doctor can mark a visit complete")
-    doc = acting_doctor or doctor_service.require_doctor_profile(db, current_user)
-    if appointment.doctor_id != doc.id:
-        raise ForbiddenError("Not your appointment")
+    doc = doctor_service.require_doctor_profile(db, current_user)
+    if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
+        log_rbac_mutation_violation(
+            current_user,
+            "appointment",
+            action="mark_appointment_completed",
+        )
+        raise ForbiddenError("Cross-tenant access not allowed")
+    if doc.id != appointment.doctor_id:
+        log_rbac_mutation_violation(
+            current_user,
+            "appointment",
+            action="mark_appointment_completed",
+            tenant_type=doc.tenant.type if doc.tenant else None,
+        )
+        raise ForbiddenError("Only the assigned doctor can mark a visit complete")
 
     data = completion or MarkAppointmentCompletedRequest()
     ih = idempotency_key.strip() if idempotency_key else ""
@@ -575,9 +588,14 @@ def authorize_appointment_access(
         raise ForbiddenError("Not allowed to access this appointment")
 
     if current_user.role == UserRole.doctor:
-        doc = acting_doctor or doctor_service.require_doctor_profile(
-            db, current_user
-        )
+        doc = doctor_service.require_doctor_profile(db, current_user)
+        if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
+            log_rbac_mutation_violation(
+                current_user,
+                "appointment",
+                action=rbac_action,
+            )
+            raise ForbiddenError("Cross-tenant access not allowed")
         if appointment.doctor_id != doc.id:
             log_rbac_mutation_violation(
                 current_user,

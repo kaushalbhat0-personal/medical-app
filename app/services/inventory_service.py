@@ -693,6 +693,8 @@ def consume_inventory_for_appointment(
         )
         raise ForbiddenError("Only doctors can record visit inventory usage")
     doc = doctor_service.require_doctor_profile(db, current_user)
+    if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
+        raise ForbiddenError("Cross-tenant access not allowed")
     if appointment.doctor_id != doc.id:
         raise ForbiddenError("Not your appointment")
     if require_scheduled and appointment.status != AppointmentStatus.scheduled:
