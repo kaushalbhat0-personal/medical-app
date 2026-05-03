@@ -58,29 +58,6 @@ def appointment_inventory_materials_selling_total(
     return total
 
 
-def _validate_billing_patient_matches_appointment_tenant(
-    db: Session,
-    appointment: Appointment,
-    patient_id: UUID,
-    current_user: User,
-) -> None:
-    patient = patient_service.get_patient_or_404(db, patient_id)
-    apt_tid = non_nil_tenant_id(appointment.tenant_id)
-    pat_tid = non_nil_tenant_id(patient.tenant_id)
-    if apt_tid is not None and pat_tid is not None and apt_tid != pat_tid:
-        logger.warning(
-            "Cross-tenant billing attempt",
-            extra={
-                "appointment_id": str(appointment.id),
-                "patient_id": str(patient.id),
-                "appointment_tenant": str(appointment.tenant_id),
-                "patient_tenant": str(patient.tenant_id),
-                "user_id": str(current_user.id),
-            },
-        )
-        raise ForbiddenError("Cross-tenant billing not allowed")
-
-
 def _validate_appointment_completed_for_billing(appointment: Appointment) -> None:
     if appointment.status != AppointmentStatus.completed:
         logger.warning(
@@ -274,9 +251,6 @@ def create_bill(
             db,
             patient_id=billing_in.patient_id,
             appointment_id=billing_in.appointment_id,
-        )
-        _validate_billing_patient_matches_appointment_tenant(
-            db, appointment, billing_in.patient_id, current_user
         )
         _validate_appointment_completed_for_billing(appointment)
     _validate_idempotency_key(db, billing_in.idempotency_key)

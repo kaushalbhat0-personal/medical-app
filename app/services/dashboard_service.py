@@ -119,12 +119,12 @@ def get_dashboard_stats_for_tenant(
             "total_revenue": float(total_revenue),
         }
 
-    total_patients = (
-        db.scalar(
-            select(func.count(Patient.id)).where(Patient.tenant_id == tenant_id)
-        )
-        or 0
+    has_appt_in_tenant = exists().where(
+        Appointment.patient_id == Patient.id,
+        Appointment.tenant_id == tenant_id,
+        Appointment.is_deleted == False,  # noqa: E712
     )
+    total_patients = db.scalar(select(func.count(Patient.id)).where(has_appt_in_tenant)) or 0
     total_doctors = (
         db.query(Doctor)
         .filter(

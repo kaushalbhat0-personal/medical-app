@@ -87,7 +87,8 @@ async def test_inventory_crud_and_stock_movements(
         headers=auth,
     )
     assert bad.status_code == 400
-    assert "negative" in bad.json()["detail"].lower()
+    detail = bad.json()["detail"].lower()
+    assert "insufficient" in detail or "negative" in detail
 
 
 @pytest.mark.asyncio

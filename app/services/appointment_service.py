@@ -233,23 +233,13 @@ def create_appointment(
     doctor = doctor_service.get_doctor_or_404(db, appt_in.doctor_id)
     doctor_service.require_doctor_tenant_for_scheduling(doctor)
 
-    patient_row = patient_service.get_patient_or_404(db, appt_in.patient_id)
-    patient_tid = non_nil_tenant_id(patient_row.tenant_id)
-    doctor_tid = non_nil_tenant_id(doctor.tenant_id)
-    request_tid = non_nil_tenant_id(tenant_id)
-
-    if patient_tid and doctor_tid and patient_tid != doctor_tid:
-        raise ForbiddenError("Cross-tenant appointment not allowed")
-
-    if not patient_tid and doctor_tid:
-        patient_row.tenant_id = doctor_tid
-        db.add(patient_row)
-        patient_tid = doctor_tid
+    final_tid = non_nil_tenant_id(doctor.tenant_id)
+    if not final_tid:
+        raise ValidationError("Tenant cannot be resolved")
 
     logger.info(
-        "[BOOKING_FLOW_V2] patient_id=%s patient_tenant=%s doctor_tenant=%s",
-        patient_row.id,
-        patient_row.tenant_id,
+        "[BOOKING_FLOW_V2] patient_id=%s doctor_tenant=%s",
+        appt_in.patient_id,
         doctor.tenant_id,
     )
 
@@ -269,9 +259,6 @@ def create_appointment(
     appointment_data = appt_in.model_dump()
     appointment_data["created_by"] = current_user.id
 
-    final_tid = request_tid or patient_tid or doctor_tid
-    if not final_tid:
-        raise ValidationError("Tenant cannot be resolved")
     appointment_data["tenant_id"] = final_tid
     appointment_data["doctor_id"] = appt_in.doctor_id
     appointment_data["patient_id"] = appt_in.patient_id
@@ -659,6 +646,13 @@ def update_appointment(
 
     patient_id = update_data.get("patient_id", appointment.patient_id)
     doctor_id = update_data.get("doctor_id", appointment.doctor_id)
+    if "doctor_id" in update_data:
+        doctor_for_tenant = doctor_service.get_doctor_or_404(db, doctor_id)
+        doctor_service.require_doctor_tenant_for_scheduling(doctor_for_tenant)
+        appt_tid = non_nil_tenant_id(doctor_for_tenant.tenant_id)
+        if not appt_tid:
+            raise ValidationError("Tenant cannot be resolved")
+        update_data["tenant_id"] = appt_tid
     appointment_time = update_data.get("appointment_time", appointment.appointment_time)
     prev_doctor_id = appointment.doctor_id
     prev_appointment_time = appointment.appointment_time

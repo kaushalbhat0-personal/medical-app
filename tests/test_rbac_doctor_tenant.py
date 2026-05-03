@@ -192,7 +192,7 @@ def test_doctor_cannot_access_patient_in_other_tenant(db_session: Session) -> No
     )
     db_session.commit()
 
-    with pytest.raises(ForbiddenError, match="Resource is not in your tenant"):
+    with pytest.raises(ForbiddenError, match="Patient is not in your tenant"):
         patient_service.authorize_patient_read(
             db_session, patient, doc_user, tenant_id=tenant_a.id
         )

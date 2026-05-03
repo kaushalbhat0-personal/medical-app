@@ -54,15 +54,10 @@ def patient_has_appointment_with_doctor(
 def patient_has_active_appointment_in_tenant(
     db: Session, patient_id: UUID, tenant_id: UUID
 ) -> bool:
-    stmt = (
-        select(func.count(Appointment.id))
-        .select_from(Appointment)
-        .join(Doctor, Doctor.id == Appointment.doctor_id)
-        .where(
-            Appointment.patient_id == patient_id,
-            Doctor.tenant_id == tenant_id,
-            Appointment.is_deleted == False,  # noqa: E712
-        )
+    stmt = select(func.count(Appointment.id)).where(
+        Appointment.patient_id == patient_id,
+        Appointment.tenant_id == tenant_id,
+        Appointment.is_deleted == False,  # noqa: E712
     )
     n = db.scalar(stmt)
     return bool(n and n > 0)
@@ -70,8 +65,8 @@ def patient_has_active_appointment_in_tenant(
 
 def patient_member_of_tenant(tenant_id: UUID):
     """
-    Legacy helper — admin lists use :func:`apply_patient_scope` (tenant_id *or* appointment
-    in tenant). Kept for narrow migration/debug.
+    Legacy predicate — prefer :func:`apply_patient_scope` or
+    :func:`patient_has_active_appointment_in_tenant`.
     """
     return Patient.tenant_id == tenant_id
 
@@ -80,8 +75,8 @@ def _primary_doctor_name_in_tenant_subquery(tenant_id: UUID):
     """
     For tenant-scoped lists: one deterministic doctor label per patient (min name among
     doctors for non-deleted appointments with ``Appointment.tenant_id`` in this tenant).
-    NULL if the patient is tenant-scoped only via patient.tenant_id and has no such
-    appointment row.
+    NULL if the patient has no non-deleted appointment with ``Appointment.tenant_id``
+    in this tenant.
     """
     return (
         select(func.min(Doctor.name))
@@ -110,8 +105,8 @@ def get_patients(
     data_scope_kind: Literal["doctor", "tenant"] = "tenant",
 ) -> list[tuple[Patient, str | None]]:
     """
-    List patients using :func:`apply_patient_scope` (tenant=patient or appointment in
-    tenant; doctor=appointment EXISTS). Returns ``(Patient, doctor_name)``; doctor_name
+    List patients using :func:`apply_patient_scope` (tenant=appointment in tenant;
+    doctor=appointment EXISTS). Returns ``(Patient, doctor_name)``; doctor_name
     is set for tenant admin lists when derivable from appointments in that tenant.
     """
     if user_id is not None:
@@ -119,8 +114,6 @@ def get_patients(
         if search:
             stmt = stmt.where(Patient.name.ilike(f"%{search}%"))
         stmt = stmt.where(Patient.user_id == user_id)
-        if tenant_id is not None:
-            stmt = stmt.where(Patient.tenant_id == tenant_id)
         stmt = stmt.offset(skip).limit(limit)
         return [(p, None) for p in list(db.scalars(stmt).all())]
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.crud_appointment import add_appointment
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.doctor import Doctor
 from app.models.user import UserRole
 from tests.factories import (
     BOOKING_ANCHOR_DATE_ISO,
@@ -480,7 +481,7 @@ async def test_mark_completed_generate_bill_consultation_only(
     assert float(rows[0]["amount"]) == pytest.approx(250.50)
 
 
-def test_appointment_tenant_always_matches_patient_invariant(
+def test_appointment_tenant_always_matches_doctor_invariant(
     db_session: Session,
 ) -> None:
     doc_email = f"doc_{uuid.uuid4().hex[:8]}@e2e.test"
@@ -508,5 +509,7 @@ def test_appointment_tenant_always_matches_patient_invariant(
     db_session.commit()
 
     for a in db_session.scalars(select(Appointment)).all():
-        if a.patient_id and a.tenant_id:
-            assert a.tenant_id == a.patient.tenant_id
+        if a.patient_id and a.tenant_id and a.doctor_id:
+            d = db_session.get(Doctor, a.doctor_id)
+            assert d is not None
+            assert a.tenant_id == d.tenant_id

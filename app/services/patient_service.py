@@ -220,22 +220,20 @@ def authorize_patient_access(
         return
 
     if tenant_id is not None:
-        if patient.tenant_id is not None:
-            assert_authorized(
-                "access",
-                "patient",
-                current_user,
-                tenant_id,
-                resource_tenant_id=patient.tenant_id,
+        if not crud_patient.patient_has_active_appointment_in_tenant(
+            db, patient.id, tenant_id
+        ):
+            log_rbac_mutation_violation(
+                current_user, "patient", action=rbac_action
             )
-        else:
-            if not crud_patient.patient_has_active_appointment_in_tenant(
-                db, patient.id, tenant_id
-            ):
-                log_rbac_mutation_violation(
-                    current_user, "patient", action=rbac_action
-                )
-                raise ForbiddenError("Patient is not in your tenant")
+            raise ForbiddenError("Patient is not in your tenant")
+        assert_authorized(
+            "access",
+            "patient",
+            current_user,
+            tenant_id,
+            resource_tenant_id=tenant_id,
+        )
 
     if current_user.role in (UserRole.admin, UserRole.staff):
         if restrict_to_doctor_id is not None and not patient_is_in_doctor_cohort(

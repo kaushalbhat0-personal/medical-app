@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import exists, false, or_
+from sqlalchemy import exists, false
 from sqlalchemy.sql import Select
 
 from app.core.permissions import has_tenant_admin_privileges
@@ -90,8 +90,7 @@ def apply_patient_scope(
     """
     Single source of truth for patient list visibility.
 
-    - tenant scope: patients with ``Patient.tenant_id == tenant_id`` (legacy) **or** a
-      non-deleted appointment with ``Appointment.tenant_id == tenant_id`` (cross-clinic).
+    - tenant scope: non-deleted appointment with ``Appointment.tenant_id == tenant_id``.
     - doctor scope: EXISTS active appointment for ``doctor_id`` (unchanged).
     """
     from app.models.appointment import Appointment
@@ -113,12 +112,8 @@ def apply_patient_scope(
         Appointment.tenant_id == tenant_id,
         Appointment.is_deleted == False,  # noqa: E712
     )
-    tenant_scoped = or_(
-        Patient.tenant_id == tenant_id,
-        has_appt_in_tenant,
-    )
     if user.role in (UserRole.admin, UserRole.staff, UserRole.super_admin):
-        return stmt.where(tenant_scoped)
+        return stmt.where(has_appt_in_tenant)
     if user.role == UserRole.doctor and user.is_owner:
-        return stmt.where(tenant_scoped)
+        return stmt.where(has_appt_in_tenant)
     return stmt.where(false())

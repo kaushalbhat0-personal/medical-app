@@ -43,10 +43,10 @@ def _data_scope_doctor(db: Session, user) -> ResolvedDataScope:
     return resolve_data_scope("doctor", current_user=user, linked_doctor=linked)
 
 
-def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
+def test_admin_sees_patient_after_booking_in_tenant_scope(
     db_session: Session,
 ) -> None:
-    """Admin tenant scope lists by ``Patient.tenant_id``; booking aligns tenant like ``create_appointment``."""
+    """Tenant admin lists a patient with ``tenant_id`` NULL once they have an appointment in that org."""
     tenant = create_tenant(db_session, tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
@@ -93,11 +93,6 @@ def test_admin_sees_patient_after_tenant_backfill_strict_tenant_scope(
             "created_by": doc_user.id,
             "tenant_id": tenant.id,
         },
-    )
-    db_session.commit()
-    # Same as appointment_service: set patient.tenant_id from doctor org when missing
-    db_session.execute(
-        update(Patient).where(Patient.id == p.id).values(tenant_id=tenant.id)
     )
     db_session.commit()
 
@@ -303,7 +298,7 @@ def test_doctor_read_requires_appointment_not_created_by(
 async def test_admin_sees_all_patients_in_tenant(
     client: AsyncClient, db_session: Session
 ) -> None:
-    """GET /patients with tenant scope lists patients where ``patient.tenant_id`` matches the org."""
+    """GET /patients with tenant scope lists patients with a non-deleted appointment in that org."""
     t1 = create_tenant(db_session, tenant_type=TenantType.organization)
     t_other = create_tenant(db_session, tenant_type=TenantType.organization)
 
@@ -570,8 +565,8 @@ def test_patient_visible_after_booking(db_session: Session) -> None:
     assert p.id in {x.id for x in out}
 
 
-def test_admin_sees_all_patients(db_session: Session) -> None:
-    """Admin tenant scope returns every patient row with that ``tenant_id``."""
+def test_admin_sees_all_patients_with_appointments_in_tenant(db_session: Session) -> None:
+    """Admin tenant scope lists patients that have at least one appointment in that org."""
     t1 = create_tenant(db_session, tenant_type=TenantType.organization)
     admin = create_user(
         db_session,
@@ -594,10 +589,10 @@ def test_admin_sees_all_patients(db_session: Session) -> None:
         role=UserRole.doctor,
         tenant_id=t1.id,
     )
-    create_doctor_profile(
+    doc1 = create_doctor_profile(
         db_session, tenant_id=t1.id, user_id=d1.id, timezone_name="UTC"
     )
-    create_doctor_profile(
+    doc2 = create_doctor_profile(
         db_session, tenant_id=t1.id, user_id=d2.id, timezone_name="UTC"
     )
     p1u = create_user(
@@ -625,6 +620,31 @@ def test_admin_sees_all_patients(db_session: Session) -> None:
         user_id=p2u.id,
         created_by=d2.id,
         name="B",
+    )
+    db_session.commit()
+
+    t0 = datetime.now(timezone.utc) + timedelta(hours=5)
+    add_appointment(
+        db_session,
+        {
+            "patient_id": p1.id,
+            "doctor_id": doc1.id,
+            "appointment_time": t0,
+            "status": AppointmentStatus.scheduled,
+            "created_by": d1.id,
+            "tenant_id": t1.id,
+        },
+    )
+    add_appointment(
+        db_session,
+        {
+            "patient_id": p2.id,
+            "doctor_id": doc2.id,
+            "appointment_time": t0 + timedelta(hours=1),
+            "status": AppointmentStatus.scheduled,
+            "created_by": d2.id,
+            "tenant_id": t1.id,
+        },
     )
     db_session.commit()
 
