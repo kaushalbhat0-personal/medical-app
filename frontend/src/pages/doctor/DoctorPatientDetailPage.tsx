@@ -17,22 +17,35 @@ import {
 } from '../../utils/doctorSchedule';
 import { appointmentsApi, billingApi, patientsApi } from '../../services';
 import { Textarea } from '@/components/ui/textarea';
-import type { Appointment, Bill, Patient } from '../../types';
+import type { Appointment, Bill, Patient, VisitAggregate } from '../../types';
 
 type Section = 'activity' | 'bills' | 'info';
 
+/**
+ * Timeline is visit-centric.
+ * One clinical encounter renders as one VisitAggregate card,
+ * even if billing/inventory metadata exists.
+ *
+ * TODO: Future extensions for Phase 2 clinical features:
+ * - Add prescriptions to VisitAggregate display
+ * - Add vitals to VisitAggregate display
+ * - Add attachments to VisitAggregate display
+ * - Add follow-up plans to VisitAggregate display
+ * - Add AI visit summaries
+ */
 type TimelineItem =
   | {
       id: string;
-      kind: 'appointment';
+      kind: 'visit';
       at: number;
       dayKey: string;
       iso: string;
-      appt: Appointment;
+      /** VisitAggregate: appointment + attached metadata (bill, inventory, prescriptions, etc.) */
+      visit: VisitAggregate;
     }
   | {
       id: string;
-      kind: 'bill';
+      kind: 'bill-only';
       at: number;
       dayKey: string;
       iso: string;
@@ -45,7 +58,7 @@ function appointmentTime(a: Appointment): number {
 }
 
 function kindPriority(k: TimelineItem['kind']): number {
-  return k === 'appointment' ? 0 : 1;
+  return k === 'visit' ? 0 : 1;
 }
 
 function formatRelativePast(iso: string | undefined): string {
@@ -231,41 +244,69 @@ export function DoctorPatientDetailPage() {
     [bills]
   );
 
+  /**
+   * Build visit-centric timeline.
+   * Each appointment becomes one VisitAggregate card.
+   * Bills are attached to their appointment visits, not shown separately.
+   */
   const { timelineByDay, dayOrder } = useMemo(() => {
     const items: TimelineItem[] = [];
+    const processedBillIds = new Set<string>();
+
+    // Build VisitAggregate for each appointment (visit-centric grouping)
     for (const a of appointments) {
       const raw = a.appointment_time || a.scheduled_at;
       const t = appointmentTime(a);
       if (!raw || !t) continue;
       const dayKey = appointmentCalendarDayYmd(raw, DISPLAY_TIMEZONE);
       if (!dayKey) continue;
+
+      // Find attached bill for this appointment
+      const bill = bills.find((b) =>
+        b.appointment_id && String(b.appointment_id) === String(a.id)
+      );
+
+      if (bill) {
+        processedBillIds.add(String(bill.id));
+      }
+
+      // Create VisitAggregate: appointment + attached metadata
+      const visitAggregate: VisitAggregate = {
+        appointment: a,
+        bill: bill || null,
+        inventoryUsage: a.inventory_usages,
+      };
+
       items.push({
-        id: `a-${a.id}`,
-        kind: 'appointment',
+        id: `visit-${a.id}`,
+        kind: 'visit',
         at: t,
         dayKey,
         iso: raw,
-        appt: a,
+        visit: visitAggregate,
       });
     }
+
+    // Add orphaned bills (bills without appointments) as separate timeline items
     for (const b of bills) {
-      const ap = b.appointment_id ? appointments.find((x) => String(x.id) === String(b.appointment_id)) : undefined;
-      const raw = ap
-        ? ap.appointment_time || ap.scheduled_at
-        : b.created_at || b.updated_at;
+      if (processedBillIds.has(String(b.id))) continue;
+
+      const raw = b.created_at || b.updated_at;
       const t = raw ? new Date(raw).getTime() : 0;
       if (!raw || !t) continue;
       const dayKey = appointmentCalendarDayYmd(raw, DISPLAY_TIMEZONE);
       if (!dayKey) continue;
+
       items.push({
-        id: `b-${b.id}`,
-        kind: 'bill',
+        id: `bill-${b.id}`,
+        kind: 'bill-only',
         at: t,
         dayKey,
         iso: raw,
         bill: b,
       });
     }
+    
     const byDay = new Map<string, TimelineItem[]>();
     for (const it of items) {
       if (!byDay.has(it.dayKey)) byDay.set(it.dayKey, []);
@@ -382,18 +423,19 @@ export function DoctorPatientDetailPage() {
     }
   };
 
-  const saveClinicalNotes = async () => {
+  /** Save persistent patient context notes (NOT visit-specific clinical notes). */
+  const savePatientContextNotes = async () => {
     if (!id || !patient) return;
     setNotesSaving(true);
     try {
       const updated = await patientsApi.update(id, { clinical_notes: notesDraft.trim() || null });
       setPatient(updated);
-      toast.success('Notes saved');
+      toast.success('Patient context saved');
     } catch (e) {
       const msg =
         axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
           ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not save')
-          : 'Could not save notes';
+          : 'Could not save patient context';
       toast.error(msg);
     } finally {
       setNotesSaving(false);
@@ -612,8 +654,8 @@ export function DoctorPatientDetailPage() {
           {patient && (
             <Card className="rounded-xl border bg-white p-4 shadow-md relative z-0">
               <CardHeader className="pb-2 px-0 pt-0">
-                <CardTitle className="text-base">Notes</CardTitle>
-                <CardDescription>Quick context for the next visit (saved on this patient)</CardDescription>
+                <CardTitle className="text-base">Patient Context Notes</CardTitle>
+                <CardDescription>Persistent context across all visits (not visit-specific)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 px-0 pb-0">
                 {canMutate ? (
@@ -621,7 +663,7 @@ export function DoctorPatientDetailPage() {
                     <Textarea
                       value={notesDraft}
                       onChange={(e) => setNotesDraft(e.target.value)}
-                      placeholder="e.g. Patient has had fever for 3 days; follow up on blood work…"
+                      placeholder="e.g. Chronic conditions, allergies, ongoing medications, family history..."
                       disabled={notesSaving}
                       className="min-h-[88px] resize-y"
                     />
@@ -629,16 +671,16 @@ export function DoctorPatientDetailPage() {
                       <Button
                         type="button"
                         size="sm"
-                        onClick={() => void saveClinicalNotes()}
+                        onClick={() => void savePatientContextNotes()}
                         disabled={notesSaving || notesDraft === (patient.clinical_notes ?? '')}
                       >
-                        {notesSaving ? 'Saving…' : 'Save notes'}
+                        {notesSaving ? 'Saving…' : 'Save context'}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <p className="text-sm text-foreground/90 whitespace-pre-wrap rounded-md border border-border/60 bg-muted/20 px-3 py-2 min-h-[4.5rem]">
-                    {patient.clinical_notes?.trim() ? patient.clinical_notes : 'No notes on file.'}
+                    {patient.clinical_notes?.trim() ? patient.clinical_notes : 'No patient context on file.'}
                   </p>
                 )}
               </CardContent>
@@ -672,9 +714,13 @@ export function DoctorPatientDetailPage() {
                     </h2>
                     <ul className="space-y-3">
                       {list.map((it) => {
-                        if (it.kind === 'appointment') {
-                          const a = it.appt;
+                        if (it.kind === 'visit') {
+                          const a = it.visit.appointment;
+                          const b = it.visit.bill;
+                          const inv = it.visit.inventoryUsage;
                           const canCompleteOrCancel = canMutate && apptCanAct(a.status);
+                          const st = b ? billStatusLabel(b.status) : null;
+
                           return (
                             <li
                               key={it.id}
@@ -696,7 +742,7 @@ export function DoctorPatientDetailPage() {
                                       )}
                                     </span>
                                     <span className="mx-1.5 text-border">·</span>
-                                    <span className="text-foreground">Appointment</span>{' '}
+                                    <span className="text-foreground">Visit</span>{' '}
                                     <Badge
                                       variant={apptStatusVariant(a.status)}
                                       className="capitalize align-middle ml-0.5"
@@ -704,13 +750,78 @@ export function DoctorPatientDetailPage() {
                                       {a.status}
                                     </Badge>
                                   </p>
-                                  <Link
-                                    to={`/doctor/appointments/${a.id}`}
-                                    className="text-primary text-xs font-medium hover:underline shrink-0"
-                                  >
-                                    View visit
-                                  </Link>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 shrink-0">
+                                    <Link
+                                      to={`/doctor/appointments/${a.id}`}
+                                      className="text-primary text-xs font-medium hover:underline"
+                                    >
+                                      View encounter
+                                    </Link>
+                                  </div>
                                 </div>
+
+                                {/*
+                                  Clinical encounter documentation hierarchy (clinical-first):
+                                  1. Diagnosis (most important clinical output)
+                                  2. Treatment summary (what was done)
+                                  3. Clinical notes (detailed observations)
+                                  4. Medicines used (inventory)
+                                  5. Bill summary (secondary, visually lighter)
+                                */}
+                                {(a.diagnosis || a.treatment_summary || a.clinical_notes) && (
+                                  <div className="space-y-1 text-xs text-muted-foreground border-t border-border/50 pt-2">
+                                    {a.diagnosis && (
+                                      <p><span className="font-medium text-foreground">Diagnosis:</span> {a.diagnosis}</p>
+                                    )}
+                                    {a.treatment_summary && (
+                                      <p><span className="font-medium text-foreground">Treatment:</span> {a.treatment_summary}</p>
+                                    )}
+                                    {a.clinical_notes && (
+                                      <p><span className="font-medium text-foreground">Clinical notes:</span> {a.clinical_notes}</p>
+                                    )}
+                                    {/* DEPRECATED: completion_notes preserved for backward compatibility */}
+                                    {a.completion_notes && (
+                                      <p><span className="font-medium text-foreground">Notes (legacy):</span> {a.completion_notes}</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Show inventory usage if available */}
+                                {a.status === 'completed' && inv && inv.length > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    <p className="font-medium text-foreground">Medicines given:</p>
+                                    <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                                      {inv.map((u) => (
+                                        <li key={u.item_id}>
+                                          {u.item_name || 'Item'} × {u.quantity}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* Bill summary - visually lighter, secondary */}
+                                {b && (
+                                  <div className="flex items-center gap-2 text-xs border-t border-border/30 pt-2">
+                                    <IndianRupee className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      {b.currency} {Number(b.amount).toFixed(0)}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn('capitalize text-[0.65rem] py-0', st?.className)}
+                                    >
+                                      {st?.label}
+                                    </Badge>
+                                    <Link
+                                      to={`/doctor/bills/${b.id}`}
+                                      className="text-primary font-medium hover:underline ml-auto"
+                                    >
+                                      View bill
+                                    </Link>
+                                  </div>
+                                )}
+                                
                                 {canCompleteOrCancel && (
                                   <div className="flex flex-wrap gap-2">
                                     <Button
@@ -739,6 +850,8 @@ export function DoctorPatientDetailPage() {
                             </li>
                           );
                         }
+                        
+                        // Bill-only card (for bills without appointments)
                         const b = it.bill;
                         const st = billStatusLabel(b.status);
                         const canPay = canMutate && (b.status === 'pending' || b.status === 'failed');
@@ -778,14 +891,6 @@ export function DoctorPatientDetailPage() {
                                   >
                                     View bill
                                   </Link>
-                                  {b.appointment_id && (
-                                    <Link
-                                      to={`/doctor/appointments/${b.appointment_id}`}
-                                      className="text-primary text-xs font-medium hover:underline"
-                                    >
-                                      View visit
-                                    </Link>
-                                  )}
                                 </div>
                               </div>
                               {canPay && (
@@ -861,7 +966,7 @@ export function DoctorPatientDetailPage() {
                               to={`/doctor/appointments/${b.appointment_id}`}
                               className="text-primary hover:underline"
                             >
-                              {apptTime ? `Visit (${apptTime})` : 'View visit'}
+                              {apptTime ? `Encounter (${apptTime})` : 'View encounter'}
                             </Link>
                           </>
                         )}

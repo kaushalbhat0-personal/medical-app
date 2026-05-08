@@ -35,7 +35,7 @@ import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
 import { DoctorPatientDetailPage } from './pages/doctor/DoctorPatientDetailPage';
 import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
-import { DoctorAppointmentDetailPage } from './pages/doctor/DoctorAppointmentDetailPage';
+import { EncounterWorkspacePage } from './pages/doctor/EncounterWorkspacePage';
 import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
 import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
 import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
@@ -399,11 +399,25 @@ function AnimatedRoutes() {
               </AnimatedPage>
             }
           />
+          {/*
+            Encounter Workspace - Future-proof clinical workspace for patient visits
+            Replaces the legacy DoctorAppointmentDetailPage with encounter-centric architecture
+            that supports Phase 2 clinical features (prescriptions, vitals, SOAP notes, etc.)
+          */}
           <Route
             path="appointments/:appointmentId"
             element={
               <AnimatedPage>
-                <DoctorAppointmentDetailPage />
+                <EncounterWorkspacePage />
+              </AnimatedPage>
+            }
+          />
+          {/* Legacy route preserved for backward compatibility - redirects to workspace */}
+          <Route
+            path="encounter/:appointmentId"
+            element={
+              <AnimatedPage>
+                <EncounterWorkspacePage />
               </AnimatedPage>
             }
           />

@@ -243,6 +243,11 @@ export interface Doctor {
   verified?: boolean;
 }
 
+/**
+ * Appointment acts as the Visit/Encounter anchor in the clinical domain model.
+ * Billing, inventory usage, prescriptions, and clinical notes are attached to the appointment encounter.
+ * The timeline is visit-centric: one clinical encounter renders as one VisitAggregate card.
+ */
 export interface Appointment {
   id: number | string;
   patient_id: number | string;
@@ -252,8 +257,26 @@ export interface Appointment {
   scheduled_at?: string;
   /** `pending` is client-only until refetch replaces with server status. */
   status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
-  /** Saved when the visit is marked complete (doctor). */
+  /**
+   * DEPRECATED: completion_notes is deprecated and should not be written for new visits.
+   * Use clinical_notes for visit documentation. Preserved for backward compatibility.
+   * Operational completion metadata only - not clinical documentation.
+   */
   completion_notes?: string | null;
+  /**
+   * Clinical notes = medical observations/treatment documentation for THIS visit/encounter.
+   * This is the primary field for clinical encounter documentation.
+   */
+  clinical_notes?: string | null;
+  /**
+   * Diagnosis = primary and differential diagnoses recorded during this visit.
+   */
+  diagnosis?: string | null;
+  /**
+   * Treatment summary = treatment provided, medications prescribed, follow-up plan.
+   */
+  treatment_summary?: string | null;
+  /** Patient context notes (persistent across visits) - stored on Patient, not Appointment. */
   notes?: string;
   // Backend returns flat structure, no nested objects
   patient?: Patient;
@@ -270,6 +293,68 @@ export interface AppointmentInventoryUsageLine {
   item_id: string;
   quantity: number;
   item_name?: string;
+}
+
+/**
+ * VisitAggregate represents a clinical encounter (visit) and all attached metadata.
+ * This is an INTERNAL abstraction for timeline rendering - there is NO database table.
+ * One appointment = one VisitAggregate = one card in the timeline.
+ *
+ * Attached metadata (billing, inventory, prescriptions, etc.) are grouped under
+ * the appointment encounter for clinical-centered display.
+ *
+ * TODO: Future extensions:
+ * - prescriptions?: Prescription[]
+ * - vitals?: VitalSigns
+ * - attachments?: Attachment[]
+ * - followUp?: FollowUpPlan
+ * - soapNotes?: SoapNotes
+ * - aiSummary?: AiVisitSummary
+ */
+export interface VisitAggregate {
+  appointment: Appointment;
+  /** Linked bill for this visit, if any */
+  bill?: Bill | null;
+  /** Inventory/medicines used during this visit */
+  inventoryUsage?: AppointmentInventoryUsageLine[];
+  // TODO: prescriptions?: Prescription[];
+  // TODO: vitals?: VitalSigns;
+  // TODO: attachments?: Attachment[];
+  // TODO: followUp?: FollowUpPlan;
+}
+
+/**
+ * EncounterDetailAggregate represents the complete clinical encounter workspace data.
+ * This is a frontend/domain abstraction - there is NO database table.
+ * 
+ * The appointment acts as the clinical encounter anchor.
+ * Bills, inventory usage, prescriptions, etc. are attached metadata.
+ * 
+ * TODO: Future Phase 2 clinical extensions:
+ * - prescriptions?: Prescription[] - formal prescription records
+ * - vitals?: VitalSigns - blood pressure, temperature, weight, etc.
+ * - attachments?: Attachment[] - lab reports, images, documents
+ * - followUp?: FollowUpPlan - scheduled follow-up appointments
+ * - soapNotes?: SoapNotes - structured SOAP documentation
+ * - aiSummary?: AiVisitSummary - AI-generated visit summary
+ */
+export interface EncounterDetailAggregate {
+  /** The appointment acts as the clinical encounter anchor */
+  appointment: Appointment;
+  /** Patient associated with this encounter */
+  patient: Patient;
+  /** Doctor who conducted this encounter (optional for some workflows) */
+  doctor?: Doctor;
+  /** Linked bill for this encounter, if any */
+  bill?: Bill | null;
+  /** Inventory/medicines used during this encounter */
+  inventoryUsage?: AppointmentInventoryUsageLine[];
+  // TODO: Future extension - prescriptions?: Prescription[];
+  // TODO: Future extension - vitals?: VitalSigns;
+  // TODO: Future extension - attachments?: Attachment[];
+  // TODO: Future extension - followUp?: FollowUpPlan;
+  // TODO: Future extension - soapNotes?: SoapNotes;
+  // TODO: Future extension - aiSummary?: AiVisitSummary;
 }
 
 export interface Bill {

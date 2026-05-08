@@ -1,0 +1,550 @@
+/**
+ * EncounterWorkspacePage - Future-proof clinical workspace for patient visits/encounters
+ * 
+ * This page replaces the legacy DoctorAppointmentDetailPage with a unified,
+ * encounter-centric workspace that prepares for Phase 2 clinical features:
+ * - Prescriptions (formal prescription module)
+ * - Vitals (blood pressure, temperature, etc.)
+ * - SOAP notes (structured documentation)
+ * - Follow-up plans
+ * - Attachments (lab reports, images)
+ * - AI summaries
+ * 
+ * Architecture principles:
+ * - Appointment = Encounter anchor (NO separate Visit table)
+ * - Clinical-first hierarchy (diagnosis > treatment > notes > medicines > billing)
+ * - Reusable section components for extensibility
+ * - Capability-based authorization (no role-based checks)
+ * - Mobile-responsive design
+ * 
+ * Invariants preserved:
+ * - Tenant safety (all data scoped to current tenant)
+ * - Idempotent completion
+ * - Structured audit logging
+ * - Timeline invariants
+ * - Billing/inventory invariants
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+import { CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ErrorState } from '../../components/common';
+import {
+  EncounterHeaderSection,
+  EncounterClinicalSection,
+  EncounterMedicationSection,
+  EncounterBillingSection,
+  EncounterTimelineSection,
+} from '../../components/encounter';
+import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
+import { appointmentsApi, billingApi, inventoryApi, patientsApi } from '../../services';
+import { DISPLAY_TIMEZONE } from '../../constants/time';
+import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
+import {
+  getTenantInventoryCache,
+  invalidateTenantInventoryCache,
+  setTenantInventoryCache,
+} from '../../utils/tenantInventoryCache';
+import type { 
+  Appointment, 
+  Bill, 
+  Patient, 
+  Doctor, 
+  EncounterDetailAggregate,
+  VisitAggregate,
+} from '../../types';
+import type { InventoryItemWithStockDTO } from '../../services/inventory';
+
+// Import the completion modal component (extracted from legacy page)
+import { CompleteVisitModal } from './components/CompleteVisitModal';
+
+/**
+ * Build the EncounterDetailAggregate from loaded data.
+ * This is the authoritative data structure for the encounter workspace.
+ */
+function buildEncounterAggregate(
+  appointment: Appointment,
+  patient: Patient,
+  doctor: Doctor | undefined,
+  bill: Bill | null,
+): EncounterDetailAggregate {
+  return {
+    appointment,
+    patient,
+    doctor,
+    bill,
+    inventoryUsage: appointment.inventory_usages,
+    // TODO: Future Phase 2 extensions:
+    // prescriptions: undefined,
+    // vitals: undefined,
+    // attachments: undefined,
+    // followUp: undefined,
+    // soapNotes: undefined,
+    // aiSummary: undefined,
+  };
+}
+
+export function EncounterWorkspacePage() {
+  const { appointmentId } = useParams<{ appointmentId: string }>();
+  const { isIndependent, isReadOnly } = useDoctorWorkspace();
+  
+  // Core data state
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [doctor, setDoctor] = useState<Doctor | undefined>(undefined);
+  const [bill, setBill] = useState<Bill | null>(null);
+  
+  // Historical data for timeline
+  const [previousVisits, setPreviousVisits] = useState<VisitAggregate[]>([]);
+  const [previousBills, setPreviousBills] = useState<Bill[]>([]);
+  
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [markBusy, setMarkBusy] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
+  
+  // Inventory cache for completion modal
+  const [invItems, setInvItems] = useState<InventoryItemWithStockDTO[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const inventoryLoadErrorToastShown = useRef(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const completionIdempotencyRef = useRef('');
+  
+  useModalFocusTrap(modalRef, completeOpen);
+  
+  // Check if user can mark this encounter as complete
+  const canMarkComplete = useMemo(() => {
+    return isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+  }, [isIndependent, isReadOnly, appointment?.status]);
+  
+  /**
+   * Main data loading effect - loads encounter aggregate data
+   */
+  const loadEncounterData = useCallback(async () => {
+    if (!appointmentId) {
+      setError('Missing appointment ID');
+      setLoading(false);
+      return;
+    }
+    
+    let cancelled = false;
+    setError(null);
+    setLoading(true);
+    
+    try {
+      // Load primary encounter data
+      const appt = await appointmentsApi.getById(appointmentId);
+      if (cancelled) return;
+      setAppointment(appt);
+      
+      // Load related entities in parallel
+      const [linkedBills] = await Promise.all([
+        // Bills linked to this appointment
+        billingApi.getAll({ appointment_id: String(appt.id), limit: 5 }),
+      ]);
+      
+      if (!cancelled) {
+        setBill(linkedBills.length > 0 ? linkedBills[0] : null);
+      }
+      
+      // Load patient details
+      if (appt.patient_id) {
+        try {
+          const patientData = await patientsApi.getById(String(appt.patient_id));
+          if (!cancelled) setPatient(patientData);
+        } catch {
+          // Patient may have been deleted - use embedded data if available
+          if (appt.patient && !cancelled) {
+            setPatient(appt.patient);
+          }
+        }
+        
+        // Load patient history for timeline
+        try {
+          const [patientAppointments, patientBills] = await Promise.all([
+            appointmentsApi.getAll({ 
+              patient_id: String(appt.patient_id), 
+              skip: 0, 
+              limit: 50 
+            }),
+            billingApi.getAll({ 
+              patient_id: String(appt.patient_id), 
+              skip: 0, 
+              limit: 50 
+            }),
+          ]);
+          
+          if (!cancelled) {
+            // Filter out current appointment from history
+            const historyAppointments = patientAppointments.filter(
+              a => String(a.id) !== String(appt.id)
+            );
+            
+            // Build VisitAggregates for history
+            const historyVisits: VisitAggregate[] = historyAppointments.map(a => {
+              const linkedBill = patientBills.find(
+                b => b.appointment_id && String(b.appointment_id) === String(a.id)
+              );
+              return {
+                appointment: a,
+                bill: linkedBill || null,
+                inventoryUsage: a.inventory_usages,
+              };
+            });
+            
+            setPreviousVisits(historyVisits);
+            
+            // Bills not linked to appointments (orphaned)
+            const linkedBillIds = new Set(
+              patientAppointments
+                .map(a => patientBills.find(
+                  b => b.appointment_id && String(b.appointment_id) === String(a.id)
+                ))
+                .filter(Boolean)
+                .map(b => String(b!.id))
+            );
+            
+            const orphanedBills = patientBills.filter(
+              b => !linkedBillIds.has(String(b.id))
+            );
+            
+            setPreviousBills(orphanedBills);
+          }
+        } catch (e) {
+          // Non-critical: history loading failure shouldn't block the page
+          console.warn('Failed to load patient history:', e);
+        }
+      }
+      
+      // Set doctor (from appointment embedded data if available)
+      if (!cancelled) {
+        setDoctor(appt.doctor);
+      }
+      
+    } catch (e) {
+      if (!cancelled) {
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          setError('Encounter not found');
+        } else if (axios.isAxiosError(e) && e.response?.status === 403) {
+          setError('Access denied');
+        } else {
+          setError('Could not load encounter data');
+        }
+        setAppointment(null);
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [appointmentId, retryKey]);
+  
+  useEffect(() => {
+    void loadEncounterData();
+  }, [loadEncounterData]);
+  
+  /**
+   * Load inventory items for completion modal
+   */
+  useEffect(() => {
+    if (!canMarkComplete || !appointment) return;
+    
+    const cached = getTenantInventoryCache();
+    if (cached && cached.length > 0) {
+      setInvItems(cached);
+      setInvLoading(false);
+      return;
+    }
+    
+    let cancelled = false;
+    setInvLoading(true);
+    
+    void inventoryApi
+      .listAllWithStock({ active_only: true })
+      .then((rows) => {
+        if (!cancelled) {
+          inventoryLoadErrorToastShown.current = false;
+          setInvItems(rows);
+          setTenantInventoryCache(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInvItems([]);
+          if (!inventoryLoadErrorToastShown.current) {
+            toast.error('Could not load clinic inventory');
+            inventoryLoadErrorToastShown.current = true;
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInvLoading(false);
+      });
+      
+    return () => {
+      cancelled = true;
+    };
+  }, [canMarkComplete, appointment?.id]);
+  
+  /**
+   * Handle encounter completion
+   */
+  const handleEncounterComplete = async (payload: {
+    clinical_notes: string | null;
+    diagnosis: string | null;
+    treatment_summary: string | null;
+    items: { item_id: string; quantity: number }[];
+    generate_bill: boolean;
+    bill_consultation_amount?: number;
+  }) => {
+    if (!appointmentId) return;
+    
+    setMarkBusy(true);
+    try {
+      const { appointment: updated } = await appointmentsApi.markCompleted(
+        appointmentId,
+        payload,
+        { idempotencyKey: completionIdempotencyRef.current }
+      );
+      
+      setAppointment(updated);
+      invalidateTenantInventoryCache();
+      setCompleteOpen(false);
+      
+      toast.success(payload.generate_bill 
+        ? 'Encounter completed and bill created' 
+        : 'Encounter marked complete'
+      );
+      
+      // Refresh bill data
+      const forAppt = await billingApi.getAll({ 
+        appointment_id: String(updated.id), 
+        limit: 5 
+      });
+      setBill(forAppt.length > 0 ? forAppt[0] : null);
+      
+    } catch (e) {
+      const msg = axios.isAxiosError(e) && e.response?.data 
+        ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not complete encounter')
+        : 'Could not complete encounter';
+      toast.error(msg, { duration: 5000 });
+    } finally {
+      setMarkBusy(false);
+    }
+  };
+  
+  /**
+   * Open completion modal with fresh idempotency key
+   */
+  const openCompleteModal = () => {
+    completionIdempotencyRef.current =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    setCompleteOpen(true);
+  };
+  
+  // Build the encounter aggregate
+  const encounterAggregate = useMemo(() => {
+    if (!appointment || !patient) return null;
+    return buildEncounterAggregate(appointment, patient, doctor, bill);
+  }, [appointment, patient, doctor, bill]);
+  
+  // Loading state
+  if (loading && !encounterAggregate) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-32 bg-muted rounded" />
+          <div className="h-40 bg-muted rounded-lg" />
+          <div className="h-60 bg-muted rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error && !loading) {
+    return (
+      <div className="space-y-4">
+        <ErrorState
+          title={error === 'Encounter not found' ? 'Encounter not found' : 'Error loading encounter'}
+          description={
+            error === 'Encounter not found'
+              ? 'This encounter may have been removed or you may not have access.'
+              : 'We could not load this encounter. Please try again.'
+          }
+          error={error}
+          onRetry={() => setRetryKey(k => k + 1)}
+        />
+      </div>
+    );
+  }
+  
+  // Missing data state
+  if (!encounterAggregate || !appointment || !patient) {
+    return (
+      <div className="space-y-4">
+        <ErrorState
+          title="Data unavailable"
+          description="Encounter data could not be loaded."
+        />
+      </div>
+    );
+  }
+  
+  const formattedDateTime = formatAppointmentDateTimeWithZoneLabel(
+    appointment.appointment_time || appointment.scheduled_at || '',
+    DISPLAY_TIMEZONE
+  );
+  
+  return (
+    <div 
+      className="space-y-6 pb-8"
+      id={appointmentId ? `encounter-${appointmentId}` : undefined}
+    >
+      {/* 
+        PART 2: Encounter Workspace Layout
+        Stable encounter sections with clear visual hierarchy
+      */}
+      
+      {/* Section 1: Header - Visit status/time (Hierarchy #1) */}
+      <EncounterHeaderSection
+        appointment={encounterAggregate.appointment}
+        patient={encounterAggregate.patient}
+        doctor={encounterAggregate.doctor}
+        formattedDateTime={formattedDateTime}
+        backTo="/doctor/appointments"
+        backLabel="Appointments"
+        actions={
+          canMarkComplete ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={markBusy}
+              onClick={openCompleteModal}
+              className="gap-1.5"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Complete encounter
+            </Button>
+          ) : undefined
+        }
+      />
+      
+      {/* 
+        Mobile-responsive grid layout
+        - Single column on mobile
+        - Two columns on tablet/desktop
+      */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        {/* Left column: Clinical content (2/3 width on desktop) */}
+        <div className="lg:col-span-2 space-y-4">
+          
+          {/* Section 2: Clinical Documentation (Hierarchy #2-4) */}
+          <EncounterClinicalSection
+            appointment={encounterAggregate.appointment}
+            compact={false}
+          />
+          
+          {/* Section 3: Medications (Hierarchy #5) */}
+          {encounterAggregate.appointment.status === 'completed' && (
+            <EncounterMedicationSection
+              inventoryUsages={encounterAggregate.inventoryUsage}
+              inventoryMaterialsSellingTotal={
+                encounterAggregate.appointment.inventory_materials_selling_total
+              }
+              compact={false}
+            />
+          )}
+          
+          {/* 
+            TODO: Future Phase 2 clinical extensions
+            Section placeholders for upcoming features:
+          */}
+          {/* 
+          {encounterAggregate.vitals && (
+            <EncounterVitalsSection vitals={encounterAggregate.vitals} />
+          )}
+          
+          {encounterAggregate.prescriptions && (
+            <EncounterPrescriptionsSection 
+              prescriptions={encounterAggregate.prescriptions} 
+            />
+          )}
+          
+          {encounterAggregate.attachments && (
+            <EncounterAttachmentsSection 
+              attachments={encounterAggregate.attachments} 
+            />
+          )}
+          
+          {encounterAggregate.soapNotes && (
+            <EncounterSoapNotesSection notes={encounterAggregate.soapNotes} />
+          )}
+          
+          {encounterAggregate.aiSummary && (
+            <EncounterAiSummarySection summary={encounterAggregate.aiSummary} />
+          )}
+          */}
+          
+        </div>
+        
+        {/* Right column: Billing & Context (1/3 width on desktop) */}
+        <div className="space-y-4">
+          
+          {/* Section 4: Billing (Hierarchy #6 - secondary) */}
+          <EncounterBillingSection
+            bill={encounterAggregate.bill}
+            inventoryMaterialsSellingTotal={
+              encounterAggregate.appointment.inventory_materials_selling_total
+            }
+            secondary={true}
+          />
+          
+          {/* Section 5: Patient History Timeline */}
+          <EncounterTimelineSection
+            currentEncounter={encounterAggregate.appointment}
+            previousVisits={previousVisits}
+            previousBills={previousBills}
+            limit={5}
+          />
+          
+        </div>
+      </div>
+      
+      {/* 
+        PART 5: Future Extension Hooks
+        Additional extension points for Phase 2:
+      */}
+      {/* TODO: Add follow-up plans section when implemented */}
+      {/* TODO: Add referral management section when implemented */}
+      {/* TODO: Add lab orders section when implemented */}
+      
+      {/* Complete Visit Modal */}
+      {completeOpen && (
+        <CompleteVisitModal
+          ref={modalRef}
+          appointment={appointment}
+          inventoryItems={invItems}
+          inventoryLoading={invLoading}
+          isSubmitting={markBusy}
+          onClose={() => setCompleteOpen(false)}
+          onComplete={handleEncounterComplete}
+          idempotencyKey={completionIdempotencyRef.current}
+        />
+      )}
+    </div>
+  );
+}
+
+export default EncounterWorkspacePage;

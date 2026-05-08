@@ -87,7 +87,18 @@ class Appointment(Base):
         default=False,
         server_default="false",
     )
+    # DEPRECATED: completion_notes is deprecated and should not be written to for new visits.
+    # Use clinical_notes for medical encounter documentation.
+    # This field is preserved for backward compatibility with existing data.
+    # Operational completion metadata should be stored elsewhere if needed.
     completion_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # clinical_notes = medical observations/treatment documentation for THIS visit/encounter.
+    # This is the primary field for clinical encounter documentation.
+    clinical_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # diagnosis = primary and differential diagnoses recorded during this visit.
+    diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # treatment_summary = treatment provided, medications prescribed, follow-up plan.
+    treatment_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")

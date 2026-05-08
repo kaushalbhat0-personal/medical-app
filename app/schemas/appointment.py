@@ -71,7 +71,15 @@ class AppointmentRead(BaseModel):
     status: AppointmentStatus
     created_by: UUID
     created_at: datetime
+    # DEPRECATED: completion_notes is deprecated. Use clinical_notes for visit documentation.
+    # Preserved for backward compatibility with existing data.
     completion_notes: str | None = None
+    # clinical_notes = medical observations/treatment for THIS visit (preferred field).
+    clinical_notes: str | None = None
+    # diagnosis = primary and differential diagnoses.
+    diagnosis: str | None = None
+    # treatment_summary = treatment provided, medications, follow-up plan.
+    treatment_summary: str | None = None
 
     patient: PatientMini
     doctor: DoctorMini
@@ -83,7 +91,16 @@ class AppointmentRead(BaseModel):
 
 
 class MarkAppointmentCompletedRequest(BaseModel):
+    # DEPRECATED: completion_notes is deprecated and will be ignored for new visits.
+    # Use clinical_notes for visit documentation.
+    # This field is preserved for backward compatibility; existing data is not migrated.
     completion_notes: str | None = Field(None, max_length=50_000)
+    # clinical_notes = medical observations/treatment for THIS visit (preferred).
+    clinical_notes: str | None = Field(None, max_length=50_000)
+    # diagnosis = primary and differential diagnoses.
+    diagnosis: str | None = Field(None, max_length=50_000)
+    # treatment_summary = treatment provided, medications, follow-up plan.
+    treatment_summary: str | None = Field(None, max_length=50_000)
     items: list[InventoryUseLine] = Field(default_factory=list)
     generate_bill: bool = False
     bill_consultation_amount: Decimal = Field(

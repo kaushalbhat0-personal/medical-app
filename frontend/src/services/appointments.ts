@@ -75,10 +75,21 @@ export const appointmentsApi = {
     const response = await api.put(`/appointments/${id}`, payload);
     return response.data;
   },
+  /**
+   * Mark an appointment as completed.
+   * Note: completion_notes is deprecated and ignored by the backend. Use clinical_notes instead.
+   */
   markCompleted: async (
     id: string,
     payload?: {
+      /** @deprecated Use clinical_notes instead. Kept for backward compatibility. */
       completion_notes?: string | null;
+      /** Clinical observations/treatment documentation for this visit (preferred). */
+      clinical_notes?: string | null;
+      /** Primary and differential diagnoses. */
+      diagnosis?: string | null;
+      /** Treatment provided, medications prescribed, follow-up plan. */
+      treatment_summary?: string | null;
       items?: { item_id: string; quantity: number }[];
       generate_bill?: boolean;
       bill_consultation_amount?: number | string;

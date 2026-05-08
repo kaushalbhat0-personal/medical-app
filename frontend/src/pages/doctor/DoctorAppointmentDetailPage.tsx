@@ -43,7 +43,9 @@ export function DoctorAppointmentDetailPage() {
   const [retryKey, setRetryKey] = useState(0);
   const [markBusy, setMarkBusy] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
-  const [completionNotes, setCompletionNotes] = useState('');
+  const [clinicalNotes, setClinicalNotes] = useState('');
+  const [diagnosis, setDiagnosis] = useState('');
+  const [treatmentSummary, setTreatmentSummary] = useState('');
   const [usageRows, setUsageRows] = useState<UsageRow[]>([]);
   const [generateBill, setGenerateBill] = useState(false);
   const [consultationFeeInput, setConsultationFeeInput] = useState('');
@@ -146,7 +148,9 @@ export function DoctorAppointmentDetailPage() {
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
-    setCompletionNotes('');
+    setClinicalNotes('');
+    setDiagnosis('');
+    setTreatmentSummary('');
     setUsageRows([{ key: crypto.randomUUID(), item_id: '', quantity: '1' }]);
     setGenerateBill(false);
     setConsultationFeeInput('');
@@ -219,7 +223,10 @@ export function DoctorAppointmentDetailPage() {
       const { appointment: updated } = await appointmentsApi.markCompleted(
         appointmentId,
         {
-          completion_notes: completionNotes.trim() || null,
+          // Note: completion_notes is deprecated - use clinical_notes for visit documentation
+          clinical_notes: clinicalNotes.trim() || null,
+          diagnosis: diagnosis.trim() || null,
+          treatment_summary: treatmentSummary.trim() || null,
           items: validUsagePayload ?? [],
           generate_bill: generateBill,
           bill_consultation_amount: fee,
@@ -317,9 +324,35 @@ export function DoctorAppointmentDetailPage() {
               </Link>
             </p>
           )}
+          {/*
+            Clinical encounter documentation hierarchy:
+            1. Diagnosis (most important clinical output)
+            2. Treatment summary (what was done)
+            3. Clinical notes (detailed observations)
+            Billing information is shown secondary.
+          */}
+          {appointment.diagnosis && (
+            <p className="text-muted-foreground border-t border-border pt-2 mt-2">
+              <span className="font-medium text-foreground">Diagnosis: </span>
+              {appointment.diagnosis}
+            </p>
+          )}
+          {appointment.treatment_summary && (
+            <p className="text-muted-foreground border-t border-border pt-2 mt-2">
+              <span className="font-medium text-foreground">Treatment: </span>
+              {appointment.treatment_summary}
+            </p>
+          )}
+          {appointment.clinical_notes && (
+            <p className="text-muted-foreground border-t border-border pt-2 mt-2">
+              <span className="font-medium text-foreground">Clinical notes: </span>
+              {appointment.clinical_notes}
+            </p>
+          )}
+          {/* DEPRECATED: completion_notes preserved for backward compatibility */}
           {appointment.completion_notes && (
             <p className="text-muted-foreground border-t border-border pt-2 mt-2">
-              <span className="font-medium text-foreground">Completion notes: </span>
+              <span className="font-medium text-foreground">Notes (legacy): </span>
               {appointment.completion_notes}
             </p>
           )}
@@ -390,18 +423,55 @@ export function DoctorAppointmentDetailPage() {
             </div>
 
             <div className="space-y-4">
+              {/*
+                Clinical documentation fields for visit completion.
+                Note: The deprecated 'completion_notes' field has been removed from this modal.
+                Use the fields below for clinical encounter documentation.
+                TODO: Future extension - add prescriptions, vitals, SOAP notes, attachments.
+              */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="visit-notes">
-                  Notes
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="diagnosis">
+                  Diagnosis
                 </label>
                 <textarea
-                  id="visit-notes"
-                  className="mt-1 flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Clinical notes, follow-up, etc."
-                  value={completionNotes}
-                  onChange={(e) => setCompletionNotes(e.target.value)}
+                  id="diagnosis"
+                  className="mt-1 flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Primary diagnosis and differential diagnoses..."
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
                 />
               </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="clinical-notes">
+                  Clinical Notes
+                </label>
+                <textarea
+                  id="clinical-notes"
+                  className="mt-1 flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Detailed clinical observations, symptoms, examination findings..."
+                  value={clinicalNotes}
+                  onChange={(e) => setClinicalNotes(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="treatment-summary">
+                  Treatment Summary
+                </label>
+                <textarea
+                  id="treatment-summary"
+                  className="mt-1 flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Treatment provided, medications prescribed, follow-up plan..."
+                  value={treatmentSummary}
+                  onChange={(e) => setTreatmentSummary(e.target.value)}
+                />
+              </div>
+
+              {/*
+                Inventory usage section - medicines given during the visit.
+                TODO: Future extension - integrate with formal prescription module.
+              */}
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">

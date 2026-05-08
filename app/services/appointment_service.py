@@ -523,8 +523,19 @@ def mark_appointment_completed(
             current_user,
             tenant_id,
         )
-    if data.completion_notes is not None:
-        appointment.completion_notes = data.completion_notes
+    # DEPRECATED: completion_notes is deprecated and no longer written for new visits.
+    # Use clinical_notes for visit documentation. Preserved for backward compatibility.
+    # if data.completion_notes is not None:
+    #     appointment.completion_notes = data.completion_notes
+    # clinical_notes = medical observations/treatment for THIS visit (preferred).
+    if data.clinical_notes is not None:
+        appointment.clinical_notes = data.clinical_notes
+    # diagnosis = primary and differential diagnoses.
+    if data.diagnosis is not None:
+        appointment.diagnosis = data.diagnosis
+    # treatment_summary = treatment provided, medications, follow-up plan.
+    if data.treatment_summary is not None:
+        appointment.treatment_summary = data.treatment_summary
 
     appointment.status = AppointmentStatus.completed
     db.add(appointment)
