@@ -458,8 +458,6 @@ def mark_appointment_completed(
         restrict_to_doctor_id=restrict_to_doctor_id,
         require_assigned_doctor=True,
     )
-    if current_user.role != UserRole.doctor:
-        raise ForbiddenError("Only the assigned doctor can mark a visit complete")
 
     assigned_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     validate_appointment_invariants(appointment, assigned_doctor)
@@ -610,6 +608,10 @@ def _assert_doctor_assigned_to_appointment(
     *,
     rbac_action: str,
 ) -> None:
+    # Capability-based check: user must have a Doctor record linked via user_id
+    # AND that doctor must be the assigned doctor for this appointment.
+    # This works for ANY user role - admin, staff, or doctor - as long as they
+    # have a valid Doctor record linked to their user account.
     doc = doctor_service.get_current_doctor(db, current_user)
     if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
         log_rbac_mutation_violation(
@@ -625,7 +627,7 @@ def _assert_doctor_assigned_to_appointment(
             action=rbac_action,
             tenant_type=doc.tenant.type if doc.tenant else None,
         )
-        raise ForbiddenError("Not allowed to access this appointment")
+        raise ForbiddenError("Only the assigned doctor can complete this appointment")
 
 
 def authorize_appointment_access(
@@ -638,6 +640,9 @@ def authorize_appointment_access(
     restrict_to_doctor_id: UUID | None = None,
     require_assigned_doctor: bool = False,
 ) -> None:
+    # Authorization is capability-based:
+    # A user may act as a doctor if they have a Doctor record linked via user_id.
+    # Role (admin/doctor/staff) is NOT used for permission decisions here.
     if appointment.tenant_id is None:
         raise ValidationError("Appointment tenant is not set")
 
@@ -671,6 +676,15 @@ def authorize_appointment_access(
         resource_tenant_id=appointment.tenant_id,
     )
 
+    # Capability-based authorization: if require_assigned_doctor is True,
+    # check if user has a Doctor record and is the assigned doctor.
+    # This works for ANY user with a Doctor record (admin, staff, or doctor role).
+    if require_assigned_doctor:
+        _assert_doctor_assigned_to_appointment(
+            db, current_user, appointment, rbac_action=rbac_action
+        )
+        return
+
     if current_user.role in (UserRole.admin, UserRole.staff):
         if (
             restrict_to_doctor_id is not None
@@ -683,11 +697,6 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
-        if require_assigned_doctor:
-            _assert_doctor_assigned_to_appointment(
-                db, current_user, appointment, rbac_action=rbac_action
-            )
-            return
         if restrict_to_doctor_id is None:
             return
         if appointment.doctor_id == restrict_to_doctor_id:
