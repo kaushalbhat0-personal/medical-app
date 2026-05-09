@@ -17,6 +17,11 @@ from app.models.inventory import (
     InventoryReferenceType,
     InventoryStock,
 )
+from app.models.appointment import (
+    AppointmentVitals,
+    Prescription,
+    PrescriptionItem,
+)
 from app.models.doctor_availability import DoctorAvailability, DoctorTimeOff
 from app.models.patient import Patient
 from app.models.tenant import (

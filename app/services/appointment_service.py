@@ -36,6 +36,8 @@ from app.schemas.appointment import (
     AppointmentRead,
     AppointmentUpdate,
     MarkAppointmentCompletedRequest,
+    PrescriptionCreate,
+    VitalSignsCreate,
 )
 
 logger = logging.getLogger(__name__)
@@ -407,6 +409,63 @@ def _appointment_completion_result_hash(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _create_appointment_vitals(
+    db: Session,
+    appointment: Appointment,
+    vitals_data: VitalSignsCreate,
+) -> None:
+    if vitals_data is None:
+        return
+    if (
+        vitals_data.temperature is None
+        and vitals_data.bp_systolic is None
+        and vitals_data.bp_diastolic is None
+        and vitals_data.pulse is None
+        and vitals_data.weight is None
+        and vitals_data.spo2 is None
+    ):
+        return
+    crud_appointment.add_appointment_vitals(
+        db,
+        appointment_id=appointment.id,
+        temperature=vitals_data.temperature,
+        bp_systolic=vitals_data.bp_systolic,
+        bp_diastolic=vitals_data.bp_diastolic,
+        pulse=vitals_data.pulse,
+        weight=vitals_data.weight,
+        spo2=vitals_data.spo2,
+    )
+
+
+def _create_appointment_prescriptions(
+    db: Session,
+    appointment: Appointment,
+    prescriptions: list[PrescriptionCreate],
+) -> None:
+    if not prescriptions:
+        return
+    for prescription_payload in prescriptions:
+        if not prescription_payload.notes and not prescription_payload.items:
+            continue
+        prescription = crud_appointment.add_prescription(
+            db,
+            appointment_id=appointment.id,
+            doctor_id=appointment.doctor_id,
+            tenant_id=appointment.tenant_id,
+            notes=prescription_payload.notes,
+        )
+        for item_payload in prescription_payload.items:
+            crud_appointment.add_prescription_item(
+                db,
+                prescription_id=prescription.id,
+                medicine_name=item_payload.medicine_name,
+                dosage=item_payload.dosage,
+                frequency=item_payload.frequency,
+                duration=item_payload.duration,
+                instructions=item_payload.instructions,
+            )
+
+
 def appointment_to_read(db: Session, appt: Appointment) -> AppointmentRead:
     from app.services.billing_service import appointment_inventory_materials_selling_total
 
@@ -536,6 +595,13 @@ def mark_appointment_completed(
     # treatment_summary = treatment provided, medications, follow-up plan.
     if data.treatment_summary is not None:
         appointment.treatment_summary = data.treatment_summary
+    if data.follow_up_date is not None:
+        appointment.follow_up_date = data.follow_up_date
+    if data.follow_up_notes is not None:
+        appointment.follow_up_notes = data.follow_up_notes
+
+    _create_appointment_vitals(db, appointment, data.vitals)  # type: ignore[arg-type]
+    _create_appointment_prescriptions(db, appointment, data.prescriptions)
 
     appointment.status = AppointmentStatus.completed
     db.add(appointment)

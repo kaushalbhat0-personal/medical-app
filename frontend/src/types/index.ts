@@ -276,6 +276,10 @@ export interface Appointment {
    * Treatment summary = treatment provided, medications prescribed, follow-up plan.
    */
   treatment_summary?: string | null;
+  follow_up_date?: string | null;
+  follow_up_notes?: string | null;
+  vitals?: VitalSigns;
+  prescriptions?: Prescription[];
   /** Patient context notes (persistent across visits) - stored on Patient, not Appointment. */
   notes?: string;
   // Backend returns flat structure, no nested objects
@@ -293,6 +297,39 @@ export interface AppointmentInventoryUsageLine {
   item_id: string;
   quantity: number;
   item_name?: string;
+}
+
+export interface VitalSigns {
+  temperature?: number | null;
+  bp_systolic?: number | null;
+  bp_diastolic?: number | null;
+  pulse?: number | null;
+  weight?: number | null;
+  spo2?: number | null;
+  created_at: string;
+}
+
+export interface PrescriptionItem {
+  medicine_name: string;
+  dosage?: string | null;
+  frequency?: string | null;
+  duration?: string | null;
+  instructions?: string | null;
+}
+
+export interface Prescription {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  tenant_id: string;
+  notes?: string | null;
+  created_at: string;
+  items: PrescriptionItem[];
+}
+
+export interface FollowUpPlan {
+  follow_up_date?: string | null;
+  follow_up_notes?: string | null;
 }
 
 /**
@@ -317,10 +354,9 @@ export interface VisitAggregate {
   bill?: Bill | null;
   /** Inventory/medicines used during this visit */
   inventoryUsage?: AppointmentInventoryUsageLine[];
-  // TODO: prescriptions?: Prescription[];
-  // TODO: vitals?: VitalSigns;
-  // TODO: attachments?: Attachment[];
-  // TODO: followUp?: FollowUpPlan;
+  prescriptions?: Prescription[];
+  vitals?: VitalSigns;
+  followUp?: FollowUpPlan;
 }
 
 /**
@@ -349,10 +385,10 @@ export interface EncounterDetailAggregate {
   bill?: Bill | null;
   /** Inventory/medicines used during this encounter */
   inventoryUsage?: AppointmentInventoryUsageLine[];
-  // TODO: Future extension - prescriptions?: Prescription[];
-  // TODO: Future extension - vitals?: VitalSigns;
+  prescriptions?: Prescription[];
+  vitals?: VitalSigns;
+  followUp?: FollowUpPlan;
   // TODO: Future extension - attachments?: Attachment[];
-  // TODO: Future extension - followUp?: FollowUpPlan;
   // TODO: Future extension - soapNotes?: SoapNotes;
   // TODO: Future extension - aiSummary?: AiVisitSummary;
 }

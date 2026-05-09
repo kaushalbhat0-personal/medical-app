@@ -91,6 +91,26 @@ export const appointmentsApi = {
       /** Treatment provided, medications prescribed, follow-up plan. */
       treatment_summary?: string | null;
       items?: { item_id: string; quantity: number }[];
+      prescriptions?: {
+        notes?: string | null;
+        items: Array<{
+          medicine_name: string;
+          dosage?: string | null;
+          frequency?: string | null;
+          duration?: string | null;
+          instructions?: string | null;
+        }>;
+      }[];
+      vitals?: {
+        temperature?: number | null;
+        bp_systolic?: number | null;
+        bp_diastolic?: number | null;
+        pulse?: number | null;
+        weight?: number | null;
+        spo2?: number | null;
+      };
+      follow_up_date?: string | null;
+      follow_up_notes?: string | null;
       generate_bill?: boolean;
       bill_consultation_amount?: number | string;
     },

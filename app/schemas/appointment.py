@@ -61,6 +61,40 @@ class AppointmentInventoryUsageRead(BaseModel):
             return data
 
 
+class VitalSignsRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    temperature: float | None = None
+    bp_systolic: int | None = None
+    bp_diastolic: int | None = None
+    pulse: int | None = None
+    weight: float | None = None
+    spo2: int | None = None
+    created_at: datetime
+
+
+class PrescriptionItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    medicine_name: str
+    dosage: str | None = None
+    frequency: str | None = None
+    duration: str | None = None
+    instructions: str | None = None
+
+
+class PrescriptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    appointment_id: UUID
+    doctor_id: UUID
+    tenant_id: UUID
+    notes: str | None = None
+    created_at: datetime
+    items: list[PrescriptionItemRead] = Field(default_factory=list)
+
+
 class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,6 +114,10 @@ class AppointmentRead(BaseModel):
     diagnosis: str | None = None
     # treatment_summary = treatment provided, medications, follow-up plan.
     treatment_summary: str | None = None
+    follow_up_date: datetime | None = None
+    follow_up_notes: str | None = None
+    vitals: VitalSignsRead | None = None
+    prescriptions: list[PrescriptionRead] = Field(default_factory=list)
 
     patient: PatientMini
     doctor: DoctorMini
@@ -88,6 +126,28 @@ class AppointmentRead(BaseModel):
         default=None,
         description="Σ quantity × item selling_price for recorded usage (matches billing materials addon).",
     )
+
+
+class PrescriptionItemCreate(BaseModel):
+    medicine_name: str = Field(..., max_length=255)
+    dosage: str | None = Field(None, max_length=128)
+    frequency: str | None = Field(None, max_length=128)
+    duration: str | None = Field(None, max_length=128)
+    instructions: str | None = Field(None, max_length=5_000)
+
+
+class PrescriptionCreate(BaseModel):
+    notes: str | None = Field(None, max_length=10_000)
+    items: list[PrescriptionItemCreate] = Field(default_factory=list)
+
+
+class VitalSignsCreate(BaseModel):
+    temperature: float | None = Field(None, ge=25, le=45)
+    bp_systolic: int | None = Field(None, ge=30, le=250)
+    bp_diastolic: int | None = Field(None, ge=30, le=180)
+    pulse: int | None = Field(None, ge=20, le=220)
+    weight: float | None = Field(None, ge=0, le=500)
+    spo2: int | None = Field(None, ge=50, le=100)
 
 
 class MarkAppointmentCompletedRequest(BaseModel):
@@ -102,6 +162,10 @@ class MarkAppointmentCompletedRequest(BaseModel):
     # treatment_summary = treatment provided, medications, follow-up plan.
     treatment_summary: str | None = Field(None, max_length=50_000)
     items: list[InventoryUseLine] = Field(default_factory=list)
+    prescriptions: list[PrescriptionCreate] = Field(default_factory=list)
+    vitals: VitalSignsCreate | None = None
+    follow_up_date: datetime | None = None
+    follow_up_notes: str | None = Field(None, max_length=10_000)
     generate_bill: bool = False
     bill_consultation_amount: Decimal = Field(
         default_factory=lambda: Decimal("0"),

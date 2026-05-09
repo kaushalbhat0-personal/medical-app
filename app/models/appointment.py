@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, UniqueConstraint, desc, func, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, desc, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -108,6 +108,22 @@ class Appointment(Base):
         back_populates="appointment",
         cascade="all, delete-orphan",
     )
+    follow_up_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    follow_up_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vitals = relationship(
+        "AppointmentVitals",
+        back_populates="appointment",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    prescriptions = relationship(
+        "Prescription",
+        back_populates="appointment",
+        cascade="all, delete-orphan",
+    )
 
 
 class AppointmentCreationIdempotency(Base):
@@ -142,6 +158,114 @@ class AppointmentCreationIdempotency(Base):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class AppointmentVitals(Base):
+    __tablename__ = "appointment_vitals"
+
+    __table_args__ = (
+        UniqueConstraint("appointment_id", name="uq_appointment_vitals_appointment"),
+        Index("ix_appointment_vitals_appointment", "appointment_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    temperature: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    bp_systolic: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bp_diastolic: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pulse: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
+    spo2: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    appointment = relationship("Appointment", back_populates="vitals")
+
+
+class Prescription(Base):
+    __tablename__ = "prescriptions"
+
+    __table_args__ = (
+        Index("ix_prescriptions_appointment", "appointment_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("doctors.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    appointment = relationship("Appointment", back_populates="prescriptions")
+    doctor = relationship("Doctor")
+    tenant = relationship("Tenant")
+    items = relationship(
+        "PrescriptionItem",
+        back_populates="prescription",
+        cascade="all, delete-orphan",
+    )
+
+
+class PrescriptionItem(Base):
+    __tablename__ = "prescription_items"
+
+    __table_args__ = (
+        Index("ix_prescription_items_prescription", "prescription_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    prescription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prescriptions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    medicine_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    dosage: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    frequency: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    duration: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    prescription = relationship("Prescription", back_populates="items")
 
 
 class AppointmentCompletionIdempotency(Base):

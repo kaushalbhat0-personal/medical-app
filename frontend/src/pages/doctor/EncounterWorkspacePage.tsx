@@ -34,9 +34,12 @@ import { Button } from '@/components/ui/button';
 import { ErrorState } from '../../components/common';
 import {
   EncounterHeaderSection,
+  EncounterVitalsSection,
   EncounterClinicalSection,
+  EncounterPrescriptionsSection,
   EncounterMedicationSection,
   EncounterBillingSection,
+  EncounterFollowUpSection,
   EncounterTimelineSection,
 } from '../../components/encounter';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
@@ -78,13 +81,15 @@ function buildEncounterAggregate(
     doctor,
     bill,
     inventoryUsage: appointment.inventory_usages,
-    // TODO: Future Phase 2 extensions:
-    // prescriptions: undefined,
-    // vitals: undefined,
-    // attachments: undefined,
-    // followUp: undefined,
-    // soapNotes: undefined,
-    // aiSummary: undefined,
+    prescriptions: appointment.prescriptions,
+    vitals: appointment.vitals,
+    followUp:
+      appointment.follow_up_date || appointment.follow_up_notes
+        ? {
+            follow_up_date: appointment.follow_up_date,
+            follow_up_notes: appointment.follow_up_notes,
+          }
+        : undefined,
   };
 }
 
@@ -450,13 +455,25 @@ export function EncounterWorkspacePage() {
         {/* Left column: Clinical content (2/3 width on desktop) */}
         <div className="lg:col-span-2 space-y-4">
           
+          {/* Section 1: Vitals (Hierarchy #1) */}
+          <EncounterVitalsSection
+            vitals={encounterAggregate.vitals}
+            compact={false}
+          />
+
           {/* Section 2: Clinical Documentation (Hierarchy #2-4) */}
           <EncounterClinicalSection
             appointment={encounterAggregate.appointment}
             compact={false}
           />
+
+          {/* Section 3: Prescriptions (Hierarchy #5) */}
+          <EncounterPrescriptionsSection
+            prescriptions={encounterAggregate.prescriptions}
+            compact={false}
+          />
           
-          {/* Section 3: Medications (Hierarchy #5) */}
+          {/* Section 4: Medicines Given (Hierarchy #6) */}
           {encounterAggregate.appointment.status === 'completed' && (
             <EncounterMedicationSection
               inventoryUsages={encounterAggregate.inventoryUsage}
@@ -502,7 +519,7 @@ export function EncounterWorkspacePage() {
         {/* Right column: Billing & Context (1/3 width on desktop) */}
         <div className="space-y-4">
           
-          {/* Section 4: Billing (Hierarchy #6 - secondary) */}
+          {/* Section 4: Billing (Hierarchy #7 - secondary) */}
           <EncounterBillingSection
             bill={encounterAggregate.bill}
             inventoryMaterialsSellingTotal={
@@ -510,8 +527,14 @@ export function EncounterWorkspacePage() {
             }
             secondary={true}
           />
+
+          {/* Section 5: Follow-up Plan (Hierarchy #8) */}
+          <EncounterFollowUpSection
+            followUp={encounterAggregate.followUp}
+            compact={false}
+          />
           
-          {/* Section 5: Patient History Timeline */}
+          {/* Section 6: Patient History Timeline */}
           <EncounterTimelineSection
             currentEncounter={encounterAggregate.appointment}
             previousVisits={previousVisits}

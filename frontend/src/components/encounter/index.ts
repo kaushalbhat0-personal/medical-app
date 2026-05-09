@@ -17,10 +17,11 @@ export { EncounterClinicalSection } from './EncounterClinicalSection';
 export { EncounterMedicationSection } from './EncounterMedicationSection';
 export { EncounterBillingSection } from './EncounterBillingSection';
 export { EncounterTimelineSection } from './EncounterTimelineSection';
+export { EncounterVitalsSection } from './EncounterVitalsSection';
+export { EncounterPrescriptionsSection } from './EncounterPrescriptionsSection';
+export { EncounterFollowUpSection } from './EncounterFollowUpSection';
 
 // Future extension exports (Phase 2):
-// export { EncounterVitalsSection } from './EncounterVitalsSection';
 // export { EncounterAttachmentsSection } from './EncounterAttachmentsSection';
-// export { EncounterPrescriptionsSection } from './EncounterPrescriptionsSection';
 // export { EncounterSoapNotesSection } from './EncounterSoapNotesSection';
 // export { EncounterAiSummarySection } from './EncounterAiSummarySection';

@@ -11,6 +11,9 @@ from app.models.appointment import (
     AppointmentCompletionIdempotency,
     AppointmentCreationIdempotency,
     AppointmentStatus,
+    AppointmentVitals,
+    Prescription,
+    PrescriptionItem,
 )
 from app.models.inventory import AppointmentInventoryUsage
 from app.models.patient import Patient
@@ -137,6 +140,8 @@ def get_appointment(
             selectinload(Appointment.inventory_usages).joinedload(
                 AppointmentInventoryUsage.item
             ),
+            selectinload(Appointment.vitals),
+            selectinload(Appointment.prescriptions).selectinload(Prescription.items),
         )
     )
     if not include_deleted:
@@ -154,6 +159,10 @@ def get_appointment_for_update_locked(
         .where(Appointment.id == appointment_id)
         .where(Appointment.is_deleted == False)
         .with_for_update(of=Appointment)
+        .options(
+            selectinload(Appointment.vitals),
+            selectinload(Appointment.prescriptions).selectinload(Prescription.items),
+        )
     )
     return db.scalars(stmt).first()
 
@@ -172,6 +181,8 @@ def get_appointments_by_ids(
             selectinload(Appointment.inventory_usages).joinedload(
                 AppointmentInventoryUsage.item
             ),
+            selectinload(Appointment.vitals),
+            selectinload(Appointment.prescriptions).selectinload(Prescription.items),
         )
     )
     rows = db.scalars(stmt).unique().all()
@@ -205,6 +216,8 @@ def get_appointments(
             selectinload(Appointment.inventory_usages).joinedload(
                 AppointmentInventoryUsage.item
             ),
+            selectinload(Appointment.vitals),
+            selectinload(Appointment.prescriptions).selectinload(Prescription.items),
         )
     )
 
