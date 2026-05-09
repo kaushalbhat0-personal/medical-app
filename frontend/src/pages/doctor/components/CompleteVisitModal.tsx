@@ -155,6 +155,7 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
         onClick={() => !isSubmitting && onClose()}
       />
       <div
+        ref={ref}
         className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-lg p-4 max-h-[90vh] overflow-y-auto"
         role="dialog"
         aria-modal="true"
