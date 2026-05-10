@@ -134,22 +134,19 @@ def get_pending_payments(
 @router.post("/{bill_id}/pay", response_model=BillingRead)
 def pay_bill(
     bill_id: UUID,
+    payment_method: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
 ) -> BillingRead:
     """Mark a bill as paid."""
-    from app.schemas.billing import BillingUpdate
-    from app.models.billing import BillingStatus
-
-    update_data = BillingUpdate(status=BillingStatus.paid)
-    return billing_service.update_bill(
+    return billing_service.mark_bill_paid(
         db,
         bill_id,
-        update_data,
         current_user,
         tenant_id,
+        payment_method=payment_method,
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
     )
 

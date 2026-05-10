@@ -399,7 +399,7 @@ export interface Bill {
   appointment_id?: string;
   amount: number;
   currency: string;
-  status: 'pending' | 'paid' | 'failed';
+  status: 'unpaid' | 'paid';
   description?: string;
   due_date?: string;
   paid_at?: string;

@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { IndianRupee, FileText, CreditCard, Receipt, ExternalLink } from 'lucide-react';
+import { IndianRupee, FileText, CreditCard, Receipt, ExternalLink, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { billingApi } from '../../services/billing';
 import type { Bill } from '../../types';
 
 interface EncounterBillingSectionProps {
@@ -17,15 +20,13 @@ interface EncounterBillingSectionProps {
 
 function billStatusVariant(status: Bill['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'paid') return 'secondary';
-  if (status === 'failed') return 'destructive';
-  if (status === 'pending') return 'outline';
+  if (status === 'unpaid') return 'outline';
   return 'default';
 }
 
 function billStatusLabel(status: Bill['status']): string {
   if (status === 'paid') return 'Paid';
-  if (status === 'pending') return 'Unpaid';
-  if (status === 'failed') return 'Failed';
+  if (status === 'unpaid') return 'Unpaid';
   return status;
 }
 
@@ -51,6 +52,22 @@ export function EncounterBillingSection({
   compact = false,
   secondary = true,
 }: EncounterBillingSectionProps) {
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+
+  const handleMarkPaid = async () => {
+    if (!bill) return;
+    setIsMarkingPaid(true);
+    try {
+      await billingApi.pay(bill.id);
+      // The bill status will be updated via props or refetch
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to mark bill as paid:', error);
+      // TODO: Show error toast
+    } finally {
+      setIsMarkingPaid(false);
+    }
+  };
   if (!bill) {
     return (
       <Card className={cn(
@@ -139,8 +156,8 @@ export function EncounterBillingSection({
             </div>
           )}
 
-          {/* Due date (if pending) */}
-          {bill.status === 'pending' && bill.due_date && (
+          {/* Due date (if unpaid) */}
+          {bill.status === 'unpaid' && bill.due_date && (
             <div className="flex items-center gap-2 text-xs">
               <CreditCard className="h-3.5 w-3.5 text-amber-500" aria-hidden />
               <span className="text-amber-700 dark:text-amber-400">
@@ -161,8 +178,32 @@ export function EncounterBillingSection({
           )}
         </div>
 
+        {/* Mark Paid Button (if unpaid) */}
+        {bill.status === 'unpaid' && (
+          <div className="border-t border-border/50 pt-2">
+            <Button
+              onClick={handleMarkPaid}
+              disabled={isMarkingPaid}
+              size="sm"
+              className="w-full"
+            >
+              {isMarkingPaid ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2 animate-spin" />
+                  Marking Paid...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark Paid
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* View Full Bill Link */}
-        <div className="border-t border-border/50 pt-2">
+        <div className={cn('border-t border-border/50 pt-2', bill.status === 'unpaid' && 'border-t-0 pt-0')}>
           <Link
             to={`/doctor/bills/${bill.id}`}
             className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"

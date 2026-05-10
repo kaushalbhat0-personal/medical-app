@@ -93,7 +93,7 @@ function billStatusLabel(status: Bill['status']): { label: string; className: st
       className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200',
     };
   }
-  if (status === 'pending' || status === 'failed') {
+  if (status === 'unpaid') {
     return { label: 'Unpaid', className: 'border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200' };
   }
   return { label: status, className: '' };
@@ -240,7 +240,7 @@ export function DoctorPatientDetailPage() {
   }, [appointments]);
 
   const outstandingBills = useMemo(
-    () => bills.filter((b) => b.status === 'pending' || b.status === 'failed'),
+    () => bills.filter((b) => b.status === 'unpaid'),
     [bills]
   );
 
@@ -854,7 +854,7 @@ export function DoctorPatientDetailPage() {
                         // Bill-only card (for bills without appointments)
                         const b = it.bill;
                         const st = billStatusLabel(b.status);
-                        const canPay = canMutate && (b.status === 'pending' || b.status === 'failed');
+                        const canPay = canMutate && b.status === 'unpaid';
                         return (
                           <li
                             key={it.id}

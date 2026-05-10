@@ -11,7 +11,7 @@ import type { Bill } from '../../types';
 
 function billStatusClass(status: Bill['status']): string {
   if (status === 'paid') return 'text-emerald-700 dark:text-emerald-400';
-  if (status === 'pending' || status === 'failed') return 'text-amber-800 dark:text-amber-300';
+  if (status === 'unpaid') return 'text-amber-800 dark:text-amber-300';
   return '';
 }
 

@@ -34,7 +34,7 @@ class BillingCreate(BaseModel):
     patient_id: UUID
     appointment_id: UUID | None = None
     amount: Decimal
-    status: BillingStatus = BillingStatus.pending
+    status: BillingStatus = BillingStatus.unpaid
     currency: str = "INR"
     idempotency_key: str | None = None
     description: str | None = None

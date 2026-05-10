@@ -706,6 +706,69 @@ def update_bill(
     return updated_bill
 
 
+def mark_bill_paid(
+    db: Session,
+    bill_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
+    payment_method: str | None = None,
+    *,
+    restrict_to_doctor_id: UUID | None = None,
+) -> Billing:
+    """
+    Mark a bill as paid with optional payment method.
+    
+    Requirements:
+    - Tenant-safe
+    - Resource-authoritative
+    - Audited
+    - Idempotent-safe
+    """
+    bill = get_bill_or_404(db, bill_id)
+    authorize_bill_mutate(
+        db,
+        bill,
+        current_user,
+        tenant_id,
+        rbac_action="mark_bill_paid",
+        restrict_to_doctor_id=restrict_to_doctor_id,
+    )
+
+    if bill.status == BillingStatus.paid:
+        # Idempotent: already paid
+        return bill
+
+    update_data = {
+        "status": BillingStatus.paid,
+        "paid_at": datetime.now(timezone.utc),
+    }
+    if payment_method is not None:
+        update_data["payment_method"] = payment_method
+
+    previous_status = bill.status.value
+    updated_bill = crud_billing.update_bill(db, bill, update_data)
+
+    # Create billing event
+    crud_billing.create_billing_event(
+        db,
+        billing_id=updated_bill.id,
+        previous_status=previous_status,
+        new_status=BillingStatus.paid.value,
+        event_type="mark_bill_paid",
+        event_metadata=f"Bill marked as paid{payment_method and f' via {payment_method}' or ''}",
+        created_by=current_user.id,
+    )
+
+    log_audit_mutation(
+        "mark_bill_paid",
+        current_user,
+        "billing",
+        updated_bill.id,
+        updated_bill.tenant_id,
+    )
+    return updated_bill
+
+
 def get_total_revenue(
     db: Session,
     *,

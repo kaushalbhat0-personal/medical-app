@@ -5,10 +5,12 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
@@ -517,6 +519,13 @@ def mark_appointment_completed(
         restrict_to_doctor_id=restrict_to_doctor_id,
         require_assigned_doctor=True,
     )
+
+    if settings.REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY:
+        if idempotency_key is None or not str(idempotency_key).strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Idempotency-Key header is required to complete visits",
+            )
 
     assigned_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     validate_appointment_invariants(appointment, assigned_doctor)

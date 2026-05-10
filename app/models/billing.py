@@ -11,9 +11,10 @@ from app.core.database import Base
 
 
 class BillingStatus(str, enum.Enum):
-    pending = "pending"
+    unpaid = "unpaid"
     paid = "paid"
-    failed = "failed"
+    # TODO: Future - partial payments: partial = "partial"
+    # TODO: Future - refunds: refunded = "refunded"
 
 
 class Billing(Base):
@@ -62,7 +63,7 @@ class Billing(Base):
     status: Mapped[BillingStatus] = mapped_column(
         Enum(BillingStatus, name="billingstatus", native_enum=True),
         nullable=False,
-        default=BillingStatus.pending,
+        default=BillingStatus.unpaid,
     )
     paid_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
@@ -81,6 +82,11 @@ class Billing(Base):
         nullable=False,
         default="INR",
     )
+    # TODO: Future - partial payments: amount_paid: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # TODO: Future - refunds: refund_amount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # TODO: Future - transaction references: transaction_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # TODO: Future - online payments: payment_gateway: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # TODO: Future - insurance claims: insurance_claim_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,

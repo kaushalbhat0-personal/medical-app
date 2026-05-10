@@ -135,7 +135,7 @@ def get_pending_payments(
         func.count(Billing.id),
         func.coalesce(func.sum(Billing.amount), 0.0),
     ).where(
-        Billing.status == BillingStatus.pending,
+        Billing.status == BillingStatus.unpaid,
         Billing.is_deleted == False,  # noqa: E712
     )
     if tenant_id is not None:

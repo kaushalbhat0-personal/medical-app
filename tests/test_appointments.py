@@ -392,10 +392,13 @@ async def test_mark_completed_only_assigned_doctor(
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert doc_login.status_code == 200
-    doc_headers = {"Authorization": f"Bearer {doc_login.json()['access_token']}"}
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
     ok = await client.post(
         f"/api/v1/appointments/{appt_id}/mark-completed",
-        headers=doc_headers,
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "completed"
@@ -465,7 +468,7 @@ async def test_mark_completed_generate_bill_consultation_only(
             "completion_notes": "Visit complete",
             "items": [],
         },
-        headers=doc_headers,
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "completed"

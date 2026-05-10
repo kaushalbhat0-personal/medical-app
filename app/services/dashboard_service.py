@@ -298,10 +298,7 @@ def get_admin_dashboard_metrics(
         .select_from(Billing)
         .where(
             base_bill,
-            or_(
-                Billing.status == BillingStatus.pending,
-                Billing.status == BillingStatus.failed,
-            ),
+            Billing.status == BillingStatus.unpaid,
         )
     )
     if pending_bills is None:

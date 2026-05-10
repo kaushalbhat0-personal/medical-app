@@ -347,7 +347,7 @@ export function Billing() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex gap-2 justify-end">
-                      {bill.status === 'pending' && (
+                      {bill.status === 'unpaid' && (
                         <Button
                           variant="primary"
                           size="sm"

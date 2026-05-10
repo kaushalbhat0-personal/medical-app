@@ -226,7 +226,7 @@ def _seed_tenant_a_metrics(
             appointment_id=None,
             tenant_id=tenant_a.id,
             amount=10,
-            status=BillingStatus.pending,
+            status=BillingStatus.unpaid,
             created_by=admin.id,
         )
     )
@@ -236,7 +236,7 @@ def _seed_tenant_a_metrics(
             appointment_id=None,
             tenant_id=tenant_a.id,
             amount=4.5,
-            status=BillingStatus.failed,
+            status=BillingStatus.unpaid,
             created_by=admin.id,
         )
     )
@@ -307,10 +307,7 @@ def _seed_tenant_a_metrics(
                 BillingModel.tenant_id == tenant_a.id,
                 BillingModel.is_deleted == False,  # noqa: E712
             ),
-            or_(
-                BillingModel.status == BillingStatus.pending,
-                BillingModel.status == BillingStatus.failed,
-            ),
+            BillingModel.status == BillingStatus.unpaid,
         )
     )
     return (

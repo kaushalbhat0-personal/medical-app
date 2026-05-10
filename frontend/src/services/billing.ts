@@ -84,9 +84,9 @@ export const billingApi = {
       throw handleApiError(error);
     }
   },
-  pay: async (billId: string) => {
+  pay: async (billId: string, paymentMethod?: string) => {
     try {
-      const response = await api.post(`/bills/${billId}/pay`);
+      const response = await api.post(`/bills/${billId}/pay`, { payment_method: paymentMethod });
       return response.data;
     } catch (error) {
       console.error('[billingApi.pay] Error:', error);

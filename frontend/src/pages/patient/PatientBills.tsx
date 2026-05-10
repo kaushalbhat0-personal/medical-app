@@ -9,7 +9,7 @@ import { ErrorState } from '../../components/common';
 
 function statusVariant(status: Bill['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'paid') return 'default';
-  if (status === 'failed') return 'destructive';
+  if (status === 'unpaid') return 'secondary';
   return 'secondary';
 }
 

@@ -99,12 +99,6 @@ def mark_appointment_completed(
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> AppointmentRead:
-    if settings.REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY:
-        if idempotency_key is None or not str(idempotency_key).strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Idempotency-Key header is required to complete visits",
-            )
     effective = data if data is not None else MarkAppointmentCompletedRequest()
     appt, idempotent_replay = appointment_service.mark_appointment_completed(
         db,
