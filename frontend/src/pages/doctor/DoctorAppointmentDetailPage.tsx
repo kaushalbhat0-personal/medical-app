@@ -209,8 +209,6 @@ export function DoctorAppointmentDetailPage() {
   const isTooEarlyToComplete =
     completionCutoff !== null && Date.now() < completionCutoff.getTime();
 
-  const canMarkComplete =
-    isIndependent && !isReadOnly && appointment?.status === 'scheduled';
   const canMarkCompleteButton = canMarkComplete && !isTooEarlyToComplete;
 
   const submitCompleteDisabled =
