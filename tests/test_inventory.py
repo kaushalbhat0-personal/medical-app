@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
+from app.crud.crud_appointment import add_appointment
+from app.models.appointment import AppointmentStatus
 from app.models.user import UserRole
 from tests.factories import create_doctor_profile, create_tenant, create_user
 
@@ -389,17 +392,19 @@ async def test_mark_completed_deducts_clinic_inventory(
     )
     assert login_pat.status_code == 200
     pat_h = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
-    created = await client.post(
-        "/api/v1/appointments",
-        json={
-            "patient_id": str(patient.id),
-            "doctor_id": str(doctor.id),
-            "appointment_time": slot.isoformat(),
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": tenant_id,
         },
-        headers=pat_h,
     )
-    assert created.status_code == 201
-    appt_id = created.json()["id"]
+    db_session.commit()
+    appt_id = str(appointment.id)
 
     doc_login = await client.post(
         "/api/v1/login",

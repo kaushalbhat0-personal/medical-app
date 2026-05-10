@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -116,6 +116,18 @@ class AppointmentRead(BaseModel):
     treatment_summary: str | None = None
     follow_up_date: datetime | None = None
     follow_up_notes: str | None = None
+    encounter_started_at: datetime | None = None
+    encounter_completed_at: datetime | None = None
+
+    @field_validator("encounter_started_at", "encounter_completed_at", mode="before")
+    @classmethod
+    def _normalize_encounter_datetime(cls, v: datetime | None) -> datetime | None:
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v.astimezone(timezone.utc)
+
     vitals: VitalSignsRead | None = None
     prescriptions: list[PrescriptionRead] = Field(default_factory=list)
 

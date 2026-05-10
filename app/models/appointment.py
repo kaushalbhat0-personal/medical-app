@@ -62,11 +62,25 @@ class Appointment(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+    # Actual clinical encounter timing. These are server-generated only and
+    # must not replace the scheduled appointment slot.
+    encounter_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    encounter_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     status: Mapped[AppointmentStatus] = mapped_column(
         Enum(AppointmentStatus, name="appointmentstatus", native_enum=True),
         nullable=False,
         default=AppointmentStatus.scheduled,
     )
+    # TODO: support explicit in_progress workflow and Start Encounter action.
+    # TODO: use encounter_started_at/encounter_completed_at for encounter duration analytics,
+    # TODO: preserve SOAP chronology, AI summary timing, telemedicine duration,
+    # TODO: and clinic wait-time metrics.
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         nullable=False,

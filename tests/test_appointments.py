@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
@@ -324,24 +324,194 @@ async def test_get_appointments_type_past_and_upcoming(
     assert pa.status_code == 200
     assert appt_id not in {r["id"] for r in pa.json()}
 
-    done = await client.put(
-        f"/api/v1/appointments/{appt_id}", json={"status": "completed"}, headers=doc_headers
-    )
-    assert done.status_code == 200, done.text
+    # Simulate an accidental future-completed appointment and verify temporal grouping.
+    future_completed = db_session.get(Appointment, uuid.UUID(appt_id))
+    assert future_completed is not None
+    future_completed.status = AppointmentStatus.completed
+    future_completed.encounter_started_at = datetime.now(timezone.utc) - timedelta(minutes=45)
+    future_completed.encounter_completed_at = datetime.now(timezone.utc) - timedelta(minutes=15)
+    db_session.commit()
 
     up2 = await client.get(
         "/api/v1/appointments", params={"type": "upcoming", "limit": 100}, headers=doc_headers
     )
     assert up2.status_code == 200
-    assert appt_id not in {r["id"] for r in up2.json()}
+    assert appt_id in {r["id"] for r in up2.json()}
 
     past2 = await client.get(
         "/api/v1/appointments", params={"type": "past", "limit": 100}, headers=doc_headers
     )
     assert past2.status_code == 200
-    row = next((r for r in past2.json() if r["id"] == appt_id), None)
-    assert row is not None
-    assert row["status"] == "completed"
+    assert appt_id not in {r["id"] for r in past2.json()}
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_fails_if_appointment_is_too_early(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_early_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_early_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, _slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=20),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
+        },
+    )
+    db_session.commit()
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    response = await client.post(
+        f"/api/v1/appointments/{appointment.id}/mark-completed",
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert response.status_code == 400
+    assert "cannot be completed before scheduled time" in response.json().get("detail", "").lower()
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_within_grace_window_succeeds(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_grace_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_grace_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, _slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
+        },
+    )
+    db_session.commit()
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    response = await client.post(
+        f"/api/v1/appointments/{appointment.id}/mark-completed",
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_sets_encounter_timestamps_on_completion(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_encounter_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_encounter_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, _slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
+        },
+    )
+    db_session.commit()
+    appt_id = str(appointment.id)
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    ok = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert ok.status_code == 200, ok.text
+
+    body = ok.json()
+    assert body["status"] == "completed"
+    assert body["encounter_completed_at"] is not None
+    assert body["encounter_started_at"] is not None
+
+    db_session.expire_all()
+    appointment_row = db_session.get(Appointment, appointment.id)
+    assert appointment_row is not None
+    assert appointment_row.encounter_completed_at is not None
+    assert appointment_row.encounter_started_at is not None
+    assert "+00:00" in body["encounter_started_at"] or body["encounter_started_at"].endswith("Z")
+    assert "+00:00" in body["encounter_completed_at"] or body["encounter_completed_at"].endswith("Z")
+
+    started = datetime.fromisoformat(body["encounter_started_at"].replace("Z", "+00:00"))
+    completed = datetime.fromisoformat(body["encounter_completed_at"].replace("Z", "+00:00"))
+    assert started.tzinfo is not None
+    assert completed.tzinfo is not None
+    assert completed >= started
 
 
 @pytest.mark.asyncio
@@ -368,21 +538,24 @@ async def test_mark_completed_only_assigned_doctor(
     )
     assert login_pat.status_code == 200
     pat_headers = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
-    created = await client.post(
-        "/api/v1/appointments",
-        json={
-            "patient_id": str(patient.id),
-            "doctor_id": str(doctor.id),
-            "appointment_time": slot.isoformat(),
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
         },
-        headers=pat_headers,
     )
-    assert created.status_code == 201, created.text
-    appt_id = created.json()["id"]
+    db_session.commit()
+    appt_id = str(appointment.id)
 
     deny = await client.post(
         f"/api/v1/appointments/{appt_id}/mark-completed",
-        headers=pat_headers,
+        headers={**pat_headers, "Idempotency-Key": str(uuid.uuid4())},
     )
     assert deny.status_code == 403
 
@@ -423,24 +596,19 @@ async def test_mark_completed_generate_bill_consultation_only(
     )
     assert doctor.tenant_id is not None
 
-    login_pat = await client.post(
-        "/api/v1/login",
-        data={"username": pat_email, "password": pat_pw},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert login_pat.status_code == 200
-    pat_headers = {"Authorization": f"Bearer {login_pat.json()['access_token']}"}
-    created = await client.post(
-        "/api/v1/appointments",
-        json={
-            "patient_id": str(patient.id),
-            "doctor_id": str(doctor.id),
-            "appointment_time": slot.isoformat(),
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
         },
-        headers=pat_headers,
     )
-    assert created.status_code == 201, created.text
-    appt_id = created.json()["id"]
+    db_session.commit()
+    appt_id = str(appointment.id)
 
     doc_login = await client.post(
         "/api/v1/login",

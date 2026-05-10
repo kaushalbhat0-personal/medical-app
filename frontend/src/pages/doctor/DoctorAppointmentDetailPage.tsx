@@ -200,8 +200,21 @@ export function DoctorAppointmentDetailPage() {
     validUsagePayload !== null &&
     (!generateBill ? true : consultationFeeValid && billWouldBePositive);
 
+  const appointmentTime = appointment?.appointment_time
+    ? new Date(appointment.appointment_time)
+    : null;
+  const completionCutoff = appointmentTime
+    ? new Date(appointmentTime.getTime() - 15 * 60 * 1000)
+    : null;
+  const isTooEarlyToComplete =
+    completionCutoff !== null && Date.now() < completionCutoff.getTime();
+
+  const canMarkComplete =
+    isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+  const canMarkCompleteButton = canMarkComplete && !isTooEarlyToComplete;
+
   const submitCompleteDisabled =
-    markBusy || appointment?.status !== 'scheduled' || !canSubmitComplete;
+    markBusy || !canMarkCompleteButton || !canSubmitComplete;
 
   const addQuickMedicineRow = useCallback((itemId: string) => {
     setUsageRows((prev) => [...prev, { key: crypto.randomUUID(), item_id: itemId, quantity: '1' }]);
@@ -382,9 +395,19 @@ export function DoctorAppointmentDetailPage() {
             )}
           {canMarkComplete && (
             <div className="pt-2">
-              <Button type="button" size="sm" disabled={markBusy} onClick={openCompleteModal}>
+              <Button
+                type="button"
+                size="sm"
+                disabled={markBusy || isTooEarlyToComplete}
+                onClick={openCompleteModal}
+              >
                 Mark as completed
               </Button>
+              {isTooEarlyToComplete && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Can be completed near scheduled appointment time.
+                </p>
+              )}
             </div>
           )}
         </CardContent>

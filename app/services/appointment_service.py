@@ -143,28 +143,17 @@ def _validate_patient_no_other_appointment_same_instant(
         raise ValidationError("You already have an appointment at this time")
 
 
-def _validate_appointment_can_be_completed(appointment: Appointment) -> None:
+def _validate_appointment_can_be_completed_time(appointment_time: datetime) -> None:
     """
     Validate that an appointment can be completed based on its scheduled time.
-    
-    An appointment can only be completed if:
-    - The current time is at or past the appointment_time minus a grace window
-    
-    Grace window (15 minutes):
-    - Allows for doctors completing appointments slightly early
-    - Mitigates timezone/device clock issues
-    - Practical for clinic operations
-    
-    This is an INVARIANT that prevents impossible states:
-    - Future appointments should never be marked completed
-    - Timeline grouping must be based on appointment_time, not status
     """
     from datetime import timedelta
-    
+
+    appointment_time = normalize_appointment_time_utc(appointment_time)
     now_utc = datetime.now(timezone.utc)
     grace_window = timedelta(minutes=15)
-    completion_cutoff = appointment.appointment_time - grace_window
-    
+    completion_cutoff = appointment_time - grace_window
+
     if now_utc < completion_cutoff:
         remaining = completion_cutoff - now_utc
         minutes_remaining = int(remaining.total_seconds() / 60)
@@ -172,6 +161,10 @@ def _validate_appointment_can_be_completed(appointment: Appointment) -> None:
             f"Appointment cannot be completed before scheduled time. "
             f"Can complete in approximately {minutes_remaining} minutes."
         )
+
+
+def _validate_appointment_can_be_completed(appointment: Appointment) -> None:
+    _validate_appointment_can_be_completed_time(appointment.appointment_time)
 
 
 def authorize_appointment_create(
@@ -522,25 +515,6 @@ def mark_appointment_completed(
     if appointment is None:
         raise NotFoundError("Appointment not found")
 
-    # DEBUG: Identity resolution before authorization check
-    doc = doctor_service.get_current_doctor(db, current_user)
-
-    print("========== COMPLETE VISIT DEBUG ==========")
-    print("CURRENT_USER_ID:", current_user.id)
-    print("CURRENT_USER_ROLE:", current_user.role)
-
-    if doc:
-        print("RESOLVED_DOCTOR_ID:", doc.id)
-        print("RESOLVED_DOCTOR_USER_ID:", doc.user_id)
-        print("RESOLVED_DOCTOR_TENANT:", doc.tenant_id)
-    else:
-        print("RESOLVED_DOCTOR: None")
-
-    print("APPOINTMENT_ID:", appointment.id)
-    print("APPOINTMENT_DOCTOR_ID:", appointment.doctor_id)
-    print("APPOINTMENT_TENANT_ID:", appointment.tenant_id)
-    print("==========================================")
-
     authorize_appointment_access(
         db,
         appointment,
@@ -560,7 +534,8 @@ def mark_appointment_completed(
 
     assigned_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     validate_appointment_invariants(appointment, assigned_doctor)
-    
+    now_utc = datetime.now(timezone.utc)
+
     # CRITICAL INVARIANT: Prevent completing future appointments.
     # This ensures that temporal grouping (past/upcoming) stays independent from status.
     # Only validate if the appointment is not already completed (allow idempotent replays).
@@ -650,9 +625,14 @@ def mark_appointment_completed(
     _create_appointment_prescriptions(db, appointment, data.prescriptions)
 
     appointment.status = AppointmentStatus.completed
+    appointment.encounter_completed_at = now_utc
+    if appointment.encounter_started_at is None:
+        appointment.encounter_started_at = now_utc
     db.add(appointment)
     db.flush()
 
+    # TODO: if encounter_started_at is later tracked by a Start Encounter action,
+    # do not overwrite an existing start time here.
     if data.generate_bill:
         from app.schemas.billing import BillingCreate
         from app.services import billing_service
@@ -781,6 +761,13 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.patient:
+        if require_assigned_doctor:
+            log_rbac_mutation_violation(
+                current_user,
+                "appointment",
+                action=rbac_action,
+            )
+            raise ForbiddenError("Only the assigned doctor can complete this appointment")
         try:
             acting_patient = patient_service.get_patient_by_user_id(db, current_user.id)
         except NotFoundError:
@@ -891,6 +878,9 @@ def update_appointment(
     _validate_status_regression(appointment.status, new_status)
 
     appointment_time = update_data.get("appointment_time", appointment.appointment_time)
+    if new_status == AppointmentStatus.completed and appointment.status != AppointmentStatus.completed:
+        _validate_appointment_can_be_completed_time(appointment_time)
+
     prev_doctor_id = appointment.doctor_id
     prev_appointment_time = appointment.appointment_time
 
