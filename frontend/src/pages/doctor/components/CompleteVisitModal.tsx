@@ -31,6 +31,16 @@ interface CompleteVisitModalProps {
     diagnosis: string | null;
     treatment_summary: string | null;
     items: { item_id: string; quantity: number }[];
+    prescriptions: {
+      notes: string | null;
+      items: {
+        medicine_name: string;
+        dosage?: string | null;
+        frequency?: string | null;
+        duration?: string | null;
+        instructions?: string | null;
+      }[];
+    }[];
     generate_bill: boolean;
     bill_consultation_amount?: number;
   }) => void;
@@ -38,6 +48,15 @@ interface CompleteVisitModalProps {
 }
 
 type UsageRow = { key: string; item_id: string; quantity: string };
+type PrescriptionRow = {
+  key: string;
+  notes: string;
+  medicine_name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+};
 
 export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalProps>(
   function CompleteVisitModalInner({
@@ -53,6 +72,17 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
   const [treatmentSummary, setTreatmentSummary] = useState('');
   const [usageRows, setUsageRows] = useState<UsageRow[]>([
     { key: crypto.randomUUID(), item_id: '', quantity: '1' },
+  ]);
+  const [prescriptionRows, setPrescriptionRows] = useState<PrescriptionRow[]>([
+    {
+      key: crypto.randomUUID(),
+      notes: '',
+      medicine_name: '',
+      dosage: '',
+      frequency: '',
+      duration: '',
+      instructions: '',
+    },
   ]);
   const [generateBill, setGenerateBill] = useState(false);
   const [consultationFeeInput, setConsultationFeeInput] = useState('');
@@ -90,6 +120,25 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
     }
     return lines;
   }, [usageRows, stockById]);
+
+  const validPrescriptionPayload = useMemo(() => {
+    return prescriptionRows
+      .map((row) => ({
+        notes: row.notes.trim() || null,
+        items: row.medicine_name
+          ? [
+              {
+                medicine_name: row.medicine_name.trim(),
+                dosage: row.dosage.trim() || null,
+                frequency: row.frequency.trim() || null,
+                duration: row.duration.trim() || null,
+                instructions: row.instructions.trim() || null,
+              },
+            ]
+          : [],
+      }))
+      .filter((entry) => entry.notes || entry.items.length > 0);
+  }, [prescriptionRows]);
   
   const medicinesSellingPreview = useMemo(() => {
     if (validUsagePayload === null) return null;
@@ -141,6 +190,7 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
       diagnosis: diagnosis.trim() || null,
       treatment_summary: treatmentSummary.trim() || null,
       items: validUsagePayload ?? [],
+      prescriptions: validPrescriptionPayload,
       generate_bill: generateBill,
       bill_consultation_amount: fee,
     });
@@ -230,7 +280,166 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
               onChange={(e) => setTreatmentSummary(e.target.value)}
             />
           </div>
+          <div>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Prescriptions
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Record medicines prescribed to the patient for this encounter. Inventory is not deducted until medicines are given.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-9"
+                disabled={isSubmitting}
+                onClick={() =>
+                  setPrescriptionRows((prev) => [
+                    ...prev,
+                    {
+                      key: crypto.randomUUID(),
+                      notes: '',
+                      medicine_name: '',
+                      dosage: '',
+                      frequency: '',
+                      duration: '',
+                      instructions: '',
+                    },
+                  ])
+                }
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add prescription
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {prescriptionRows.map((row) => (
+                <div key={row.key} className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">Medication</p>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      disabled={prescriptionRows.length <= 1 || isSubmitting}
+                      onClick={() =>
+                        setPrescriptionRows((prev) => prev.filter((item) => item.key !== row.key))
+                      }
+                      aria-label="Remove prescription"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-notes-${row.key}`}>
+                        Notes
+                      </label>
+                      <textarea
+                        id={`rx-notes-${row.key}`}
+                        className="mt-1 flex min-h-[56px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="Any prescription notes for the patient or pharmacy..."
+                        value={row.notes}
+                        onChange={(e) =>
+                          setPrescriptionRows((prev) =>
+                            prev.map((item) =>
+                              item.key === row.key ? { ...item, notes: e.target.value } : item
+                            )
+                          )
+                        }
+                      />
+                    </div>
 
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-medicine-${row.key}`}>
+                          Medicine
+                        </label>
+                        <Input
+                          id={`rx-medicine-${row.key}`}
+                          placeholder="Medicine name"
+                          value={row.medicine_name}
+                          disabled={isSubmitting}
+                          onChange={(e) =>
+                            setPrescriptionRows((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, medicine_name: e.target.value }
+                                  : item
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-dosage-${row.key}`}>
+                          Dosage
+                        </label>
+                        <Input
+                          id={`rx-dosage-${row.key}`}
+                          placeholder="e.g. 500 mg"
+                          value={row.dosage}
+                          disabled={isSubmitting}
+                          onChange={(e) =>
+                            setPrescriptionRows((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key ? { ...item, dosage: e.target.value } : item
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <Input
+                        id={`rx-frequency-${row.key}`}
+                        placeholder="Frequency"
+                        value={row.frequency}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setPrescriptionRows((prev) =>
+                            prev.map((item) =>
+                              item.key === row.key ? { ...item, frequency: e.target.value } : item
+                            )
+                          )
+                        }
+                      />
+                      <Input
+                        id={`rx-duration-${row.key}`}
+                        placeholder="Duration"
+                        value={row.duration}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setPrescriptionRows((prev) =>
+                            prev.map((item) =>
+                              item.key === row.key ? { ...item, duration: e.target.value } : item
+                            )
+                          )
+                        }
+                      />
+                      <Input
+                        id={`rx-instructions-${row.key}`}
+                        placeholder="Instructions"
+                        value={row.instructions}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setPrescriptionRows((prev) =>
+                            prev.map((item) =>
+                              item.key === row.key ? { ...item, instructions: e.target.value } : item
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {/*
             Inventory usage section - medicines given during the visit.
             TODO: Future extension - integrate with formal prescription module.

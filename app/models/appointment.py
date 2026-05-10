@@ -212,6 +212,7 @@ class Prescription(Base):
 
     __table_args__ = (
         Index("ix_prescriptions_appointment", "appointment_id"),
+        Index("ix_prescriptions_patient", "patient_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -229,6 +230,11 @@ class Prescription(Base):
         ForeignKey("doctors.id", ondelete="CASCADE"),
         nullable=False,
     )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("patients.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tenants.id", ondelete="RESTRICT"),
@@ -243,6 +249,7 @@ class Prescription(Base):
 
     appointment = relationship("Appointment", back_populates="prescriptions")
     doctor = relationship("Doctor")
+    patient = relationship("Patient")
     tenant = relationship("Tenant")
     items = relationship(
         "PrescriptionItem",

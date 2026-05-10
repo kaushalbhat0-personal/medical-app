@@ -321,6 +321,7 @@ export interface Prescription {
   id: string;
   appointment_id: string;
   doctor_id: string;
+  patient_id: string;
   tenant_id: string;
   notes?: string | null;
   created_at: string;

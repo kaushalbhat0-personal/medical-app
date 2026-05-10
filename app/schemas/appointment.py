@@ -89,6 +89,7 @@ class PrescriptionRead(BaseModel):
     id: UUID
     appointment_id: UUID
     doctor_id: UUID
+    patient_id: UUID
     tenant_id: UUID
     notes: str | None = None
     created_at: datetime

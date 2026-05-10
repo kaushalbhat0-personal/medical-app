@@ -15,7 +15,7 @@ from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
 from app.crud import crud_appointment, crud_billing
-from app.models.appointment import Appointment, AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus, Prescription
 from app.models.user import User, UserRole
 from app.services import doctor_service, doctor_slot_service, inventory_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
@@ -463,6 +463,14 @@ def _create_appointment_vitals(
     )
 
 
+def _validate_prescription_against_appointment(
+    appointment: Appointment,
+    prescription: PrescriptionCreate,
+) -> None:
+    if not prescription.notes and not prescription.items:
+        raise ValidationError("Prescription must include notes or items")
+
+
 def _create_appointment_prescriptions(
     db: Session,
     appointment: Appointment,
@@ -477,6 +485,7 @@ def _create_appointment_prescriptions(
             db,
             appointment_id=appointment.id,
             doctor_id=appointment.doctor_id,
+            patient_id=appointment.patient_id,
             tenant_id=appointment.tenant_id,
             notes=prescription_payload.notes,
         )
@@ -484,12 +493,125 @@ def _create_appointment_prescriptions(
             crud_appointment.add_prescription_item(
                 db,
                 prescription_id=prescription.id,
-                medicine_name=item_payload.medicine_name,
-                dosage=item_payload.dosage,
-                frequency=item_payload.frequency,
-                duration=item_payload.duration,
-                instructions=item_payload.instructions,
+                line_data={
+                    "medicine_name": item_payload.medicine_name,
+                    "dosage": item_payload.dosage,
+                    "frequency": item_payload.frequency,
+                    "duration": item_payload.duration,
+                    "instructions": item_payload.instructions,
+                },
             )
+        log_structured_audit_event(
+            event="prescription_created",
+            tenant_id=appointment.tenant_id,
+            resource_id=str(prescription.id),
+            actor_id=str(appointment.doctor_id),
+            appointment_id=str(appointment.id),
+            doctor_id=str(appointment.doctor_id),
+            patient_id=str(appointment.patient_id),
+            status="success",
+        )
+
+
+def create_prescription_for_appointment(
+    db: Session,
+    appointment_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
+    prescription_data: PrescriptionCreate,
+) -> Prescription:
+    appointment = get_appointment_or_404(db, appointment_id)
+    authorize_appointment_access(
+        db,
+        appointment,
+        current_user,
+        tenant_id,
+        rbac_action="create_prescription",
+        require_assigned_doctor=True,
+    )
+    if appointment.tenant_id is None:
+        raise ValidationError("Appointment tenant is not set")
+    _validate_prescription_against_appointment(appointment, prescription_data)
+    prescription = crud_appointment.add_prescription(
+        db,
+        appointment_id=appointment.id,
+        doctor_id=appointment.doctor_id,
+        patient_id=appointment.patient_id,
+        tenant_id=appointment.tenant_id,
+        notes=prescription_data.notes,
+    )
+    for item_payload in prescription_data.items:
+        crud_appointment.add_prescription_item(
+            db,
+            prescription_id=prescription.id,
+            line_data={
+                "medicine_name": item_payload.medicine_name,
+                "dosage": item_payload.dosage,
+                "frequency": item_payload.frequency,
+                "duration": item_payload.duration,
+                "instructions": item_payload.instructions,
+            },
+        )
+    log_structured_audit_event(
+        event="prescription_created",
+        tenant_id=appointment.tenant_id,
+        resource_id=str(prescription.id),
+        actor_id=str(current_user.id),
+        appointment_id=str(appointment.id),
+        doctor_id=str(appointment.doctor_id),
+        patient_id=str(appointment.patient_id),
+        status="success",
+    )
+    return prescription
+
+
+def update_prescription(
+    db: Session,
+    prescription_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
+    update_data: PrescriptionCreate,
+) -> Prescription:
+    prescription = crud_appointment.get_prescription_by_id(db, prescription_id)
+    if prescription is None:
+        raise NotFoundError("Prescription not found")
+    appointment = get_appointment_or_404(db, prescription.appointment_id)
+    authorize_appointment_access(
+        db,
+        appointment,
+        current_user,
+        tenant_id,
+        rbac_action="update_prescription",
+        require_assigned_doctor=True,
+    )
+    _validate_prescription_against_appointment(appointment, update_data)
+    crud_appointment.update_prescription(
+        db,
+        prescription,
+        {
+            "notes": update_data.notes,
+            "items": [item.model_dump() for item in update_data.items],
+        },
+    )
+    log_structured_audit_event(
+        event="prescription_updated",
+        tenant_id=appointment.tenant_id,
+        resource_id=str(prescription.id),
+        actor_id=str(current_user.id),
+        appointment_id=str(appointment.id),
+        doctor_id=str(appointment.doctor_id),
+        patient_id=str(appointment.patient_id),
+        status="success",
+    )
+    return prescription
+
+
+def get_prescriptions_by_appointment(
+    db: Session,
+    appointment_id: UUID,
+) -> list[Prescription]:
+    appointment = get_appointment_or_404(db, appointment_id)
+    return crud_appointment.get_prescriptions_for_appointment(db, appointment_id)
 
 
 def appointment_to_read(db: Session, appt: Appointment) -> AppointmentRead:

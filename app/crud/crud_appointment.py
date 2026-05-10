@@ -167,6 +167,93 @@ def get_appointment_for_update_locked(
     return db.scalars(stmt).first()
 
 
+def add_prescription(
+    db: Session,
+    appointment_id: UUID,
+    doctor_id: UUID,
+    patient_id: UUID,
+    tenant_id: UUID,
+    notes: str | None = None,
+) -> Prescription:
+    prescription = Prescription(
+        appointment_id=appointment_id,
+        doctor_id=doctor_id,
+        patient_id=patient_id,
+        tenant_id=tenant_id,
+        notes=notes,
+    )
+    db.add(prescription)
+    db.flush()
+    db.refresh(prescription)
+    return prescription
+
+
+def add_prescription_item(
+    db: Session,
+    prescription_id: UUID,
+    line_data: dict[str, Any],
+) -> PrescriptionItem:
+    item = PrescriptionItem(
+        prescription_id=prescription_id,
+        medicine_name=line_data["medicine_name"],
+        dosage=line_data.get("dosage"),
+        frequency=line_data.get("frequency"),
+        duration=line_data.get("duration"),
+        instructions=line_data.get("instructions"),
+    )
+    db.add(item)
+    db.flush()
+    db.refresh(item)
+    return item
+
+
+def update_prescription(
+    db: Session,
+    prescription: Prescription,
+    update_data: dict[str, Any],
+) -> Prescription:
+    if "notes" in update_data:
+        prescription.notes = update_data["notes"]
+
+    if "items" in update_data:
+        prescription.items.clear()
+        for item_data in update_data["items"]:
+            prescription.items.append(
+                PrescriptionItem(
+                    medicine_name=item_data["medicine_name"],
+                    dosage=item_data.get("dosage"),
+                    frequency=item_data.get("frequency"),
+                    duration=item_data.get("duration"),
+                    instructions=item_data.get("instructions"),
+                )
+            )
+
+    db.add(prescription)
+    db.flush()
+    db.refresh(prescription)
+    return prescription
+
+
+def get_prescription_by_id(db: Session, prescription_id: UUID) -> Prescription | None:
+    stmt = (
+        select(Prescription)
+        .where(Prescription.id == prescription_id)
+        .options(selectinload(Prescription.items))
+    )
+    return db.scalars(stmt).first()
+
+
+def get_prescriptions_for_appointment(
+    db: Session, appointment_id: UUID
+) -> list[Prescription]:
+    stmt = (
+        select(Prescription)
+        .where(Prescription.appointment_id == appointment_id)
+        .options(selectinload(Prescription.items))
+    )
+    return list(db.scalars(stmt).all())
+
+
 def get_appointments_by_ids(
     db: Session, appointment_ids: list[UUID]
 ) -> dict[UUID, Appointment]:

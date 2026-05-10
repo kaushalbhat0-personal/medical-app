@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.crud.crud_appointment import add_appointment
-from app.models.appointment import Appointment, AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus, Prescription
 from app.models.doctor import Doctor
 from app.models.user import UserRole
 from tests.factories import (
@@ -576,6 +576,174 @@ async def test_mark_completed_only_assigned_doctor(
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "completed"
     assert ok.json()["patient_id"] == str(patient.id)
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_creates_prescriptions_with_patient_ids_and_no_inventory_deduction(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_rx_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_rx_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, _slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
+        },
+    )
+    db_session.commit()
+    appt_id = str(appointment.id)
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    payload = {
+        "clinical_notes": "Follow-up prescription",
+        "prescriptions": [
+            {
+                "notes": "Prescribe only if symptomatic",
+                "items": [
+                    {
+                        "medicine_name": "Paracetamol",
+                        "dosage": "500 mg",
+                        "frequency": "Thrice a day",
+                        "duration": "5 days",
+                        "instructions": "After meals",
+                    }
+                ],
+            }
+        ],
+        "items": [],
+    }
+
+    ok = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json=payload,
+        headers={**doc_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert ok.status_code == 200, ok.text
+    body = ok.json()
+    assert body["status"] == "completed"
+    assert body["prescriptions"]
+    assert body["prescriptions"][0]["patient_id"] == str(patient.id)
+    assert body["prescriptions"][0]["items"][0]["medicine_name"] == "Paracetamol"
+    assert body["inventory_usages"] == []
+
+    prescription_rows = db_session.scalars(
+        select(Prescription).where(Prescription.appointment_id == appointment.id)
+    ).all()
+    assert len(prescription_rows) == 1
+    assert prescription_rows[0].patient_id == patient.id
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_prescription_payload_is_idempotent_and_not_duplicated(
+    client: AsyncClient, db_session: Session
+) -> None:
+    doc_email = f"doc_rxid_{uuid.uuid4().hex[:8]}@e2e.test"
+    pat_email = f"pat_rxid_{uuid.uuid4().hex[:8]}@e2e.test"
+    doc_pw = "DocPass123!"
+    pat_pw = "PatPass123!"
+
+    doctor, patient, _slot = seed_bookable_doctor_and_patient(
+        db_session,
+        doctor_email=doc_email,
+        doctor_password=doc_pw,
+        patient_email=pat_email,
+        patient_password=pat_pw,
+    )
+    assert doctor.tenant_id is not None
+
+    appointment = add_appointment(
+        db_session,
+        {
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "appointment_time": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "status": AppointmentStatus.scheduled,
+            "created_by": patient.user_id,
+            "tenant_id": doctor.tenant_id,
+        },
+    )
+    db_session.commit()
+    appt_id = str(appointment.id)
+
+    doc_login = await client.post(
+        "/api/v1/login",
+        data={"username": doc_email, "password": doc_pw},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert doc_login.status_code == 200
+    doc_headers = {
+        "Authorization": f"Bearer {doc_login.json()['access_token']}",
+        "X-Tenant-ID": str(doctor.tenant_id),
+    }
+
+    idempotency_key = str(uuid.uuid4())
+    payload = {
+        "clinical_notes": "Follow-up prescription",
+        "prescriptions": [
+            {
+                "notes": "Take as directed",
+                "items": [
+                    {
+                        "medicine_name": "Ibuprofen",
+                        "dosage": "200 mg",
+                        "frequency": "Twice a day",
+                        "duration": "3 days",
+                        "instructions": "With food",
+                    }
+                ],
+            }
+        ],
+        "items": [],
+    }
+
+    first = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json=payload,
+        headers={**doc_headers, "Idempotency-Key": idempotency_key},
+    )
+    assert first.status_code == 200, first.text
+    assert len(first.json()["prescriptions"]) == 1
+
+    second = await client.post(
+        f"/api/v1/appointments/{appt_id}/mark-completed",
+        json=payload,
+        headers={**doc_headers, "Idempotency-Key": idempotency_key},
+    )
+    assert second.status_code == 200, second.text
+    assert len(second.json()["prescriptions"]) == 1
+    assert second.json()["prescriptions"][0]["items"][0]["medicine_name"] == "Ibuprofen"
+
+    prescription_rows = db_session.scalars(
+        select(Prescription).where(Prescription.appointment_id == appointment.id)
+    ).all()
+    assert len(prescription_rows) == 1
 
 
 @pytest.mark.asyncio

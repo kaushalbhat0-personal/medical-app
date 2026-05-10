@@ -39,15 +39,18 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('appointment_id', sa.UUID(), nullable=False),
     sa.Column('doctor_id', sa.UUID(), nullable=False),
+    sa.Column('patient_id', sa.UUID(), nullable=False),
     sa.Column('tenant_id', sa.UUID(), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['appointment_id'], ['appointments.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_prescriptions_appointment', 'prescriptions', ['appointment_id'], unique=False)
+    op.create_index('ix_prescriptions_patient', 'prescriptions', ['patient_id'], unique=False)
     op.create_table('prescription_items',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('prescription_id', sa.UUID(), nullable=False),
