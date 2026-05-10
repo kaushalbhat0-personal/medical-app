@@ -143,6 +143,37 @@ def _validate_patient_no_other_appointment_same_instant(
         raise ValidationError("You already have an appointment at this time")
 
 
+def _validate_appointment_can_be_completed(appointment: Appointment) -> None:
+    """
+    Validate that an appointment can be completed based on its scheduled time.
+    
+    An appointment can only be completed if:
+    - The current time is at or past the appointment_time minus a grace window
+    
+    Grace window (15 minutes):
+    - Allows for doctors completing appointments slightly early
+    - Mitigates timezone/device clock issues
+    - Practical for clinic operations
+    
+    This is an INVARIANT that prevents impossible states:
+    - Future appointments should never be marked completed
+    - Timeline grouping must be based on appointment_time, not status
+    """
+    from datetime import timedelta
+    
+    now_utc = datetime.now(timezone.utc)
+    grace_window = timedelta(minutes=15)
+    completion_cutoff = appointment.appointment_time - grace_window
+    
+    if now_utc < completion_cutoff:
+        remaining = completion_cutoff - now_utc
+        minutes_remaining = int(remaining.total_seconds() / 60)
+        raise ValidationError(
+            f"Appointment cannot be completed before scheduled time. "
+            f"Can complete in approximately {minutes_remaining} minutes."
+        )
+
+
 def authorize_appointment_create(
     db: Session,
     appointment_in: AppointmentCreate,
@@ -529,6 +560,12 @@ def mark_appointment_completed(
 
     assigned_doctor = doctor_service.get_doctor_or_404(db, appointment.doctor_id)
     validate_appointment_invariants(appointment, assigned_doctor)
+    
+    # CRITICAL INVARIANT: Prevent completing future appointments.
+    # This ensures that temporal grouping (past/upcoming) stays independent from status.
+    # Only validate if the appointment is not already completed (allow idempotent replays).
+    if appointment.status != AppointmentStatus.completed:
+        _validate_appointment_can_be_completed(appointment)
 
     data = completion or MarkAppointmentCompletedRequest()
     ih = idempotency_key.strip() if idempotency_key else ""
