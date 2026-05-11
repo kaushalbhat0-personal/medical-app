@@ -233,9 +233,12 @@ def _build_css(branding: BrandingContext | None = None) -> str:
     secondary = _escape_html(branding.secondary_color) if branding and branding.secondary_color else "#555"
     accent = _escape_html(branding.accent_color) if branding and branding.accent_color else "#f59e0b"
 
-    return f"""
+    # Build CSS template — use .format() instead of f-string to avoid
+    # Python 3.10 f-string parsing bug with number+letter combinations
+    # like "15mm", "8px", "11px" inside f-strings with {{ }} escapes.
+    _css_template = """
         @page {{
-            margin: 15mm 12mm;
+            margin: {page_margin};
             @bottom-center {{
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 8px;
@@ -422,6 +425,13 @@ def _build_css(branding: BrandingContext | None = None) -> str:
             white-space: nowrap;
         }}
     """
+
+    return _css_template.format(
+        page_margin="15mm 12mm",
+        primary=primary,
+        secondary=secondary,
+        accent=accent,
+    )
 
 
 def _build_html_document(
