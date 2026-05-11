@@ -13,7 +13,9 @@ import {
   Building2,
   ShieldCheck,
   Palette,
+  Bell,
 } from 'lucide-react';
+
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
@@ -59,9 +61,11 @@ const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/doctors', label: 'Doctors', icon: Stethoscope },
   { path: '/admin/inventory', label: 'Inventory', icon: Package },
   { path: '/admin/branding', label: 'Branding', icon: Palette },
+  { path: '/admin/communications', label: 'Communications', icon: Bell },
   { path: '/dashboard', label: 'Reports', icon: BarChart3 },
   { path: '/billing', label: 'Billing', icon: CreditCard },
 ];
+
 
 const verificationsNavItem = {
   path: '/admin/doctor-verifications',

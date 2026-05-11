@@ -44,6 +44,8 @@ import { AdminInventoryPage } from './pages/InventoryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
 import AdminBrandingPage from './pages/AdminBrandingPage';
+import AdminCommunicationsPage from './pages/AdminCommunicationsPage';
+
 import { Signup } from './pages/Signup';
 import { SignupPatient } from './pages/SignupPatient';
 import { SignupDoctor } from './pages/SignupDoctor';
@@ -305,6 +307,23 @@ function AnimatedRoutes() {
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
                       <AdminBrandingPage />
+                    </AnimatedPage>
+                  </AppLayout>
+                </AdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/communications"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <AdminRoute user={user}>
+                  <AppLayout user={user} onLogout={logout}>
+                    <AnimatedPage>
+                      <AdminCommunicationsPage />
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
