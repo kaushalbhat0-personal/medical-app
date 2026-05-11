@@ -30,6 +30,10 @@ interface CompleteVisitModalProps {
     clinical_notes: string | null;
     diagnosis: string | null;
     treatment_summary: string | null;
+    subjective_notes: string | null;
+    objective_notes: string | null;
+    assessment_notes: string | null;
+    plan_notes: string | null;
     items: { item_id: string; quantity: number }[];
     prescriptions: {
       notes: string | null;
@@ -41,6 +45,18 @@ interface CompleteVisitModalProps {
         instructions?: string | null;
       }[];
     }[];
+    vitals: {
+      temperature?: number | null;
+      bp_systolic?: number | null;
+      bp_diastolic?: number | null;
+      pulse?: number | null;
+      respiratory_rate?: number | null;
+      spo2?: number | null;
+      weight?: number | null;
+      height?: number | null;
+      bmi?: number | null;
+      notes?: string | null;
+    } | null;
     generate_bill: boolean;
     bill_consultation_amount?: number;
   }) => void;
@@ -70,6 +86,22 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatmentSummary, setTreatmentSummary] = useState('');
+  const [subjectiveNotes, setSubjectiveNotes] = useState('');
+  const [objectiveNotes, setObjectiveNotes] = useState('');
+  const [assessmentNotes, setAssessmentNotes] = useState('');
+  const [planNotes, setPlanNotes] = useState('');
+  const [vitals, setVitals] = useState({
+    temperature: '',
+    bp_systolic: '',
+    bp_diastolic: '',
+    pulse: '',
+    respiratory_rate: '',
+    spo2: '',
+    weight: '',
+    height: '',
+    bmi: '',
+    notes: '',
+  });
   const [usageRows, setUsageRows] = useState<UsageRow[]>([
     { key: crypto.randomUUID(), item_id: '', quantity: '1' },
   ]);

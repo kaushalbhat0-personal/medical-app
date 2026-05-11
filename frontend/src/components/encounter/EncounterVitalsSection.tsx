@@ -71,19 +71,37 @@ export function EncounterVitalsSection({ vitals, compact = false }: EncounterVit
                 <p className="mt-2 text-sm text-muted-foreground">{vitals.weight.toFixed(1)} kg</p>
               </div>
             )}
-            {vitals?.spo2 != null && (
+            {vitals?.respiratory_rate != null && (
               <div className="rounded-lg border border-border p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Droplet className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  SpO2
+                  <Activity className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Respiratory Rate
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{vitals.spo2}%</p>
+                <p className="mt-2 text-sm text-muted-foreground">{vitals.respiratory_rate} breaths/min</p>
               </div>
             )}
-            {vitals?.created_at && (
+            {vitals?.height != null && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Scale className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Height
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{vitals.height.toFixed(1)} cm</p>
+              </div>
+            )}
+            {vitals?.bmi != null && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Scale className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  BMI
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{vitals.bmi.toFixed(1)} kg/m²</p>
+              </div>
+            )}
+            {vitals?.notes && (
               <div className="rounded-lg border border-border p-3 col-span-full">
-                <p className="text-xs text-muted-foreground">Recorded at</p>
-                <p className="text-sm text-foreground">{new Date(vitals.created_at).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm text-foreground">{vitals.notes}</p>
               </div>
             )}
           </div>

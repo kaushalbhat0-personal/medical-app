@@ -68,8 +68,12 @@ class VitalSignsRead(BaseModel):
     bp_systolic: int | None = None
     bp_diastolic: int | None = None
     pulse: int | None = None
-    weight: float | None = None
+    respiratory_rate: int | None = None
     spo2: int | None = None
+    weight: float | None = None
+    height: float | None = None
+    bmi: float | None = None
+    notes: str | None = None
     created_at: datetime
 
 
@@ -115,6 +119,11 @@ class AppointmentRead(BaseModel):
     diagnosis: str | None = None
     # treatment_summary = treatment provided, medications, follow-up plan.
     treatment_summary: str | None = None
+    # SOAP notes: structured clinical documentation
+    subjective_notes: str | None = None
+    objective_notes: str | None = None
+    assessment_notes: str | None = None
+    plan_notes: str | None = None
     follow_up_date: datetime | None = None
     follow_up_notes: str | None = None
     encounter_started_at: datetime | None = None
@@ -159,8 +168,12 @@ class VitalSignsCreate(BaseModel):
     bp_systolic: int | None = Field(None, ge=30, le=250)
     bp_diastolic: int | None = Field(None, ge=30, le=180)
     pulse: int | None = Field(None, ge=20, le=220)
-    weight: float | None = Field(None, ge=0, le=500)
+    respiratory_rate: int | None = Field(None, ge=8, le=60)
     spo2: int | None = Field(None, ge=50, le=100)
+    weight: float | None = Field(None, ge=0, le=500)
+    height: float | None = Field(None, ge=30, le=250)
+    bmi: float | None = Field(None, ge=10, le=70)
+    notes: str | None = Field(None, max_length=10_000)
 
 
 class MarkAppointmentCompletedRequest(BaseModel):
@@ -174,6 +187,11 @@ class MarkAppointmentCompletedRequest(BaseModel):
     diagnosis: str | None = Field(None, max_length=50_000)
     # treatment_summary = treatment provided, medications, follow-up plan.
     treatment_summary: str | None = Field(None, max_length=50_000)
+    # SOAP notes: structured clinical documentation
+    subjective_notes: str | None = Field(None, max_length=50_000)
+    objective_notes: str | None = Field(None, max_length=50_000)
+    assessment_notes: str | None = Field(None, max_length=50_000)
+    plan_notes: str | None = Field(None, max_length=50_000)
     items: list[InventoryUseLine] = Field(default_factory=list)
     prescriptions: list[PrescriptionCreate] = Field(default_factory=list)
     vitals: VitalSignsCreate | None = None

@@ -18,6 +18,7 @@ export { EncounterMedicationSection } from './EncounterMedicationSection';
 export { EncounterBillingSection } from './EncounterBillingSection';
 export { EncounterTimelineSection } from './EncounterTimelineSection';
 export { EncounterVitalsSection } from './EncounterVitalsSection';
+export { EncounterSOAPSection } from './EncounterSOAPSection';
 export { EncounterPrescriptionsSection } from './EncounterPrescriptionsSection';
 export { EncounterFollowUpSection } from './EncounterFollowUpSection';
 

@@ -428,3 +428,54 @@ def soft_delete_appointment(db: Session, appointment: Appointment) -> Appointmen
     db.commit()
     db.refresh(appointment)
     return appointment
+
+
+def add_appointment_vitals(
+    db: Session,
+    appointment_id: UUID,
+    temperature: float | None = None,
+    bp_systolic: int | None = None,
+    bp_diastolic: int | None = None,
+    pulse: int | None = None,
+    respiratory_rate: int | None = None,
+    spo2: int | None = None,
+    weight: float | None = None,
+    height: float | None = None,
+    bmi: float | None = None,
+    notes: str | None = None,
+) -> AppointmentVitals:
+    vitals = AppointmentVitals(
+        appointment_id=appointment_id,
+        temperature=temperature,
+        bp_systolic=bp_systolic,
+        bp_diastolic=bp_diastolic,
+        pulse=pulse,
+        respiratory_rate=respiratory_rate,
+        spo2=spo2,
+        weight=weight,
+        height=height,
+        bmi=bmi,
+        notes=notes,
+    )
+    db.add(vitals)
+    db.flush()
+    db.refresh(vitals)
+    return vitals
+
+
+def update_appointment_vitals(
+    db: Session,
+    vitals: AppointmentVitals,
+    update_data: dict[str, Any],
+) -> AppointmentVitals:
+    for field, value in update_data.items():
+        setattr(vitals, field, value)
+    db.add(vitals)
+    db.flush()
+    db.refresh(vitals)
+    return vitals
+
+
+def get_vitals_by_appointment(db: Session, appointment_id: UUID) -> AppointmentVitals | None:
+    stmt = select(AppointmentVitals).where(AppointmentVitals.appointment_id == appointment_id)
+    return db.scalars(stmt).first()

@@ -439,6 +439,7 @@ def _create_appointment_vitals(
     db: Session,
     appointment: Appointment,
     vitals_data: VitalSignsCreate,
+    current_user: User,
 ) -> None:
     if vitals_data is None:
         return
@@ -447,8 +448,12 @@ def _create_appointment_vitals(
         and vitals_data.bp_systolic is None
         and vitals_data.bp_diastolic is None
         and vitals_data.pulse is None
-        and vitals_data.weight is None
+        and vitals_data.respiratory_rate is None
         and vitals_data.spo2 is None
+        and vitals_data.weight is None
+        and vitals_data.height is None
+        and vitals_data.bmi is None
+        and vitals_data.notes is None
     ):
         return
     crud_appointment.add_appointment_vitals(
@@ -458,8 +463,20 @@ def _create_appointment_vitals(
         bp_systolic=vitals_data.bp_systolic,
         bp_diastolic=vitals_data.bp_diastolic,
         pulse=vitals_data.pulse,
-        weight=vitals_data.weight,
+        respiratory_rate=vitals_data.respiratory_rate,
         spo2=vitals_data.spo2,
+        weight=vitals_data.weight,
+        height=vitals_data.height,
+        bmi=vitals_data.bmi,
+        notes=vitals_data.notes,
+    )
+    log_structured_audit_event(
+        event="vitals_recorded",
+        tenant_id=appointment.tenant_id,
+        resource_id=str(appointment.id),
+        actor_id=str(current_user.id),
+        appointment_id=str(appointment.id),
+        patient_id=str(appointment.patient_id),
     )
 
 
@@ -738,12 +755,35 @@ def mark_appointment_completed(
     # treatment_summary = treatment provided, medications, follow-up plan.
     if data.treatment_summary is not None:
         appointment.treatment_summary = data.treatment_summary
+    # SOAP notes: structured clinical documentation
+    if data.subjective_notes is not None:
+        appointment.subjective_notes = data.subjective_notes
+    if data.objective_notes is not None:
+        appointment.objective_notes = data.objective_notes
+    if data.assessment_notes is not None:
+        appointment.assessment_notes = data.assessment_notes
+    if data.plan_notes is not None:
+        appointment.plan_notes = data.plan_notes
+    if any([
+        data.subjective_notes is not None,
+        data.objective_notes is not None,
+        data.assessment_notes is not None,
+        data.plan_notes is not None,
+    ]):
+        log_structured_audit_event(
+            event="soap_updated",
+            tenant_id=appointment.tenant_id,
+            resource_id=str(appointment.id),
+            actor_id=str(current_user.id),
+            appointment_id=str(appointment.id),
+            patient_id=str(appointment.patient_id),
+        )
     if data.follow_up_date is not None:
         appointment.follow_up_date = data.follow_up_date
     if data.follow_up_notes is not None:
         appointment.follow_up_notes = data.follow_up_notes
 
-    _create_appointment_vitals(db, appointment, data.vitals)  # type: ignore[arg-type]
+    _create_appointment_vitals(db, appointment, data.vitals, current_user)  # type: ignore[arg-type]
     _create_appointment_prescriptions(db, appointment, data.prescriptions)
 
     appointment.status = AppointmentStatus.completed

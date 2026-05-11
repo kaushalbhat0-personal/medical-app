@@ -113,6 +113,11 @@ class Appointment(Base):
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     # treatment_summary = treatment provided, medications prescribed, follow-up plan.
     treatment_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SOAP notes: structured clinical documentation
+    subjective_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objective_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assessment_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    plan_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
@@ -197,12 +202,10 @@ class AppointmentVitals(Base):
     bp_diastolic: Mapped[int | None] = mapped_column(Integer, nullable=True)
     pulse: Mapped[int | None] = mapped_column(Integer, nullable=True)
     weight: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
-    spo2: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
+    respiratory_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    bmi: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     appointment = relationship("Appointment", back_populates="vitals")
 

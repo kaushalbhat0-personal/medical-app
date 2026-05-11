@@ -276,6 +276,13 @@ export interface Appointment {
    * Treatment summary = treatment provided, medications prescribed, follow-up plan.
    */
   treatment_summary?: string | null;
+  /**
+   * SOAP notes: structured clinical documentation
+   */
+  subjective_notes?: string | null;
+  objective_notes?: string | null;
+  assessment_notes?: string | null;
+  plan_notes?: string | null;
   follow_up_date?: string | null;
   follow_up_notes?: string | null;
   vitals?: VitalSigns;
@@ -304,8 +311,12 @@ export interface VitalSigns {
   bp_systolic?: number | null;
   bp_diastolic?: number | null;
   pulse?: number | null;
-  weight?: number | null;
+  respiratory_rate?: number | null;
   spo2?: number | null;
+  weight?: number | null;
+  height?: number | null;
+  bmi?: number | null;
+  notes?: string | null;
   created_at: string;
 }
 

@@ -1,0 +1,71 @@
+import { FileText, Stethoscope, Brain, ClipboardList } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import type { Appointment } from '../../types';
+
+interface EncounterSOAPSectionProps {
+  appointment: Appointment;
+  compact?: boolean;
+}
+
+export function EncounterSOAPSection({ appointment, compact = false }: EncounterSOAPSectionProps) {
+  const hasSOAP = appointment.subjective_notes || appointment.objective_notes ||
+                  appointment.assessment_notes || appointment.plan_notes;
+
+  return (
+    <Card className={cn('overflow-hidden', compact && 'text-sm')}>
+      <CardHeader className={cn('pb-2', compact && 'p-3 pb-2')}>
+        <CardTitle className={cn('flex items-center gap-2', compact && 'text-sm')}>
+          <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
+          SOAP Notes
+        </CardTitle>
+      </CardHeader>
+      <CardContent className={cn('space-y-4', compact && 'p-3 pt-0')}>
+        {!hasSOAP ? (
+          <p className="text-sm text-muted-foreground italic">
+            No structured SOAP notes recorded for this encounter.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {appointment.subjective_notes && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                  <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Subjective
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{appointment.subjective_notes}</p>
+              </div>
+            )}
+            {appointment.objective_notes && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                  <Stethoscope className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Objective
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{appointment.objective_notes}</p>
+              </div>
+            )}
+            {appointment.assessment_notes && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                  <Brain className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Assessment
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{appointment.assessment_notes}</p>
+              </div>
+            )}
+            {appointment.plan_notes && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                  <ClipboardList className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Plan
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{appointment.plan_notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
