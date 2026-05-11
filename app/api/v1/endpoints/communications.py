@@ -79,7 +79,7 @@ def list_notifications(
     patient_id: UUID | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """
     List notification events for the current tenant.
@@ -88,7 +88,6 @@ def list_notifications(
     Patient: only their own notifications.
     Doctor: notifications for their patients (future).
     """
-    tenant_id = tenant_context.tenant_id
     if tenant_id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -130,10 +129,9 @@ def get_notification(
     event_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Get a single notification event with delivery details."""
-    tenant_id = tenant_context.tenant_id
     event = crud_notification.get_notification_event(db, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -163,10 +161,9 @@ def get_deliveries(
     event_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Get all delivery records for a notification event."""
-    tenant_id = tenant_context.tenant_id
     event = crud_notification.get_notification_event(db, event_id)
     if event is None or event.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -186,10 +183,9 @@ def list_failed_deliveries(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """List failed deliveries for the current tenant."""
-    tenant_id = tenant_context.tenant_id
     if tenant_id is None:
         raise HTTPException(status_code=403, detail="Tenant context required")
 
@@ -215,10 +211,9 @@ def resend_delivery(
     request: ResendNotificationRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Resend a failed delivery."""
-    tenant_id = tenant_context.tenant_id
     delivery = crud_notification.get_notification_delivery(db, delivery_id)
     if delivery is None:
         raise HTTPException(status_code=404, detail="Delivery not found")
@@ -253,10 +248,9 @@ def list_templates(
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """List communication templates for the current tenant."""
-    tenant_id = tenant_context.tenant_id
     templates, total = crud_notification.get_templates_for_tenant(
         db, tenant_id, skip=skip, limit=limit
     )
@@ -273,7 +267,7 @@ def get_template(
     template_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Get a single communication template."""
     template = crud_notification.get_communication_template(db, template_id)
@@ -281,7 +275,7 @@ def get_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Tenant isolation: system templates (tenant_id IS NULL) are visible to all
-    if template.tenant_id is not None and template.tenant_id != tenant_context.tenant_id:
+    if template.tenant_id is not None and template.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     return CommunicationTemplateRead.model_validate(template)
@@ -296,10 +290,9 @@ def create_template(
     data: CommunicationTemplateCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Create a new communication template for the current tenant."""
-    tenant_id = tenant_context.tenant_id
     if tenant_id is None:
         raise HTTPException(status_code=403, detail="Tenant context required")
 
@@ -330,7 +323,7 @@ def update_template(
     data: CommunicationTemplateUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Update a communication template."""
     template = crud_notification.get_communication_template(db, template_id)
@@ -338,7 +331,7 @@ def update_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Only tenant-owned templates can be updated
-    if template.tenant_id != tenant_context.tenant_id:
+    if template.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     template = crud_notification.update_communication_template(
@@ -358,14 +351,14 @@ def delete_template(
     template_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Delete a communication template."""
     template = crud_notification.get_communication_template(db, template_id)
     if template is None:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    if template.tenant_id != tenant_context.tenant_id:
+    if template.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     crud_notification.delete_communication_template(db, template_id)
@@ -382,10 +375,9 @@ def preview_template(
     request: TemplatePreviewRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Preview a rendered template with test data."""
-    tenant_id = tenant_context.tenant_id
     template = None
 
     if request.template_id:
@@ -444,10 +436,9 @@ def list_placeholders():
 def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """Get aggregated notification stats for the admin dashboard."""
-    tenant_id = tenant_context.tenant_id
     if tenant_id is None:
         raise HTTPException(status_code=403, detail="Tenant context required")
 
@@ -463,7 +454,7 @@ def get_dashboard_stats(
 @router.get("/reminder-settings", response_model=ReminderSettings)
 def get_reminder_settings(
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """
     Get reminder settings for the current tenant.
@@ -477,7 +468,7 @@ def get_reminder_settings(
 def update_reminder_settings(
     settings: ReminderSettings,
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """
     Update reminder settings for the current tenant.
@@ -496,7 +487,7 @@ def update_reminder_settings(
 def trigger_reminders(
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
-    tenant_context: deps.CurrentTenantContext = Depends(deps.get_optional_scoped_tenant),
+    tenant_id: UUID | None = Depends(deps.get_optional_scoped_tenant_id),
 ):
     """
     Manually trigger reminder generation.
