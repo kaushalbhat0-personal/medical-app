@@ -217,7 +217,7 @@ def _escape_html(text: str | None) -> str:
         text.replace("&", "&")
         .replace("<", "<")
         .replace(">", ">")
-        .replace('"', """)
+        .replace('"', "&quot;")
         .replace("'", "&#x27;")
     )
 
