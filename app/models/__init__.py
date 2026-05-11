@@ -30,6 +30,14 @@ from app.models.tenant import (
     TenantType,
     UserTenant,
 )
+from app.models.notification import (
+    CommunicationTemplate,
+    NotificationChannel,
+    NotificationDelivery,
+    NotificationDeliveryStatus,
+    NotificationEvent,
+    NotificationEventType,
+)
 from app.models.tenant_branding import (
     TenantBrandingProfile,
     TenantOrganizationProfile,
@@ -65,6 +73,13 @@ __all__ = [
     "UserTenant",
     "TenantOrganizationProfile",
     "TenantBrandingProfile",
+    "NotificationEvent",
+    "NotificationEventType",
+    "NotificationDelivery",
+    "NotificationDeliveryStatus",
+    "NotificationChannel",
+    "CommunicationTemplate",
 ]
+
 
 

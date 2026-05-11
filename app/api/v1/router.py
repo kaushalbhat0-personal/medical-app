@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     auth,
     billing,
     branding,
+    communications,
     dashboard,
     doctor,
     doctor_profile,
@@ -19,6 +20,7 @@ from app.api.v1.endpoints import (
     tenant,
     users,
 )
+
 
 
 api_router = APIRouter()
@@ -40,6 +42,7 @@ api_router.include_router(dashboard.admin_router, prefix="/admin")
 api_router.include_router(admin_doctor_verification.router, prefix="/admin")
 api_router.include_router(documents.router)
 api_router.include_router(branding.router)
+api_router.include_router(communications.router)
 
 
 
