@@ -39,12 +39,12 @@ import {
   fetchPatientFinancialLedger,
   exportReport,
   downloadBlob,
-  type BillingReportRow,
   type BillingReportResult,
-  type InventoryLedgerRow,
   type InventoryLedgerResult,
   type PatientFinancialLedger,
 } from '../services/reporting';
+import { documentsApi } from '../services/documents';
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -57,29 +57,24 @@ function formatCurrency(value: string | number): string {
   }).format(num);
 }
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  return dayjs(dateStr).format('MMM D, YYYY h:mm A');
-}
-
 function formatDateShort(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return dayjs(dateStr).format('MMM D, YYYY');
 }
 
 function statusBadge(status: string) {
-  const variant = status === 'paid' ? 'success' : status === 'unpaid' ? 'warning' : 'default';
+  const variant = status === 'paid' ? 'default' : status === 'unpaid' ? 'secondary' : 'default';
   return (
-    <Badge variant={variant as any}>
+    <Badge variant={variant}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
 }
 
 function movementBadge(type: string) {
-  const variant = type === 'IN' ? 'success' : type === 'OUT' ? 'destructive' : 'warning';
+  const variant = type === 'IN' ? 'default' : type === 'OUT' ? 'destructive' : 'secondary';
   return (
-    <Badge variant={variant as any}>
+    <Badge variant={variant}>
       {type}
     </Badge>
   );
@@ -164,7 +159,7 @@ function BillingReportTab() {
               <Label htmlFor="bill-status" className="text-xs">Status</Label>
               <Select
                 value={statusFilter}
-                onValueChange={(v) => { setStatusFilter(v); setPage(0); }}
+                onValueChange={(v: string) => { setStatusFilter(v); setPage(0); }}
               >
                 <SelectTrigger id="bill-status" className="h-9 w-36">
                   <SelectValue placeholder="All" />
@@ -363,7 +358,7 @@ function InventoryLedgerTab() {
               <Label htmlFor="inv-movement" className="text-xs">Movement</Label>
               <Select
                 value={movementFilter}
-                onValueChange={(v) => { setMovementFilter(v); setPage(0); }}
+                onValueChange={(v: string) => { setMovementFilter(v); setPage(0); }}
               >
                 <SelectTrigger id="inv-movement" className="h-9 w-36">
                   <SelectValue placeholder="All" />
@@ -600,7 +595,17 @@ function PatientFinancialsTab() {
                 <Button variant="outline" size="sm" onClick={() => handleExport('pdf')}>
                   <FileText className="mr-1 h-4 w-4" /> PDF
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void documentsApi.triggerStatementDownload(ledger.patient_id);
+                  }}
+                >
+                  <Wallet className="mr-1 h-4 w-4" /> Statement
+                </Button>
               </div>
+
             </CardHeader>
             <CardContent>
               {ledger.bills.length === 0 ? (
@@ -657,7 +662,7 @@ function PatientFinancialsTab() {
                           <td className="px-3 py-2 text-muted-foreground">{formatDateShort(enc.appointment_time)}</td>
                           <td className="px-3 py-2 text-center">
                             {enc.has_bill ? (
-                              <Badge variant="success">Yes</Badge>
+                              <Badge variant="default">Yes</Badge>
                             ) : (
                               <Badge variant="secondary">No</Badge>
                             )}

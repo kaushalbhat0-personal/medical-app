@@ -30,6 +30,10 @@ from app.models.tenant import (
     TenantType,
     UserTenant,
 )
+from app.models.tenant_branding import (
+    TenantBrandingProfile,
+    TenantOrganizationProfile,
+)
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -59,4 +63,8 @@ __all__ = [
     "TenantCreationIdempotency",
     "TenantType",
     "UserTenant",
+    "TenantOrganizationProfile",
+    "TenantBrandingProfile",
 ]
+
+

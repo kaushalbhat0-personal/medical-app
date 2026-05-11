@@ -24,8 +24,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, FileText, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
 import { ErrorState } from '../../components/common';
 import {
   EncounterHeaderSection,
@@ -39,7 +40,8 @@ import {
 } from '../../components/encounter';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
-import { appointmentsApi, billingApi, encountersApi, inventoryApi } from '../../services';
+import { appointmentsApi, billingApi, documentsApi, encountersApi, inventoryApi } from '../../services';
+
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import {
@@ -48,7 +50,6 @@ import {
   setTenantInventoryCache,
 } from '../../utils/tenantInventoryCache';
 import type {
-  Appointment,
   Bill,
   EncounterDetailAggregate,
   VisitAggregate,
@@ -88,8 +89,6 @@ export function EncounterWorkspacePage() {
   // Derive convenience references from the aggregate
   const appointment = aggregate?.appointment ?? null;
   const patient = aggregate?.patient ?? null;
-  const doctor = aggregate?.doctor ?? null;
-  const bill = aggregate?.bill ?? null;
 
   // Check if user can mark this encounter as complete
   const canMarkComplete = useMemo(() => {
@@ -405,19 +404,52 @@ export function EncounterWorkspacePage() {
         backTo="/doctor/appointments"
         backLabel="Appointments"
         actions={
-          canMarkComplete ? (
-            <Button
-              type="button"
-              size="sm"
-              disabled={markBusy}
-              onClick={openCompleteModal}
-              className="gap-1.5"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Complete encounter
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {/* Document download buttons — shown for completed encounters */}
+            {appointment?.status === 'completed' && appointmentId && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void documentsApi.triggerPrescriptionDownload(appointmentId);
+                  }}
+                  className="gap-1.5"
+                >
+                  <FileText className="h-4 w-4" />
+                  Prescription
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void documentsApi.triggerEncounterSummaryDownload(appointmentId);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Printer className="h-4 w-4" />
+                  Summary
+                </Button>
+              </>
+            )}
+            {/* Complete encounter button — shown for scheduled encounters */}
+            {canMarkComplete && (
+              <Button
+                type="button"
+                size="sm"
+                disabled={markBusy}
+                onClick={openCompleteModal}
+                className="gap-1.5"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Complete encounter
+              </Button>
+            )}
+          </div>
         }
+
       />
       
       {/* 

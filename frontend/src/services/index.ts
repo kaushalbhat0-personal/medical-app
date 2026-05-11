@@ -34,3 +34,17 @@ export {
   type InventoryItemType,
   type InventoryItemWithStockDTO,
 } from './inventory';
+export { documentsApi } from './documents';
+export {
+  getOrganizationProfile,
+  updateOrganizationProfile,
+  getBrandingProfile,
+  updateBrandingProfile,
+  previewDocument,
+  type TenantOrganizationProfile,
+  type TenantOrganizationProfileUpdate,
+  type TenantBrandingProfile,
+  type TenantBrandingProfileUpdate,
+} from './branding';
+
+

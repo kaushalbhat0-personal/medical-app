@@ -12,6 +12,7 @@ import {
   Package,
   Building2,
   ShieldCheck,
+  Palette,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -57,6 +58,7 @@ const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/patients', label: 'Patients', icon: Users },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope },
   { path: '/admin/inventory', label: 'Inventory', icon: Package },
+  { path: '/admin/branding', label: 'Branding', icon: Palette },
   { path: '/dashboard', label: 'Reports', icon: BarChart3 },
   { path: '/billing', label: 'Billing', icon: CreditCard },
 ];
@@ -86,9 +88,10 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
     const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
     const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
     const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
+    const brandingItem = { path: '/admin/branding', label: 'Branding', icon: Palette };
     const mid = isSuperAdminRole(effRoles)
-      ? [adminItem, tenantsItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem]
-      : [adminItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem];
+      ? [adminItem, tenantsItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem, brandingItem]
+      : [adminItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem, brandingItem];
     return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
   }, [effRoles, showVerifyNav]);
 

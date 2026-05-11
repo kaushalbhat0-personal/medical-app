@@ -77,6 +77,18 @@ class Tenant(Base):
     )
 
     user_associations = relationship("UserTenant", back_populates="tenant")
+    organization_profile = relationship(
+        "TenantOrganizationProfile",
+        back_populates="tenant",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    branding_profile = relationship(
+        "TenantBrandingProfile",
+        back_populates="tenant",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class TenantCreationIdempotency(Base):
