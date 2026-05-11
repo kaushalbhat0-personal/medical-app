@@ -106,9 +106,13 @@ export const appointmentsApi = {
         bp_systolic?: number | null;
         bp_diastolic?: number | null;
         pulse?: number | null;
-        weight?: number | null;
+        respiratory_rate?: number | null;
         spo2?: number | null;
-      };
+        weight?: number | null;
+        height?: number | null;
+        bmi?: number | null;
+        notes?: string | null;
+      } | null;
       follow_up_date?: string | null;
       follow_up_notes?: string | null;
       generate_bill?: boolean;

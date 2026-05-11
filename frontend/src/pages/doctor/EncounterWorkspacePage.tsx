@@ -306,7 +306,33 @@ export function EncounterWorkspacePage() {
     clinical_notes: string | null;
     diagnosis: string | null;
     treatment_summary: string | null;
+    subjective_notes: string | null;
+    objective_notes: string | null;
+    assessment_notes: string | null;
+    plan_notes: string | null;
     items: { item_id: string; quantity: number }[];
+    prescriptions: {
+      notes: string | null;
+      items: {
+        medicine_name: string;
+        dosage?: string | null;
+        frequency?: string | null;
+        duration?: string | null;
+        instructions?: string | null;
+      }[];
+    }[];
+    vitals: {
+      temperature?: number | null;
+      bp_systolic?: number | null;
+      bp_diastolic?: number | null;
+      pulse?: number | null;
+      respiratory_rate?: number | null;
+      spo2?: number | null;
+      weight?: number | null;
+      height?: number | null;
+      bmi?: number | null;
+      notes?: string | null;
+    } | null;
     generate_bill: boolean;
     bill_consultation_amount?: number;
   }) => {

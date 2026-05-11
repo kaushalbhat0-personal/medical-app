@@ -217,12 +217,33 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
     
     const fee = generateBill && consultationFeeValid ? consultationFeeNumber : undefined;
     
+    // Normalize vitals: only send if at least one field has a value
+    const normalizedVitals = Object.values(vitals).some((v) => v !== '' && v !== null)
+      ? {
+          temperature: vitals.temperature ? parseFloat(vitals.temperature) : null,
+          bp_systolic: vitals.bp_systolic ? parseInt(vitals.bp_systolic, 10) : null,
+          bp_diastolic: vitals.bp_diastolic ? parseInt(vitals.bp_diastolic, 10) : null,
+          pulse: vitals.pulse ? parseInt(vitals.pulse, 10) : null,
+          respiratory_rate: vitals.respiratory_rate ? parseInt(vitals.respiratory_rate, 10) : null,
+          spo2: vitals.spo2 ? parseInt(vitals.spo2, 10) : null,
+          weight: vitals.weight ? parseFloat(vitals.weight) : null,
+          height: vitals.height ? parseFloat(vitals.height) : null,
+          bmi: vitals.bmi ? parseFloat(vitals.bmi) : null,
+          notes: vitals.notes.trim() || null,
+        }
+      : null;
+    
     onComplete({
       clinical_notes: clinicalNotes.trim() || null,
       diagnosis: diagnosis.trim() || null,
       treatment_summary: treatmentSummary.trim() || null,
+      subjective_notes: subjectiveNotes.trim() || null,
+      objective_notes: objectiveNotes.trim() || null,
+      assessment_notes: assessmentNotes.trim() || null,
+      plan_notes: planNotes.trim() || null,
       items: validUsagePayload ?? [],
       prescriptions: validPrescriptionPayload,
+      vitals: normalizedVitals,
       generate_bill: generateBill,
       bill_consultation_amount: fee,
     });
@@ -312,6 +333,153 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
               onChange={(e) => setTreatmentSummary(e.target.value)}
             />
           </div>
+
+          {/* SOAP Notes Section */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              SOAP Notes <span className="font-normal text-muted-foreground/60">(optional)</span>
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="subjective-notes">
+                  Subjective
+                </label>
+                <textarea
+                  id="subjective-notes"
+                  className="mt-1 flex min-h-[56px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Patient's reported symptoms, history, concerns..."
+                  value={subjectiveNotes}
+                  onChange={(e) => setSubjectiveNotes(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="objective-notes">
+                  Objective
+                </label>
+                <textarea
+                  id="objective-notes"
+                  className="mt-1 flex min-h-[56px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Vital signs, examination findings, observations..."
+                  value={objectiveNotes}
+                  onChange={(e) => setObjectiveNotes(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="assessment-notes">
+                  Assessment
+                </label>
+                <textarea
+                  id="assessment-notes"
+                  className="mt-1 flex min-h-[56px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Diagnosis, differential diagnoses, clinical impression..."
+                  value={assessmentNotes}
+                  onChange={(e) => setAssessmentNotes(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="plan-notes">
+                  Plan
+                </label>
+                <textarea
+                  id="plan-notes"
+                  className="mt-1 flex min-h-[56px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Treatment plan, medications, follow-up, referrals..."
+                  value={planNotes}
+                  onChange={(e) => setPlanNotes(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Vitals Section */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Vitals <span className="font-normal text-muted-foreground/60">(optional)</span>
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-temperature">
+                  Temp (°F)
+                </label>
+                <Input
+                  id="vital-temperature"
+                  type="number"
+                  step="0.1"
+                  inputMode="decimal"
+                  placeholder="98.6"
+                  value={vitals.temperature}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, temperature: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-bp-sys">
+                  BP Systolic
+                </label>
+                <Input
+                  id="vital-bp-sys"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="120"
+                  value={vitals.bp_systolic}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, bp_systolic: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-bp-dia">
+                  BP Diastolic
+                </label>
+                <Input
+                  id="vital-bp-dia"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="80"
+                  value={vitals.bp_diastolic}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, bp_diastolic: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-pulse">
+                  Pulse (bpm)
+                </label>
+                <Input
+                  id="vital-pulse"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="72"
+                  value={vitals.pulse}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, pulse: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-spo2">
+                  SpO₂ (%)
+                </label>
+                <Input
+                  id="vital-spo2"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="98"
+                  value={vitals.spo2}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, spo2: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground" htmlFor="vital-weight">
+                  Weight (kg)
+                </label>
+                <Input
+                  id="vital-weight"
+                  type="number"
+                  step="0.1"
+                  inputMode="decimal"
+                  placeholder="70"
+                  value={vitals.weight}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, weight: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
               <div>
