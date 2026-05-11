@@ -74,7 +74,7 @@ class VitalSignsRead(BaseModel):
     height: float | None = None
     bmi: float | None = None
     notes: str | None = None
-    created_at: datetime
+    created_at: datetime | None = None
 
 
 class PrescriptionItemRead(BaseModel):

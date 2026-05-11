@@ -1,22 +1,17 @@
 /**
- * EncounterWorkspacePage - Future-proof clinical workspace for patient visits/encounters
- * 
- * This page replaces the legacy DoctorAppointmentDetailPage with a unified,
- * encounter-centric workspace that prepares for Phase 2 clinical features:
- * - Prescriptions (formal prescription module)
- * - Vitals (blood pressure, temperature, etc.)
- * - SOAP notes (structured documentation)
- * - Follow-up plans
- * - Attachments (lab reports, images)
- * - AI summaries
- * 
+ * EncounterWorkspacePage - Clinical workspace for patient visits/encounters
+ *
+ * This page consumes the canonical Encounter Aggregate API (GET /encounters/{appointment_id})
+ * instead of assembling multiple requests client-side.
+ *
  * Architecture principles:
  * - Appointment = Encounter anchor (NO separate Visit table)
+ * - Single canonical payload from backend
  * - Clinical-first hierarchy (diagnosis > treatment > notes > medicines > billing)
  * - Reusable section components for extensibility
  * - Capability-based authorization (no role-based checks)
  * - Mobile-responsive design
- * 
+ *
  * Invariants preserved:
  * - Tenant safety (all data scoped to current tenant)
  * - Idempotent completion
@@ -44,7 +39,7 @@ import {
 } from '../../components/encounter';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
-import { appointmentsApi, billingApi, inventoryApi, patientsApi } from '../../services';
+import { appointmentsApi, billingApi, encountersApi, inventoryApi } from '../../services';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import {
@@ -52,11 +47,9 @@ import {
   invalidateTenantInventoryCache,
   setTenantInventoryCache,
 } from '../../utils/tenantInventoryCache';
-import type { 
-  Appointment, 
-  Bill, 
-  Patient, 
-  Doctor, 
+import type {
+  Appointment,
+  Bill,
   EncounterDetailAggregate,
   VisitAggregate,
 } from '../../types';
@@ -65,71 +58,47 @@ import type { InventoryItemWithStockDTO } from '../../services/inventory';
 // Import the completion modal component (extracted from legacy page)
 import { CompleteVisitModal } from './components/CompleteVisitModal';
 
-/**
- * Build the EncounterDetailAggregate from loaded data.
- * This is the authoritative data structure for the encounter workspace.
- */
-function buildEncounterAggregate(
-  appointment: Appointment,
-  patient: Patient,
-  doctor: Doctor | undefined,
-  bill: Bill | null,
-): EncounterDetailAggregate {
-  return {
-    appointment,
-    patient,
-    doctor,
-    bill,
-    inventoryUsage: appointment.inventory_usages,
-    prescriptions: appointment.prescriptions,
-    vitals: appointment.vitals,
-    followUp:
-      appointment.follow_up_date || appointment.follow_up_notes
-        ? {
-            follow_up_date: appointment.follow_up_date,
-            follow_up_notes: appointment.follow_up_notes,
-          }
-        : undefined,
-  };
-}
-
 export function EncounterWorkspacePage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
-  
-  // Core data state
-  const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [doctor, setDoctor] = useState<Doctor | undefined>(undefined);
-  const [bill, setBill] = useState<Bill | null>(null);
-  
-  // Historical data for timeline
+
+  // Core data state — single aggregate from the API
+  const [aggregate, setAggregate] = useState<EncounterDetailAggregate | null>(null);
+
+  // Historical data for timeline (still loaded separately for pagination)
   const [previousVisits, setPreviousVisits] = useState<VisitAggregate[]>([]);
   const [previousBills, setPreviousBills] = useState<Bill[]>([]);
-  
+
   // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [markBusy, setMarkBusy] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
-  
+
   // Inventory cache for completion modal
   const [invItems, setInvItems] = useState<InventoryItemWithStockDTO[]>([]);
   const [invLoading, setInvLoading] = useState(false);
   const inventoryLoadErrorToastShown = useRef(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const completionIdempotencyRef = useRef('');
-  
+
   useModalFocusTrap(modalRef, completeOpen);
-  
+
+  // Derive convenience references from the aggregate
+  const appointment = aggregate?.appointment ?? null;
+  const patient = aggregate?.patient ?? null;
+  const doctor = aggregate?.doctor ?? null;
+  const bill = aggregate?.bill ?? null;
+
   // Check if user can mark this encounter as complete
   const canMarkComplete = useMemo(() => {
     return isIndependent && !isReadOnly && appointment?.status === 'scheduled';
   }, [isIndependent, isReadOnly, appointment?.status]);
-  
+
   /**
-   * Main data loading effect - loads encounter aggregate data
+   * Main data loading effect — consumes the canonical Encounter Aggregate API.
+   * Single request replaces the previous multi-request pattern.
    */
   const loadEncounterData = useCallback(async () => {
     if (!appointmentId) {
@@ -137,64 +106,43 @@ export function EncounterWorkspacePage() {
       setLoading(false);
       return;
     }
-    
+
     let cancelled = false;
     setError(null);
     setLoading(true);
-    
+
     try {
-      // Load primary encounter data
-      const appt = await appointmentsApi.getById(appointmentId);
+      // SINGLE canonical request — replaces multiple client-side requests
+      const encounter = await encountersApi.getById(appointmentId);
       if (cancelled) return;
-      setAppointment(appt);
-      
-      // Load related entities in parallel
-      const [linkedBills] = await Promise.all([
-        // Bills linked to this appointment
-        billingApi.getAll({ appointment_id: String(appt.id), limit: 5 }),
-      ]);
-      
-      if (!cancelled) {
-        setBill(linkedBills.length > 0 ? linkedBills[0] : null);
-      }
-      
-      // Load patient details
-      if (appt.patient_id) {
-        try {
-          const patientData = await patientsApi.getById(String(appt.patient_id));
-          if (!cancelled) setPatient(patientData);
-        } catch {
-          // Patient may have been deleted - use embedded data if available
-          if (appt.patient && !cancelled) {
-            setPatient(appt.patient);
-          }
-        }
-        
-        // Load patient history for timeline
+      setAggregate(encounter);
+
+      // Load patient history for timeline (still loaded separately for pagination/filtering)
+      if (encounter.patient?.id) {
         try {
           const [patientAppointments, patientBills] = await Promise.all([
-            appointmentsApi.getAll({ 
-              patient_id: String(appt.patient_id), 
-              skip: 0, 
-              limit: 50 
+            appointmentsApi.getAll({
+              patient_id: String(encounter.patient.id),
+              skip: 0,
+              limit: 50,
             }),
-            billingApi.getAll({ 
-              patient_id: String(appt.patient_id), 
-              skip: 0, 
-              limit: 50 
+            billingApi.getAll({
+              patient_id: String(encounter.patient.id),
+              skip: 0,
+              limit: 50,
             }),
           ]);
-          
+
           if (!cancelled) {
             // Filter out current appointment from history
             const historyAppointments = patientAppointments.filter(
-              a => String(a.id) !== String(appt.id)
+              (a) => String(a.id) !== String(encounter.appointment.id)
             );
-            
+
             // Build VisitAggregates for history
-            const historyVisits: VisitAggregate[] = historyAppointments.map(a => {
+            const historyVisits: VisitAggregate[] = historyAppointments.map((a) => {
               const linkedBill = patientBills.find(
-                b => b.appointment_id && String(b.appointment_id) === String(a.id)
+                (b) => b.appointment_id && String(b.appointment_id) === String(a.id)
               );
               return {
                 appointment: a,
@@ -202,23 +150,25 @@ export function EncounterWorkspacePage() {
                 inventoryUsage: a.inventory_usages,
               };
             });
-            
+
             setPreviousVisits(historyVisits);
-            
+
             // Bills not linked to appointments (orphaned)
             const linkedBillIds = new Set(
               patientAppointments
-                .map(a => patientBills.find(
-                  b => b.appointment_id && String(b.appointment_id) === String(a.id)
-                ))
+                .map((a) =>
+                  patientBills.find(
+                    (b) => b.appointment_id && String(b.appointment_id) === String(a.id)
+                  )
+                )
                 .filter(Boolean)
-                .map(b => String(b!.id))
+                .map((b) => String(b!.id))
             );
-            
+
             const orphanedBills = patientBills.filter(
-              b => !linkedBillIds.has(String(b.id))
+              (b) => !linkedBillIds.has(String(b.id))
             );
-            
+
             setPreviousBills(orphanedBills);
           }
         } catch (e) {
@@ -226,12 +176,6 @@ export function EncounterWorkspacePage() {
           console.warn('Failed to load patient history:', e);
         }
       }
-      
-      // Set doctor (from appointment embedded data if available)
-      if (!cancelled) {
-        setDoctor(appt.doctor);
-      }
-      
     } catch (e) {
       if (!cancelled) {
         if (axios.isAxiosError(e) && e.response?.status === 404) {
@@ -241,17 +185,17 @@ export function EncounterWorkspacePage() {
         } else {
           setError('Could not load encounter data');
         }
-        setAppointment(null);
+        setAggregate(null);
       }
     } finally {
       if (!cancelled) setLoading(false);
     }
-    
+
     return () => {
       cancelled = true;
     };
   }, [appointmentId, retryKey]);
-  
+
   useEffect(() => {
     void loadEncounterData();
   }, [loadEncounterData]);
@@ -346,21 +290,29 @@ export function EncounterWorkspacePage() {
         { idempotencyKey: completionIdempotencyRef.current }
       );
       
-      setAppointment(updated);
+      // Update the aggregate with the completed appointment
+      setAggregate((prev) => {
+        if (!prev) return prev;
+        return { ...prev, appointment: updated };
+      });
       invalidateTenantInventoryCache();
       setCompleteOpen(false);
-      
-      toast.success(payload.generate_bill 
-        ? 'Encounter completed and bill created' 
-        : 'Encounter marked complete'
+
+      toast.success(
+        payload.generate_bill
+          ? 'Encounter completed and bill created'
+          : 'Encounter marked complete'
       );
-      
+
       // Refresh bill data
-      const forAppt = await billingApi.getAll({ 
-        appointment_id: String(updated.id), 
-        limit: 5 
+      const forAppt = await billingApi.getAll({
+        appointment_id: String(updated.id),
+        limit: 5,
       });
-      setBill(forAppt.length > 0 ? forAppt[0] : null);
+      setAggregate((prev) => {
+        if (!prev) return prev;
+        return { ...prev, bill: forAppt.length > 0 ? forAppt[0] : null };
+      });
       
     } catch (e) {
       const msg = axios.isAxiosError(e) && e.response?.data 
@@ -383,11 +335,8 @@ export function EncounterWorkspacePage() {
     setCompleteOpen(true);
   };
   
-  // Build the encounter aggregate
-  const encounterAggregate = useMemo(() => {
-    if (!appointment || !patient) return null;
-    return buildEncounterAggregate(appointment, patient, doctor, bill);
-  }, [appointment, patient, doctor, bill]);
+  // The encounter aggregate comes directly from the API — no client-side assembly needed
+  const encounterAggregate = aggregate;
   
   // Loading state
   if (loading && !encounterAggregate) {
@@ -502,7 +451,7 @@ export function EncounterWorkspacePage() {
           {/* Section 4: Medicines Given (Hierarchy #6) */}
           {encounterAggregate.appointment.status === 'completed' && (
             <EncounterMedicationSection
-              inventoryUsages={encounterAggregate.inventoryUsage}
+              inventoryUsages={encounterAggregate.inventory_usage}
               inventoryMaterialsSellingTotal={
                 encounterAggregate.appointment.inventory_materials_selling_total
               }
@@ -556,7 +505,15 @@ export function EncounterWorkspacePage() {
 
           {/* Section 5: Follow-up Plan (Hierarchy #8) */}
           <EncounterFollowUpSection
-            followUp={encounterAggregate.followUp}
+            followUp={
+              encounterAggregate.appointment.follow_up_date ||
+              encounterAggregate.appointment.follow_up_notes
+                ? {
+                    follow_up_date: encounterAggregate.appointment.follow_up_date,
+                    follow_up_notes: encounterAggregate.appointment.follow_up_notes,
+                  }
+                : undefined
+            }
             compact={false}
           />
           

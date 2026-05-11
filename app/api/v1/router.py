@@ -8,10 +8,12 @@ from app.api.v1.endpoints import (
     dashboard,
     doctor,
     doctor_profile,
+    encounter,
     health,
     inventory,
     patient,
     public_discovery,
+    reporting,
     tenant,
     users,
 )
@@ -28,6 +30,8 @@ api_router.include_router(doctor_profile.router)
 api_router.include_router(appointment.router)
 api_router.include_router(billing.router)
 api_router.include_router(inventory.router)
+api_router.include_router(encounter.router)
+api_router.include_router(reporting.router)
 api_router.include_router(dashboard.router, prefix="/dashboard")
 api_router.include_router(dashboard.admin_router, prefix="/admin")
 api_router.include_router(admin_doctor_verification.router, prefix="/admin")

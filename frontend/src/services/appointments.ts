@@ -1,6 +1,6 @@
 import { api } from './api';
 import { safeArray } from '../utils';
-import type { Appointment } from '../types';
+import type { Appointment, EncounterDetailAggregate } from '../types';
 
 export interface CreateAppointmentData {
   patient_id: string;
@@ -141,5 +141,26 @@ export const appointmentsApi = {
       console.error('[appointmentsApi.delete] Error:', error);
       throw error;
     }
+  },
+};
+
+/**
+ * Encounters API — canonical encounter aggregate endpoint.
+ *
+ * GET /encounters/{appointment_id}
+ *
+ * Returns the full EncounterDetailAggregate in a single response.
+ * This is the SINGLE canonical source for encounter workspace rendering.
+ */
+export const encountersApi = {
+  /**
+   * Get the full encounter aggregate for the given appointment.
+   * Replaces the previous pattern of assembling multiple requests client-side.
+   */
+  getById: async (appointmentId: string): Promise<EncounterDetailAggregate> => {
+    const response = await api.get<EncounterDetailAggregate>(
+      `/encounters/${appointmentId}`
+    );
+    return response.data;
   },
 };

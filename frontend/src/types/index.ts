@@ -372,37 +372,58 @@ export interface VisitAggregate {
 }
 
 /**
+ * TimelineContext — lightweight patient history for encounter context.
+ * Returned by the Encounter Aggregate API.
+ */
+export interface TimelineContext {
+  previous_visit_count: number;
+  previous_appointment_ids: string[];
+}
+
+/**
  * EncounterDetailAggregate represents the complete clinical encounter workspace data.
- * This is a frontend/domain abstraction - there is NO database table.
+ * This is a READ-ONLY aggregate returned by GET /encounters/{appointment_id}.
+ * There is NO database table — it composes existing domain entities.
  * 
  * The appointment acts as the clinical encounter anchor.
  * Bills, inventory usage, prescriptions, etc. are attached metadata.
  * 
+ * This is the SINGLE canonical source for:
+ * - Encounter Workspace rendering
+ * - AI clinical summaries (future)
+ * - PDF/export generation (future)
+ * - mobile sync (future)
+ * - analytics (future)
+ * - clinical integrations (future)
+ * 
  * TODO: Future Phase 2 clinical extensions:
- * - prescriptions?: Prescription[] - formal prescription records
- * - vitals?: VitalSigns - blood pressure, temperature, weight, etc.
  * - attachments?: Attachment[] - lab reports, images, documents
  * - followUp?: FollowUpPlan - scheduled follow-up appointments
- * - soapNotes?: SoapNotes - structured SOAP documentation
  * - aiSummary?: AiVisitSummary - AI-generated visit summary
+ * - icdCodes?: IcdCodeAssignment[]
+ * - referrals?: ReferralRead[]
+ * - ePrescriptionSigned?: boolean
  */
 export interface EncounterDetailAggregate {
   /** The appointment acts as the clinical encounter anchor */
   appointment: Appointment;
   /** Patient associated with this encounter */
   patient: Patient;
-  /** Doctor who conducted this encounter (optional for some workflows) */
-  doctor?: Doctor;
-  /** Linked bill for this encounter, if any */
-  bill?: Bill | null;
-  /** Inventory/medicines used during this encounter */
-  inventoryUsage?: AppointmentInventoryUsageLine[];
+  /** Doctor who conducted this encounter */
+  doctor: Doctor;
+  /** Clinical data */
+  vitals?: VitalSigns | null;
   prescriptions?: Prescription[];
-  vitals?: VitalSigns;
-  followUp?: FollowUpPlan;
+  /** Operational data */
+  inventory_usage?: AppointmentInventoryUsageLine[];
+  bill?: Bill | null;
+  /** Context */
+  timeline_context?: TimelineContext | null;
   // TODO: Future extension - attachments?: Attachment[];
-  // TODO: Future extension - soapNotes?: SoapNotes;
   // TODO: Future extension - aiSummary?: AiVisitSummary;
+  // TODO: Future extension - icdCodes?: IcdCodeAssignment[];
+  // TODO: Future extension - referrals?: ReferralRead[];
+  // TODO: Future extension - ePrescriptionSigned?: boolean;
 }
 
 export interface Bill {
