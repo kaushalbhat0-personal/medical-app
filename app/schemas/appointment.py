@@ -164,7 +164,7 @@ class PrescriptionCreate(BaseModel):
 
 
 class VitalSignsCreate(BaseModel):
-    temperature: float | None = Field(None, ge=25, le=45)
+    temperature: float | None = Field(None, ge=25, le=110)
     bp_systolic: int | None = Field(None, ge=30, le=250)
     bp_diastolic: int | None = Field(None, ge=30, le=180)
     pulse: int | None = Field(None, ge=20, le=220)
