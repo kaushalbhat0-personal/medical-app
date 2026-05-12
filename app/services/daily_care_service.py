@@ -297,17 +297,12 @@ def _get_upcoming_care(
             if next_appt.doctor
             else None
         )
-        clinic_name = (
-            getattr(next_appt.doctor, "clinic_name", None)
-            if next_appt.doctor
-            else None
-        )
         next_appointment_brief = UpcomingAppointmentBrief(
             id=next_appt.id,
             appointment_time=next_appt.appointment_time,
             doctor_name=doctor_name,
             doctor_specialization=specialization,
-            clinic_name=clinic_name,
+            clinic_name=None,
             status=next_appt.status.value if next_appt.status else "scheduled",
         )
 
@@ -402,7 +397,7 @@ def _get_continue_care(
     # ── Recent doctors ──────────────────────────────────────────────────────
     # Get distinct doctors from completed appointments, ordered by most recent
     recent_doctors_stmt = (
-        select(Appointment.doctor_id, Doctor.name, Doctor.specialization, Doctor.clinic_name)
+        select(Appointment.doctor_id, Doctor.name, Doctor.specialization)
         .join(Doctor, Appointment.doctor_id == Doctor.id)
         .where(Appointment.patient_id == patient.id)
         .where(Appointment.is_deleted == False)
@@ -445,7 +440,6 @@ def _get_continue_care(
                 doctor_id=row.doctor_id,
                 doctor_name=row.name or "Unknown Doctor",
                 specialization=row.specialization,
-                clinic_name=row.clinic_name,
                 last_visit=last_visit,
                 has_prescription=has_rx,
             )
