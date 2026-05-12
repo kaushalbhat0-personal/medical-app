@@ -12,8 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ModeSwitcher } from './ModeSwitcher';
 import { WorkspaceSwitcher } from '../../workspace/WorkspaceSwitcher';
-import { resolveUserWorkspace } from '../../workspace/resolver';
-import { getAllWorkspaceSlugs } from '../../workspace/registry';
+import { resolveUserWorkspace, resolveUserWorkspaces } from '../../workspace/resolver';
 import { persistLastWorkspace } from '../../workspace/WorkspaceSwitcher';
 
 export interface HeaderProps {
@@ -170,7 +169,7 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
       {user && (
         <WorkspaceSwitcher
           currentWorkspace={resolveUserWorkspace(user, localStorage.getItem('token'))}
-          availableWorkspaces={getAllWorkspaceSlugs()}
+          availableWorkspaces={resolveUserWorkspaces(user, localStorage.getItem('token'))}
           onSwitch={(slug) => persistLastWorkspace(slug)}
         />
       )}

@@ -21,6 +21,7 @@ export {
 export {
   resolveWorkspaceFromRoles,
   resolveUserWorkspace,
+  resolveUserWorkspaces,
   isUserInWorkspace,
 } from './resolver';
 

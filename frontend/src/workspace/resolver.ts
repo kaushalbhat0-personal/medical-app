@@ -20,7 +20,7 @@
 import type { User } from '../types';
 import { getEffectiveRoles, normalizeRoles } from '../utils/roles';
 import type { WorkspaceSlug } from './registry';
-
+import { getAllWorkspaceSlugs } from './registry';
 /* ──────────────────────────────────────────────
  * Role → Workspace Mapping
  * ──────────────────────────────────────────────
@@ -95,4 +95,37 @@ export function isUserInWorkspace(
   workspace: WorkspaceSlug
 ): boolean {
   return resolveUserWorkspace(user, token) === workspace;
+}
+
+/**
+ * Resolve the list of workspace slugs visible to the user.
+ *
+ * UX visibility normalization:
+ * - Admin / super_admin users see ALL workspaces (multi-workspace switcher).
+ * - Normal users (doctor, nurse, receptionist, procurement, finance, patient)
+ *   see ONLY their single resolved workspace — no dropdown.
+ *
+ * This is a PURE visibility filter. It does NOT change RBAC, route isolation,
+ * or backend permissions.
+ *
+ * @param user - The current user object (may be null)
+ * @param token - JWT token for role extraction
+ * @returns Array of workspace slugs the user should see
+ */
+export function resolveUserWorkspaces(
+  user: User | null,
+  token: string | null
+): WorkspaceSlug[] {
+  if (!user || !token) return ['admin'];
+  const effectiveRoles = getEffectiveRoles(user, token);
+  const normalized = normalizeRoles(effectiveRoles);
+
+  // Admin / super_admin see all workspaces (multi-workspace switcher)
+  if (normalized.some((r) => r === 'admin' || r === 'super_admin')) {
+    return getAllWorkspaceSlugs();
+  }
+
+  // Normal users see only their single resolved workspace
+  const primary = resolveWorkspaceFromRoles(normalized);
+  return [primary];
 }
