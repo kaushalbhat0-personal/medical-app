@@ -277,6 +277,12 @@ function AnimatedRoutes() {
           }
         />
 
+        {/* Backward-compatible redirect: bare /admin → admin dashboard landing */}
+        <Route
+          path="/admin"
+          element={<Navigate to="/admin/dashboard" replace />}
+        />
+
         <Route
           path="/admin/dashboard"
           element={
