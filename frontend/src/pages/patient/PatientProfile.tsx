@@ -16,12 +16,10 @@ import {
   Calendar,
   Settings,
   ChevronRight,
-  User,
   HeartPulse,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 const profileSections = [
   { key: 'documents', label: 'Documents', icon: FileText, route: '/patient/profile/documents', description: 'Prescriptions, summaries, invoices' },

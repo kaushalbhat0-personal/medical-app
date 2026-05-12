@@ -9,9 +9,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { CommunicationPreferences } from '../../components/patient/CommunicationPreferences';
 import { patientCommunicationsApi } from '../../services/patientCommunications';
 import type { CommunicationPreferencesUpdate, CommunicationPreferencesRead } from '../../types';

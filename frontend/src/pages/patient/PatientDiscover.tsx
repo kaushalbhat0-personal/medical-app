@@ -21,7 +21,6 @@ import {
   Bone,
   Baby,
   Activity,
-  ChevronRight,
   MapPin,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';

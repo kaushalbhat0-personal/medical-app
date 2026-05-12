@@ -9,13 +9,11 @@
  */
 
 import { Outlet, useLocation } from 'react-router-dom';
-import { HeartPulse, Bell } from 'lucide-react';
+import { HeartPulse } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { PatientBottomNav } from './PatientBottomNav';
-import { Button } from '@/components/ui/button';
-
 export function PatientLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { pathname } = useLocation();
 
   // Hide header on detail pages for a cleaner experience

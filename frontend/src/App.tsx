@@ -31,7 +31,6 @@ import { Appointments } from './pages/Appointments';
 import { Billing } from './pages/Billing';
 import { PatientHome } from './pages/patient/PatientHome';
 import { PatientClinicDoctors } from './pages/patient/PatientClinicDoctors';
-import { PatientDoctors } from './pages/patient/PatientDoctors';
 import { PatientAppointments } from './pages/patient/PatientAppointments';
 import { PatientBills } from './pages/patient/PatientBills';
 import { PatientDoctorDetail } from './pages/patient/PatientDoctorDetail';

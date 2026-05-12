@@ -12,14 +12,12 @@
  * Default view shows a summary overview.
  */
 
-import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   HeartPulse,
   Pill,
   Activity,
   Timer,
-  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
