@@ -345,15 +345,25 @@ def _get_upcoming_care(
             upcoming_follow_ups.append(brief)
 
     # ── Unread communications ───────────────────────────────────────────────
-    # Count unread notification events for this patient
-    from app.models.notification import NotificationEvent
+    # Count unread notification events using NotificationDelivery read-status.
+    # Architecture: NotificationEvent = event source-of-truth.
+    # Read-tracking lives on NotificationDelivery.status, NOT on NotificationEvent.
+    from app.models.notification import NotificationDelivery, NotificationDeliveryStatus, NotificationEvent
+
+    # Subquery: event IDs that have at least one delivery marked as 'read'
+    read_subq = (
+        select(NotificationDelivery.notification_event_id)
+        .distinct()
+        .where(NotificationDelivery.status == NotificationDeliveryStatus.read)
+        .subquery()
+    )
 
     unread_stmt = (
         select(func.count())
         .select_from(NotificationEvent)
         .where(
             NotificationEvent.patient_id == patient.id,
-            NotificationEvent.is_read == False,
+            ~NotificationEvent.id.in_(select(read_subq)),
         )
     )
     unread_count = db.scalar(unread_stmt) or 0
