@@ -7,7 +7,7 @@
  * FOUNDATION ONLY — no auth delegation, no permission escalation.
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageSection } from '@/components/ui/page-section';
 import { DependentProfileCard } from '@/components/patient/DependentProfileCard';
 import { CaregiverAccessCard } from '@/components/patient/CaregiverAccessCard';
@@ -18,7 +18,6 @@ import {
   Users,
   Heart,
   Shield,
-  UserPlus,
   ArrowLeft,
   Loader2,
 } from 'lucide-react';
@@ -195,10 +194,6 @@ export default function PatientFamilyHub() {
                   // TODO: Phase 2 — Edit trusted contact
                   console.log('Edit contact:', id);
                 }}
-                onRemoveContact={(id) => {
-                  // TODO: Phase 2 — Remove trusted contact
-                  console.log('Remove contact:', id);
-                }}
               />
             </TabsContent>
 
@@ -216,10 +211,6 @@ export default function PatientFamilyHub() {
                       <CaregiverAccessCard
                         key={cg.id}
                         caregiver={cg}
-                        onRemoveAccess={(id: string) => {
-                          // TODO: Phase 2 — Revoke caregiver access
-                          console.log('Revoke access:', id);
-                        }}
                       />
                     ))}
                   </div>

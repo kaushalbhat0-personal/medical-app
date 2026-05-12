@@ -16,7 +16,6 @@ import {
   preparationHeaderMessage,
   preparationFooterMessage,
   getCategoryLabel,
-  getCategoryIcon,
 } from '@/utils/preparationChecklist';
 
 const categoryIcons: Record<string, React.ReactNode> = {

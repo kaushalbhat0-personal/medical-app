@@ -18,7 +18,6 @@ import {
   ChevronRight,
   HeartPulse,
   Heart,
-  Shield,
   AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';

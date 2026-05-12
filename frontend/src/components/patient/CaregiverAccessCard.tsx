@@ -8,15 +8,13 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Shield, ShieldCheck, Eye, User, HeartHandshake } from 'lucide-react';
+import { Shield, ShieldCheck, Eye, HeartHandshake } from 'lucide-react';
 import type { CaregiverAccess } from '@/types';
 import { getRelationshipLabel } from '@/utils/familyHelpers';
 import { calmCreated } from '@/utils/trustSignals';
 
 interface CaregiverAccessCardProps {
   caregiver: CaregiverAccess;
-  onRemoveAccess?: (caregiverId: string) => void;
 }
 
 const trustLevelConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -39,7 +37,6 @@ const trustLevelConfig: Record<string, { label: string; icon: React.ReactNode; c
 
 export function CaregiverAccessCard({
   caregiver,
-  onRemoveAccess,
 }: CaregiverAccessCardProps) {
   const trustConfig = trustLevelConfig[caregiver.trust_level] ?? trustLevelConfig.view_only;
 

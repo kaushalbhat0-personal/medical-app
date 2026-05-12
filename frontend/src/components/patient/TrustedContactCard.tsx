@@ -6,7 +6,6 @@
  * and "shared with" indicators.
  */
 
-import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,7 +28,6 @@ import { calmCreated } from '@/utils/trustSignals';
 interface TrustedContactCardProps {
   contact: TrustedContact;
   onEdit?: (contactId: string) => void;
-  onRemove?: (contactId: string) => void;
 }
 
 const communicationIcons: Record<string, React.ReactNode> = {
@@ -63,7 +61,6 @@ const sharedItemLabels: Record<string, string> = {
 export function TrustedContactCard({
   contact,
   onEdit,
-  onRemove,
 }: TrustedContactCardProps) {
   return (
     <Card className="overflow-hidden border border-gray-200 transition-shadow hover:shadow-sm">

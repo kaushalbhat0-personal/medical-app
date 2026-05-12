@@ -5,25 +5,19 @@
  * and "Add contact" placeholder.
  */
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { UserPlus, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { TrustedContactCard } from './TrustedContactCard';
 import type { TrustedContact } from '@/types';
 import { calmEmptyMessages } from '@/utils/trustSignals';
 
 interface TrustedContactsSectionProps {
   contacts: TrustedContact[];
-  onAddContact?: () => void;
   onEditContact?: (contactId: string) => void;
-  onRemoveContact?: (contactId: string) => void;
 }
 
 export function TrustedContactsSection({
   contacts,
-  onAddContact,
   onEditContact,
-  onRemoveContact,
 }: TrustedContactsSectionProps) {
   return (
     <div className="space-y-3">
@@ -66,7 +60,6 @@ export function TrustedContactsSection({
               key={contact.id}
               contact={contact}
               onEdit={onEditContact}
-              onRemove={onRemoveContact}
             />
           ))}
         </div>

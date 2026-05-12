@@ -10,8 +10,7 @@
  * NO emergency access bypasses, NO QR scanning auth, NO hidden notes.
  */
 
-import React, { useEffect, useState } from 'react';
-import { PageSection } from '@/components/ui/page-section';
+import { useEffect, useState } from 'react';
 import { EmergencyInfoCard } from '@/components/patient/EmergencyInfoCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
