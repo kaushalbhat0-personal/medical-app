@@ -14,6 +14,11 @@ import { SuperAdminRoute } from './components/layout/SuperAdminRoute';
 import { StaffRoute } from './components/layout/StaffRoute';
 import { PatientRoute } from './components/layout/PatientRoute';
 import { PatientLayout } from './components/layout/PatientLayout';
+import { PatientCareHub } from './pages/patient/PatientCareHub';
+import { PatientDiscover } from './pages/patient/PatientDiscover';
+import { PatientProfile } from './pages/patient/PatientProfile';
+import { PatientProfileSettings } from './pages/patient/PatientProfileSettings';
+
 import { DoctorLayout } from './components/layout/DoctorLayout';
 import { DoctorRoute } from './components/layout/DoctorRoute';
 import { AnimatedPage } from './animations';
@@ -519,6 +524,8 @@ function AnimatedRoutes() {
           }
         >
           <Route index element={<Navigate to="home" replace />} />
+
+          {/* ── HOME ─────────────────────────────────────────────────────── */}
           <Route
             path="home"
             element={
@@ -527,111 +534,142 @@ function AnimatedRoutes() {
               </AnimatedPage>
             }
           />
+
+          {/* ── CARE HUB ─────────────────────────────────────────────────── */}
+          <Route path="care" element={<PatientCareHub />}>
+            <Route index element={<Navigate to="timeline" replace />} />
+            <Route
+              path="timeline"
+              element={
+                <AnimatedPage>
+                  <PatientHealthTimeline />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="medicines"
+              element={
+                <AnimatedPage>
+                  <PatientMedicines />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="vitals"
+              element={
+                <AnimatedPage>
+                  <PatientVitalsHistory />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="follow-ups"
+              element={
+                <AnimatedPage>
+                  <PatientFollowUps />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="encounters/:appointmentId"
+              element={
+                <AnimatedPage>
+                  <PatientEncounterDetail />
+                </AnimatedPage>
+              }
+            />
+          </Route>
+
+          {/* ── MESSAGES ─────────────────────────────────────────────────── */}
           <Route
-            path="clinic/:tenantId"
-            element={
-              <AnimatedPage>
-                <PatientClinicDoctors />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="doctors"
-            element={
-              <AnimatedPage>
-                <PatientDoctors />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="doctor/:id"
-            element={
-              <AnimatedPage>
-                <PatientDoctorDetail />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="doctors/:doctorId"
-            element={
-              <AnimatedPage>
-                <PatientDoctorDetail />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="appointments"
-            element={
-              <AnimatedPage>
-                <PatientAppointments />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="bills"
-            element={
-              <AnimatedPage>
-                <PatientBills />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="timeline"
-            element={
-              <AnimatedPage>
-                <PatientHealthTimeline />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="encounters/:appointmentId"
-            element={
-              <AnimatedPage>
-                <PatientEncounterDetail />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="vitals"
-            element={
-              <AnimatedPage>
-                <PatientVitalsHistory />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="follow-ups"
-            element={
-              <AnimatedPage>
-                <PatientFollowUps />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="documents"
-            element={
-              <AnimatedPage>
-                <PatientDocuments />
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="communications"
+            path="messages"
             element={
               <AnimatedPage>
                 <PatientCommunicationCenter />
               </AnimatedPage>
             }
           />
+
+          {/* ── DISCOVER ─────────────────────────────────────────────────── */}
           <Route
-            path="medicines"
+            path="discover"
             element={
               <AnimatedPage>
-                <PatientMedicines />
+                <PatientDiscover />
               </AnimatedPage>
             }
           />
+          <Route
+            path="discover/doctor/:id"
+            element={
+              <AnimatedPage>
+                <PatientDoctorDetail />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="discover/clinic/:tenantId"
+            element={
+              <AnimatedPage>
+                <PatientClinicDoctors />
+              </AnimatedPage>
+            }
+          />
+
+          {/* ── PROFILE ──────────────────────────────────────────────────── */}
+          <Route path="profile" element={<PatientProfile />}>
+            <Route index element={<Navigate to="documents" replace />} />
+            <Route
+              path="documents"
+              element={
+                <AnimatedPage>
+                  <PatientDocuments />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="bills"
+              element={
+                <AnimatedPage>
+                  <PatientBills />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="appointments"
+              element={
+                <AnimatedPage>
+                  <PatientAppointments />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <AnimatedPage>
+                  <PatientProfileSettings />
+                </AnimatedPage>
+              }
+            />
+          </Route>
+
+          {/* ── BACKWARD-COMPATIBLE REDIRECTS ────────────────────────────── */}
+          {/* Old primary tab routes → new locations */}
+          <Route path="timeline" element={<Navigate to="/patient/care/timeline" replace />} />
+          <Route path="medicines" element={<Navigate to="/patient/care/medicines" replace />} />
+          <Route path="vitals" element={<Navigate to="/patient/care/vitals" replace />} />
+          <Route path="follow-ups" element={<Navigate to="/patient/care/follow-ups" replace />} />
+          <Route path="encounters/:appointmentId" element={<Navigate to="/patient/care/encounters/:appointmentId" replace />} />
+          <Route path="communications" element={<Navigate to="/patient/messages" replace />} />
+          <Route path="doctors" element={<Navigate to="/patient/discover" replace />} />
+          <Route path="doctor/:id" element={<Navigate to="/patient/discover/doctor/:id" replace />} />
+          <Route path="doctors/:doctorId" element={<Navigate to="/patient/discover/doctor/:doctorId" replace />} />
+          <Route path="clinic/:tenantId" element={<Navigate to="/patient/discover/clinic/:tenantId" replace />} />
+          <Route path="documents" element={<Navigate to="/patient/profile/documents" replace />} />
+          <Route path="bills" element={<Navigate to="/patient/profile/bills" replace />} />
+          <Route path="appointments" element={<Navigate to="/patient/profile/appointments" replace />} />
         </Route>
+
 
 
         <Route

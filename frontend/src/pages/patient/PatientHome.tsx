@@ -427,7 +427,8 @@ export function PatientHome() {
           <div className="flex items-center gap-2">
             {upcoming_care.unread_communications > 0 && (
               <Link
-                to="/patient/communications"
+                to="/patient/messages"
+
                 className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary"
               >
                 <Bell className="h-5 w-5" />
@@ -454,7 +455,8 @@ export function PatientHome() {
         action={
           medicines_due_today.total_due > 0 ? (
             <Link
-              to="/patient/medicines"
+              to="/patient/care/medicines"
+
               className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1 text-primary')}
             >
               View All
@@ -597,7 +599,8 @@ export function PatientHome() {
             <Pill className="mx-auto h-8 w-8 text-muted-foreground/50" />
             <p className="mt-2 text-sm text-muted-foreground">No medications scheduled for today.</p>
             <Link
-              to="/patient/timeline"
+              to="/patient/care/timeline"
+
               className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
             >
               View your health timeline
@@ -618,7 +621,8 @@ export function PatientHome() {
           {/* Next Appointment */}
           {upcoming_care.next_appointment ? (
             <Link
-              to={`/patient/encounters/${upcoming_care.next_appointment.id}`}
+              to={`/patient/care/encounters/${upcoming_care.next_appointment.id}`}
+
               className="block rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-background p-4 transition hover:shadow-md"
             >
               <div className="flex items-start gap-3">
@@ -657,7 +661,8 @@ export function PatientHome() {
             <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-center">
               <p className="text-sm text-muted-foreground">No upcoming appointments.</p>
               <Link
-                to="/patient/doctors"
+              to="/patient/discover"
+
                 className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
               >
                 Book an appointment
@@ -685,7 +690,8 @@ export function PatientHome() {
                 ))}
               </div>
               <Link
-                to="/patient/follow-ups"
+                to="/patient/care/follow-ups"
+
                 className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
               >
                 View all follow-ups
@@ -713,7 +719,8 @@ export function PatientHome() {
           {/* Unread Communications */}
           {upcoming_care.unread_communications > 0 && (
             <Link
-              to="/patient/communications"
+              to="/patient/messages"
+
               className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition hover:shadow-md"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
@@ -753,7 +760,8 @@ export function PatientHome() {
                   <button
                     key={doc.doctor_id}
                     type="button"
-                    onClick={() => navigate(`/patient/doctor/${doc.doctor_id}`)}
+                    onClick={() => navigate(`/patient/discover/doctor/${doc.doctor_id}`)}
+
                     className="w-48 shrink-0 rounded-2xl border border-border/80 bg-card p-4 text-left shadow-sm transition hover:shadow-md"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -787,7 +795,8 @@ export function PatientHome() {
                 {continue_care.recent_prescriptions.slice(0, 3).map((rx) => (
                   <Link
                     key={rx.prescription_id}
-                    to="/patient/documents"
+                    to="/patient/profile/documents"
+
                     className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 transition hover:shadow-sm"
                   >
                     <FileText className="h-5 w-5 shrink-0 text-primary" />
@@ -814,7 +823,8 @@ export function PatientHome() {
                 No recent care activity. Book your first appointment to get started.
               </p>
               <Link
-                to="/patient/doctors"
+                to="/patient/discover"
+
                 className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
               >
                 Find a doctor
@@ -834,7 +844,8 @@ export function PatientHome() {
           className="animate-in fade-in duration-300"
           action={
             <Link
-              to="/patient/timeline"
+              to="/patient/care/timeline"
+
               className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1 text-primary')}
             >
               View All
@@ -846,7 +857,8 @@ export function PatientHome() {
             {health_timeline_preview.recent_cards.map((card) => (
               <Link
                 key={card.appointment_id}
-                to={`/patient/encounters/${card.appointment_id}`}
+              to={`/patient/care/encounters/${card.appointment_id}`}
+
                 className="flex items-start gap-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition hover:shadow-md"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
