@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -17,60 +18,69 @@ import { SuperAdminRoute } from './components/layout/SuperAdminRoute';
 import { StaffRoute } from './components/layout/StaffRoute';
 import { PatientRoute } from './components/layout/PatientRoute';
 import { PatientLayout } from './components/layout/PatientLayout';
-import { PatientCareHub } from './pages/patient/PatientCareHub';
-import { PatientDiscover } from './pages/patient/PatientDiscover';
-import { PatientProfile } from './pages/patient/PatientProfile';
-import { PatientProfileSettings } from './pages/patient/PatientProfileSettings';
-
 import { DoctorLayout } from './components/layout/DoctorLayout';
 import { DoctorRoute } from './components/layout/DoctorRoute';
 import { AnimatedPage } from './animations';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { Patients } from './pages/Patients';
-import { Doctors } from './pages/Doctors';
-import { Appointments } from './pages/Appointments';
-import { Billing } from './pages/Billing';
-import { PatientHome } from './pages/patient/PatientHome';
-import { PatientClinicDoctors } from './pages/patient/PatientClinicDoctors';
-import { PatientAppointments } from './pages/patient/PatientAppointments';
-import { PatientBills } from './pages/patient/PatientBills';
-import { PatientDoctorDetail } from './pages/patient/PatientDoctorDetail';
-import { PatientHealthTimeline } from './pages/patient/PatientHealthTimeline';
-import { PatientEncounterDetail } from './pages/patient/PatientEncounterDetail';
-import { PatientVitalsHistory } from './pages/patient/PatientVitalsHistory';
-import { PatientFollowUps } from './pages/patient/PatientFollowUps';
-import { PatientCommunicationCenter } from './pages/patient/PatientCommunicationCenter';
-import { PatientDocuments } from './pages/patient/PatientDocuments';
-import { PatientMedicines } from './pages/patient/PatientMedicines';
-import PatientFamilyHub from './pages/patient/PatientFamilyHub';
-import PatientEmergencyProfile from './pages/patient/PatientEmergencyProfile';
 
-import { DoctorHome } from './pages/doctor/DoctorHome';
-import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
-import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
-import { DoctorPatientDetailPage } from './pages/doctor/DoctorPatientDetailPage';
-import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
-import { EncounterWorkspacePage } from './pages/doctor/EncounterWorkspacePage';
-import { DoctorBillsPage } from './pages/doctor/DoctorBillsPage';
-import { DoctorBillDetailPage } from './pages/doctor/DoctorBillDetailPage';
-import { DoctorAvailabilityPage } from './pages/doctor/DoctorAvailabilityPage';
-import { PatientInventory } from './pages/doctor/PatientInventory';
-import { AdminInventoryPage } from './pages/InventoryPage';
-import { AdminTenantsPage } from './pages/AdminTenantsPage';
-import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
-import AdminBrandingPage from './pages/AdminBrandingPage';
-import AdminCommunicationsPage from './pages/AdminCommunicationsPage';
-import AdminProcurementDashboard from './pages/AdminProcurementDashboard';
+/* ──────────────────────────────────────────────
+ * Lazy-loaded page components
+ * ────────────────────────────────────────────── */
 
-import { Signup } from './pages/Signup';
-import { SignupPatient } from './pages/SignupPatient';
-import { SignupDoctor } from './pages/SignupDoctor';
-import { SignupHospital } from './pages/SignupHospital';
-import { ResetPassword } from './pages/ResetPassword';
-import { ClinicOnboardingPage } from './pages/doctor/ClinicOnboardingPage';
-import { CompleteProfilePage } from './pages/doctor/CompleteProfilePage';
+// Auth pages
+const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const Signup = lazy(() => import('./pages/Signup').then(m => ({ default: m.Signup })));
+const SignupPatient = lazy(() => import('./pages/SignupPatient').then(m => ({ default: m.SignupPatient })));
+const SignupDoctor = lazy(() => import('./pages/SignupDoctor').then(m => ({ default: m.SignupDoctor })));
+const SignupHospital = lazy(() => import('./pages/SignupHospital').then(m => ({ default: m.SignupHospital })));
+const ResetPassword = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
+
+// Staff / Admin pages
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Patients = lazy(() => import('./pages/Patients').then(m => ({ default: m.Patients })));
+const Doctors = lazy(() => import('./pages/Doctors').then(m => ({ default: m.Doctors })));
+const Appointments = lazy(() => import('./pages/Appointments').then(m => ({ default: m.Appointments })));
+const Billing = lazy(() => import('./pages/Billing').then(m => ({ default: m.Billing })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminInventoryPage = lazy(() => import('./pages/InventoryPage').then(m => ({ default: m.AdminInventoryPage })));
+const AdminTenantsPage = lazy(() => import('./pages/AdminTenantsPage').then(m => ({ default: m.AdminTenantsPage })));
+const AdminDoctorVerificationsPage = lazy(() => import('./pages/AdminDoctorVerificationsPage').then(m => ({ default: m.AdminDoctorVerificationsPage })));
+const AdminBrandingPage = lazy(() => import('./pages/AdminBrandingPage').then(m => ({ default: m.default })));
+const AdminCommunicationsPage = lazy(() => import('./pages/AdminCommunicationsPage').then(m => ({ default: m.default })));
+const AdminProcurementDashboard = lazy(() => import('./pages/AdminProcurementDashboard').then(m => ({ default: m.default })));
+
+// Doctor pages
+const DoctorHome = lazy(() => import('./pages/doctor/DoctorHome').then(m => ({ default: m.DoctorHome })));
+const DoctorDoctorsPage = lazy(() => import('./pages/doctor/DoctorDoctorsPage').then(m => ({ default: m.DoctorDoctorsPage })));
+const DoctorPatientsPage = lazy(() => import('./pages/doctor/DoctorPatientsPage').then(m => ({ default: m.DoctorPatientsPage })));
+const DoctorPatientDetailPage = lazy(() => import('./pages/doctor/DoctorPatientDetailPage').then(m => ({ default: m.DoctorPatientDetailPage })));
+const DoctorAppointmentsPage = lazy(() => import('./pages/doctor/DoctorAppointmentsPage').then(m => ({ default: m.DoctorAppointmentsPage })));
+const EncounterWorkspacePage = lazy(() => import('./pages/doctor/EncounterWorkspacePage').then(m => ({ default: m.EncounterWorkspacePage })));
+const DoctorBillsPage = lazy(() => import('./pages/doctor/DoctorBillsPage').then(m => ({ default: m.DoctorBillsPage })));
+const DoctorBillDetailPage = lazy(() => import('./pages/doctor/DoctorBillDetailPage').then(m => ({ default: m.DoctorBillDetailPage })));
+const DoctorAvailabilityPage = lazy(() => import('./pages/doctor/DoctorAvailabilityPage').then(m => ({ default: m.DoctorAvailabilityPage })));
+const PatientInventory = lazy(() => import('./pages/doctor/PatientInventory').then(m => ({ default: m.PatientInventory })));
+const ClinicOnboardingPage = lazy(() => import('./pages/doctor/ClinicOnboardingPage').then(m => ({ default: m.ClinicOnboardingPage })));
+const CompleteProfilePage = lazy(() => import('./pages/doctor/CompleteProfilePage').then(m => ({ default: m.CompleteProfilePage })));
+
+// Patient pages
+const PatientHome = lazy(() => import('./pages/patient/PatientHome').then(m => ({ default: m.PatientHome })));
+const PatientCareHub = lazy(() => import('./pages/patient/PatientCareHub').then(m => ({ default: m.PatientCareHub })));
+const PatientDiscover = lazy(() => import('./pages/patient/PatientDiscover').then(m => ({ default: m.PatientDiscover })));
+const PatientProfile = lazy(() => import('./pages/patient/PatientProfile').then(m => ({ default: m.PatientProfile })));
+const PatientProfileSettings = lazy(() => import('./pages/patient/PatientProfileSettings').then(m => ({ default: m.PatientProfileSettings })));
+const PatientClinicDoctors = lazy(() => import('./pages/patient/PatientClinicDoctors').then(m => ({ default: m.PatientClinicDoctors })));
+const PatientAppointments = lazy(() => import('./pages/patient/PatientAppointments').then(m => ({ default: m.PatientAppointments })));
+const PatientBills = lazy(() => import('./pages/patient/PatientBills').then(m => ({ default: m.PatientBills })));
+const PatientDoctorDetail = lazy(() => import('./pages/patient/PatientDoctorDetail').then(m => ({ default: m.PatientDoctorDetail })));
+const PatientHealthTimeline = lazy(() => import('./pages/patient/PatientHealthTimeline').then(m => ({ default: m.PatientHealthTimeline })));
+const PatientEncounterDetail = lazy(() => import('./pages/patient/PatientEncounterDetail').then(m => ({ default: m.PatientEncounterDetail })));
+const PatientVitalsHistory = lazy(() => import('./pages/patient/PatientVitalsHistory').then(m => ({ default: m.PatientVitalsHistory })));
+const PatientFollowUps = lazy(() => import('./pages/patient/PatientFollowUps').then(m => ({ default: m.PatientFollowUps })));
+const PatientCommunicationCenter = lazy(() => import('./pages/patient/PatientCommunicationCenter').then(m => ({ default: m.PatientCommunicationCenter })));
+const PatientDocuments = lazy(() => import('./pages/patient/PatientDocuments').then(m => ({ default: m.PatientDocuments })));
+const PatientMedicines = lazy(() => import('./pages/patient/PatientMedicines').then(m => ({ default: m.PatientMedicines })));
+const PatientFamilyHub = lazy(() => import('./pages/patient/PatientFamilyHub').then(m => ({ default: m.default })));
+const PatientEmergencyProfile = lazy(() => import('./pages/patient/PatientEmergencyProfile').then(m => ({ default: m.default })));
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -90,6 +100,18 @@ const warmUpBackend = async () => {
     console.log('[App] Backend warmup call failed (may be cold starting):', err);
   }
 };
+
+/**
+ * Lightweight Suspense fallback — not a blocking full-screen spinner.
+ * Just a subtle indicator while the chunk loads.
+ */
+function PageFallback() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+    </div>
+  );
+}
 
 /**
  * Redirect wrapper components for backward-compatible routes.
@@ -156,7 +178,9 @@ function AnimatedRoutes() {
             ) : isAuthenticated ? (
               <Navigate to={loginRedirect} replace />
             ) : (
-              <Login onLogin={login} />
+              <Suspense fallback={<PageFallback />}>
+                <Login onLogin={login} />
+              </Suspense>
             )
           }
         />
@@ -172,7 +196,9 @@ function AnimatedRoutes() {
             ) : isAuthenticated ? (
               <Navigate to={loginRedirect} replace />
             ) : (
-              <Signup />
+              <Suspense fallback={<PageFallback />}>
+                <Signup />
+              </Suspense>
             )
           }
         />
@@ -188,7 +214,9 @@ function AnimatedRoutes() {
             ) : isAuthenticated ? (
               <Navigate to={loginRedirect} replace />
             ) : (
-              <SignupPatient />
+              <Suspense fallback={<PageFallback />}>
+                <SignupPatient />
+              </Suspense>
             )
           }
         />
@@ -204,7 +232,9 @@ function AnimatedRoutes() {
             ) : isAuthenticated ? (
               <Navigate to={loginRedirect} replace />
             ) : (
-              <SignupDoctor />
+              <Suspense fallback={<PageFallback />}>
+                <SignupDoctor />
+              </Suspense>
             )
           }
         />
@@ -220,7 +250,9 @@ function AnimatedRoutes() {
             ) : isAuthenticated ? (
               <Navigate to={loginRedirect} replace />
             ) : (
-              <SignupHospital />
+              <Suspense fallback={<PageFallback />}>
+                <SignupHospital />
+              </Suspense>
             )
           }
         />
@@ -232,7 +264,9 @@ function AnimatedRoutes() {
               {isAuthenticated && !needsPasswordReset ? (
                 <Navigate to={postLoginHomePath(effectiveRoles, user)} replace />
               ) : (
-                <ResetPassword />
+                <Suspense fallback={<PageFallback />}>
+                  <ResetPassword />
+                </Suspense>
               )}
             </ProtectedRoute>
           }
@@ -242,7 +276,9 @@ function AnimatedRoutes() {
           path="/complete-profile"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
-              <CompleteProfilePage />
+              <Suspense fallback={<PageFallback />}>
+                <CompleteProfilePage />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -255,7 +291,9 @@ function AnimatedRoutes() {
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <DoctorRoute user={user}>
                 <AnimatedPage>
-                  <ClinicOnboardingPage />
+                  <Suspense fallback={<PageFallback />}>
+                    <ClinicOnboardingPage />
+                  </Suspense>
                 </AnimatedPage>
               </DoctorRoute>
             </ProtectedRoute>
@@ -269,7 +307,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <Dashboard />
+                    <Suspense fallback={<PageFallback />}>
+                      <Dashboard />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -291,7 +331,9 @@ function AnimatedRoutes() {
                 <AdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminDashboard />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminDashboard />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
@@ -308,7 +350,9 @@ function AnimatedRoutes() {
                 <AdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminInventoryPage />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminInventoryPage />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
@@ -325,7 +369,9 @@ function AnimatedRoutes() {
                 <SuperAdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminTenantsPage />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminTenantsPage />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </SuperAdminRoute>
@@ -341,7 +387,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <AdminDoctorVerificationsPage />
+                    <Suspense fallback={<PageFallback />}>
+                      <AdminDoctorVerificationsPage />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -357,7 +405,9 @@ function AnimatedRoutes() {
                 <AdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminBrandingPage />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminBrandingPage />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
@@ -374,7 +424,9 @@ function AnimatedRoutes() {
                 <AdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminCommunicationsPage />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminCommunicationsPage />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
@@ -391,7 +443,9 @@ function AnimatedRoutes() {
                 <AdminRoute user={user}>
                   <AppLayout user={user} onLogout={logout}>
                     <AnimatedPage>
-                      <AdminProcurementDashboard />
+                      <Suspense fallback={<PageFallback />}>
+                        <AdminProcurementDashboard />
+                      </Suspense>
                     </AnimatedPage>
                   </AppLayout>
                 </AdminRoute>
@@ -407,7 +461,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <Patients />
+                    <Suspense fallback={<PageFallback />}>
+                      <Patients />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -422,7 +478,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <Doctors />
+                    <Suspense fallback={<PageFallback />}>
+                      <Doctors />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -437,7 +495,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <Appointments />
+                    <Suspense fallback={<PageFallback />}>
+                      <Appointments />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -452,7 +512,9 @@ function AnimatedRoutes() {
               <StaffRoute user={user}>
                 <AppLayout user={user} onLogout={logout}>
                   <AnimatedPage>
-                    <Billing />
+                    <Suspense fallback={<PageFallback />}>
+                      <Billing />
+                    </Suspense>
                   </AnimatedPage>
                 </AppLayout>
               </StaffRoute>
@@ -478,7 +540,9 @@ function AnimatedRoutes() {
             path="dashboard"
             element={
               <AnimatedPage>
-                <DoctorHome />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorHome />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -486,7 +550,9 @@ function AnimatedRoutes() {
             path="doctors"
             element={
               <AnimatedPage>
-                <DoctorDoctorsPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorDoctorsPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -494,7 +560,9 @@ function AnimatedRoutes() {
             path="patients"
             element={
               <AnimatedPage>
-                <DoctorPatientsPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorPatientsPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -502,7 +570,9 @@ function AnimatedRoutes() {
             path="patients/:id"
             element={
               <AnimatedPage>
-                <DoctorPatientDetailPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorPatientDetailPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -515,7 +585,9 @@ function AnimatedRoutes() {
             path="appointments/:appointmentId"
             element={
               <AnimatedPage>
-                <EncounterWorkspacePage />
+                <Suspense fallback={<PageFallback />}>
+                  <EncounterWorkspacePage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -524,7 +596,9 @@ function AnimatedRoutes() {
             path="encounter/:appointmentId"
             element={
               <AnimatedPage>
-                <EncounterWorkspacePage />
+                <Suspense fallback={<PageFallback />}>
+                  <EncounterWorkspacePage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -532,7 +606,9 @@ function AnimatedRoutes() {
             path="appointments"
             element={
               <AnimatedPage>
-                <DoctorAppointmentsPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorAppointmentsPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -540,7 +616,9 @@ function AnimatedRoutes() {
             path="bills/:billId"
             element={
               <AnimatedPage>
-                <DoctorBillDetailPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorBillDetailPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -548,7 +626,9 @@ function AnimatedRoutes() {
             path="bills"
             element={
               <AnimatedPage>
-                <DoctorBillsPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorBillsPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -556,7 +636,9 @@ function AnimatedRoutes() {
             path="availability"
             element={
               <AnimatedPage>
-                <DoctorAvailabilityPage />
+                <Suspense fallback={<PageFallback />}>
+                  <DoctorAvailabilityPage />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -564,7 +646,9 @@ function AnimatedRoutes() {
             path="inventory"
             element={
               <AnimatedPage>
-                <PatientInventory />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientInventory />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -587,7 +671,9 @@ function AnimatedRoutes() {
             path="home"
             element={
               <AnimatedPage>
-                <PatientHome />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientHome />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -599,7 +685,9 @@ function AnimatedRoutes() {
               path="timeline"
               element={
                 <AnimatedPage>
-                  <PatientHealthTimeline />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientHealthTimeline />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -607,7 +695,9 @@ function AnimatedRoutes() {
               path="medicines"
               element={
                 <AnimatedPage>
-                  <PatientMedicines />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientMedicines />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -615,7 +705,9 @@ function AnimatedRoutes() {
               path="vitals"
               element={
                 <AnimatedPage>
-                  <PatientVitalsHistory />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientVitalsHistory />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -623,7 +715,9 @@ function AnimatedRoutes() {
               path="follow-ups"
               element={
                 <AnimatedPage>
-                  <PatientFollowUps />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientFollowUps />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -631,7 +725,9 @@ function AnimatedRoutes() {
               path="encounters/:appointmentId"
               element={
                 <AnimatedPage>
-                  <PatientEncounterDetail />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientEncounterDetail />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -642,7 +738,9 @@ function AnimatedRoutes() {
             path="messages"
             element={
               <AnimatedPage>
-                <PatientCommunicationCenter />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientCommunicationCenter />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -652,7 +750,9 @@ function AnimatedRoutes() {
             path="discover"
             element={
               <AnimatedPage>
-                <PatientDiscover />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientDiscover />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -660,7 +760,9 @@ function AnimatedRoutes() {
             path="discover/doctor/:id"
             element={
               <AnimatedPage>
-                <PatientDoctorDetail />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientDoctorDetail />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -668,7 +770,9 @@ function AnimatedRoutes() {
             path="discover/clinic/:tenantId"
             element={
               <AnimatedPage>
-                <PatientClinicDoctors />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientClinicDoctors />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -680,7 +784,9 @@ function AnimatedRoutes() {
               path="documents"
               element={
                 <AnimatedPage>
-                  <PatientDocuments />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientDocuments />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -688,7 +794,9 @@ function AnimatedRoutes() {
               path="bills"
               element={
                 <AnimatedPage>
-                  <PatientBills />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientBills />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -696,7 +804,9 @@ function AnimatedRoutes() {
               path="appointments"
               element={
                 <AnimatedPage>
-                  <PatientAppointments />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientAppointments />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -704,7 +814,9 @@ function AnimatedRoutes() {
               path="settings"
               element={
                 <AnimatedPage>
-                  <PatientProfileSettings />
+                  <Suspense fallback={<PageFallback />}>
+                    <PatientProfileSettings />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -715,7 +827,9 @@ function AnimatedRoutes() {
             path="family"
             element={
               <AnimatedPage>
-                <PatientFamilyHub />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientFamilyHub />
+                </Suspense>
               </AnimatedPage>
             }
           />
@@ -723,7 +837,9 @@ function AnimatedRoutes() {
             path="emergency-profile"
             element={
               <AnimatedPage>
-                <PatientEmergencyProfile />
+                <Suspense fallback={<PageFallback />}>
+                  <PatientEmergencyProfile />
+                </Suspense>
               </AnimatedPage>
             }
           />
