@@ -37,6 +37,8 @@ from app.schemas.medication_schedule import (
     MedicationScheduleUpdate,
     TodayAdherenceSummary,
 )
+from app.services import patient_service
+from app.services.exceptions import ForbiddenError, NotFoundError
 from app.services.security_audit import log_structured_audit_event
 
 logger = logging.getLogger(__name__)
@@ -87,6 +89,42 @@ def _enforce_patient_role(current_user) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only patients can manage medication schedules",
         )
+
+
+def _resolve_patient_tenant(db: Session, current_user) -> UUID:
+    """
+    Resolve tenant_id authoritatively from the Patient record.
+
+    Resolution order (resource-authoritative):
+      1. patient.tenant_id — the Patient record is the source of truth
+         for tenant membership in patient flows.
+      2. current_user.tenant_id — validated fallback if Patient record
+         is unavailable, but only if it is a proper UUID (never empty).
+
+    Raises:
+        HTTPException 403: If tenant cannot be resolved, preserving
+                           multi-tenant isolation guarantees.
+    """
+    # Priority 1: resource-authoritative — resolve from Patient record
+    try:
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        if patient.tenant_id:
+            return UUID(str(patient.tenant_id))
+    except (NotFoundError, ForbiddenError):
+        pass
+
+    # Priority 2: validated current_user.tenant_id (must be a real UUID)
+    user_tenant = getattr(current_user, "tenant_id", None)
+    if user_tenant is not None:
+        try:
+            return UUID(str(user_tenant))
+        except (ValueError, TypeError):
+            pass
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Tenant context not available — cannot access medication schedules",
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -402,7 +440,7 @@ def get_due_medications(
     """
     _enforce_patient_role(current_user)
     patient_id = _resolve_patient_id(current_user)
-    tenant_id = UUID(str(getattr(current_user, "tenant_id", "")))
+    tenant_id = _resolve_patient_tenant(db, current_user)
 
     schedules = crud_medication_schedule.get_due_medications(
         db, patient_id, tenant_id
@@ -424,7 +462,7 @@ def get_today_adherence_summary(
     patient_id = _resolve_patient_id(current_user)
 
     # Get due medications
-    tenant_id = UUID(str(getattr(current_user, "tenant_id", "")))
+    tenant_id = _resolve_patient_tenant(db, current_user)
     due_meds = crud_medication_schedule.get_due_medications(
         db, patient_id, tenant_id
     )
@@ -490,7 +528,7 @@ def get_patient_schedules(
     """
     _enforce_patient_role(current_user)
     patient_id = _resolve_patient_id(current_user)
-    tenant_id = UUID(str(getattr(current_user, "tenant_id", "")))
+    tenant_id = _resolve_patient_tenant(db, current_user)
 
     if active_only:
         items, total = crud_medication_schedule.get_active_schedules_for_patient(
