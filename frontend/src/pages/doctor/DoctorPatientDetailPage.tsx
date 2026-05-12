@@ -369,22 +369,8 @@ export function DoctorPatientDetailPage() {
 
   const canMutate = isIndependent && !isReadOnly;
 
-  const markAppointmentCompleted = async (apptId: string) => {
-    const key = `a-${apptId}`;
-    setRowBusyKey(key);
-    try {
-      await appointmentsApi.markCompleted(apptId);
-      toast.success('Marked completed');
-      await load();
-    } catch (e) {
-      const msg =
-        axios.isAxiosError(e) && e.response?.data && typeof e.response.data === 'object'
-          ? String((e.response.data as { detail?: unknown }).detail ?? 'Could not update')
-          : 'Could not update appointment';
-      toast.error(msg);
-    } finally {
-      setRowBusyKey(null);
-    }
+  const openEncounter = (apptId: string) => {
+    navigate(`/doctor/appointments/${apptId}`);
   };
 
   const cancelAppointment = async (apptId: string) => {
@@ -830,9 +816,9 @@ export function DoctorPatientDetailPage() {
                                       size="sm"
                                       className="h-7 text-xs"
                                       disabled={rowBusyKey === it.id}
-                                      onClick={() => void markAppointmentCompleted(String(a.id))}
+                                      onClick={() => openEncounter(String(a.id))}
                                     >
-                                      {rowBusyKey === it.id ? '…' : 'Mark completed'}
+                                      Start Encounter
                                     </Button>
                                     <Button
                                       type="button"

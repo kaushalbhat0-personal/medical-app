@@ -274,7 +274,7 @@ export function DoctorAppointmentsPage() {
                       to={`/doctor/appointments/${a.id}`}
                       className="text-xs font-medium text-primary hover:underline"
                     >
-                      Open visit
+                      {a.status === 'completed' ? 'View Encounter' : 'Start Encounter'}
                     </Link>
                   </div>
                 </div>

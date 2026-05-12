@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { LayoutGrid, List, Loader2 } from 'lucide-react';
@@ -419,24 +419,8 @@ export function DayCalendar({
     return m;
   }, [appointments, doctorId, date, tz]);
 
+  const navigate = useNavigate();
   const [apptActionBusy, setApptActionBusy] = useState<string | null>(null);
-
-  const onCompleteAppt = useCallback(
-    async (apptId: string) => {
-      setApptActionBusy(apptId);
-      try {
-        await appointmentsApi.markCompleted(apptId);
-        toast.success('Visit marked complete');
-        onBooked?.();
-        void loadDaySchedule({ skipSlotsCache: true });
-      } catch {
-        toast.error('Could not mark complete');
-      } finally {
-        setApptActionBusy(null);
-      }
-    },
-    [onBooked, loadDaySchedule]
-  );
 
   const onCancelAppt = useCallback(
     async (apptId: string) => {
@@ -765,13 +749,9 @@ export function DayCalendar({
               type="button"
               className="min-h-[44px] flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
               disabled={apptActionBusy != null}
-              onClick={() => void onCompleteAppt(String(appt.id))}
+              onClick={() => navigate(`/doctor/appointments/${String(appt.id)}`)}
             >
-              {apptActionBusy === String(appt.id) ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                'Mark completed'
-              )}
+              Open Encounter
             </Button>
             <Button
               type="button"
@@ -805,7 +785,7 @@ export function DayCalendar({
           className={listCardBaseClass}
           onKeyDown={slotNavKeyHandler(k)}
           onComplete={() => {
-            void onCompleteAppt(String(appt.id));
+            navigate(`/doctor/appointments/${String(appt.id)}`);
           }}
           onCancel={() => {
             void onCancelAppt(String(appt.id));
