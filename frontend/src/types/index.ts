@@ -778,6 +778,134 @@ export interface CommunicationPreferencesUpdate {
   opt_out_all?: boolean;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase Trust — Patient Trust & Family Foundation Types
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * EmergencyProfile — patient-visible emergency information.
+ * Stored as nullable metadata on the patient record.
+ */
+export interface EmergencyProfile {
+  blood_group: string | null;
+  allergies: string[];
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relation: string | null;
+  /** Comma-separated or newline-separated list of chronic conditions */
+  chronic_conditions: string;
+  /** Derived from encounter data — read-only */
+  active_medications_summary: string | null;
+  /** Derived from encounter data — read-only */
+  primary_doctor_name: string | null;
+  /** Derived from encounter data — read-only */
+  primary_doctor_specialization: string | null;
+  insurance_provider: string | null;
+  insurance_id: string | null;
+  /** Last updated timestamp */
+  updated_at: string | null;
+}
+
+/**
+ * EmergencyProfileUpdate — mutable fields for emergency profile.
+ */
+export interface EmergencyProfileUpdate {
+  blood_group?: string | null;
+  allergies?: string[];
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
+  chronic_conditions?: string | null;
+  insurance_provider?: string | null;
+  insurance_id?: string | null;
+}
+
+/**
+ * TrustedContact — a person the patient trusts with their care information.
+ */
+export interface TrustedContact {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string | null;
+  email: string | null;
+  communication_preference: 'sms' | 'email' | 'whatsapp' | 'none';
+  is_emergency_contact: boolean;
+  /** What information is shared with this contact */
+  shared_items: Array<'appointments' | 'medications' | 'documents' | 'all'>;
+  created_at: string | null;
+}
+
+/**
+ * DependentProfile — a family member whose care is managed by this patient.
+ */
+export interface DependentProfile {
+  id: string;
+  name: string;
+  relationship: string;
+  age: number | null;
+  gender: string | null;
+  /** Upcoming appointments for this dependent */
+  upcoming_appointments: Array<{
+    id: string;
+    appointment_time: string;
+    doctor_name: string;
+    doctor_specialization: string | null;
+    clinic_name: string | null;
+  }>;
+  /** Shared medication reminders count */
+  shared_medication_count: number;
+}
+
+/**
+ * CaregiverAccess — a person who has access to this patient's care information.
+ */
+export interface CaregiverAccess {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string | null;
+  email: string | null;
+  /** When access was granted */
+  access_granted_at: string | null;
+  /** Trust level */
+  trust_level: 'view_only' | 'limited' | 'full';
+}
+
+/**
+ * HealthSummaryMetadata — metadata for the downloadable health summary.
+ */
+export interface HealthSummaryMetadata {
+  encounter_count: number;
+  active_medication_count: number;
+  document_count: number;
+  has_emergency_profile: boolean;
+  last_encounter_date: string | null;
+  generated_at: string | null;
+}
+
+/**
+ * VisitPreparationItem — a single preparation checklist item with local state.
+ */
+export interface VisitPreparationItem {
+  id: string;
+  label: string;
+  description: string | null;
+  category: 'documents' | 'medication' | 'preparation' | 'logistics';
+  checked: boolean;
+}
+
+/**
+ * PatientTrustAggregate — aggregate of all trust & family data.
+ */
+export interface PatientTrustAggregate {
+  emergency_profile: EmergencyProfile | null;
+  trusted_contacts: TrustedContact[];
+  dependents: DependentProfile[];
+  caregivers: CaregiverAccess[];
+  health_summary: HealthSummaryMetadata | null;
+}
+
 export interface PatientCommunicationAggregate {
   recent_notifications: CommunicationCard[];
   unread_count: number;

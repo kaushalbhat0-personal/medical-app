@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     medication_schedule,
     patient,
     patient_communication,
+    patient_trust,
     patient_workspace,
     public_discovery,
     reporting,
@@ -48,5 +49,6 @@ api_router.include_router(branding.router)
 api_router.include_router(communications.router)
 api_router.include_router(patient_workspace.router)
 api_router.include_router(patient_communication.router)
+api_router.include_router(patient_trust.router)
 api_router.include_router(medication_schedule.router)
 api_router.include_router(daily_care.router)

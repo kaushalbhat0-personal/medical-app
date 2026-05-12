@@ -41,6 +41,8 @@ import { PatientFollowUps } from './pages/patient/PatientFollowUps';
 import { PatientCommunicationCenter } from './pages/patient/PatientCommunicationCenter';
 import { PatientDocuments } from './pages/patient/PatientDocuments';
 import { PatientMedicines } from './pages/patient/PatientMedicines';
+import PatientFamilyHub from './pages/patient/PatientFamilyHub';
+import PatientEmergencyProfile from './pages/patient/PatientEmergencyProfile';
 
 import { DoctorHome } from './pages/doctor/DoctorHome';
 import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
@@ -676,6 +678,24 @@ function AnimatedRoutes() {
               }
             />
           </Route>
+
+          {/* ── TRUST & FAMILY ───────────────────────────────────────────── */}
+          <Route
+            path="family"
+            element={
+              <AnimatedPage>
+                <PatientFamilyHub />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="emergency-profile"
+            element={
+              <AnimatedPage>
+                <PatientEmergencyProfile />
+              </AnimatedPage>
+            }
+          />
 
           {/* ── BACKWARD-COMPATIBLE REDIRECTS ────────────────────────────── */}
           {/* Old primary tab routes → new locations */}
