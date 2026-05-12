@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
@@ -84,6 +84,31 @@ const warmUpBackend = async () => {
     console.log('[App] Backend warmup call failed (may be cold starting):', err);
   }
 };
+
+/**
+ * Redirect wrapper components for backward-compatible routes.
+ * These use useParams to properly interpolate route params into the target URL,
+ * avoiding the bug where literal ":appointmentId" strings were sent to the API.
+ */
+function RedirectEncounterDetail() {
+  const { appointmentId } = useParams<{ appointmentId: string }>();
+  return <Navigate to={`/patient/care/encounters/${appointmentId}`} replace />;
+}
+
+function RedirectDoctorDetail() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/patient/discover/doctor/${id}`} replace />;
+}
+
+function RedirectDoctorDetailByDoctorId() {
+  const { doctorId } = useParams<{ doctorId: string }>();
+  return <Navigate to={`/patient/discover/doctor/${doctorId}`} replace />;
+}
+
+function RedirectClinicDetail() {
+  const { tenantId } = useParams<{ tenantId: string }>();
+  return <Navigate to={`/patient/discover/clinic/${tenantId}`} replace />;
+}
 
 function AnimatedRoutes() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
@@ -658,12 +683,12 @@ function AnimatedRoutes() {
           <Route path="medicines" element={<Navigate to="/patient/care/medicines" replace />} />
           <Route path="vitals" element={<Navigate to="/patient/care/vitals" replace />} />
           <Route path="follow-ups" element={<Navigate to="/patient/care/follow-ups" replace />} />
-          <Route path="encounters/:appointmentId" element={<Navigate to="/patient/care/encounters/:appointmentId" replace />} />
+          <Route path="encounters/:appointmentId" element={<RedirectEncounterDetail />} />
           <Route path="communications" element={<Navigate to="/patient/messages" replace />} />
           <Route path="doctors" element={<Navigate to="/patient/discover" replace />} />
-          <Route path="doctor/:id" element={<Navigate to="/patient/discover/doctor/:id" replace />} />
-          <Route path="doctors/:doctorId" element={<Navigate to="/patient/discover/doctor/:doctorId" replace />} />
-          <Route path="clinic/:tenantId" element={<Navigate to="/patient/discover/clinic/:tenantId" replace />} />
+          <Route path="doctor/:id" element={<RedirectDoctorDetail />} />
+          <Route path="doctors/:doctorId" element={<RedirectDoctorDetailByDoctorId />} />
+          <Route path="clinic/:tenantId" element={<RedirectClinicDetail />} />
           <Route path="documents" element={<Navigate to="/patient/profile/documents" replace />} />
           <Route path="bills" element={<Navigate to="/patient/profile/bills" replace />} />
           <Route path="appointments" element={<Navigate to="/patient/profile/appointments" replace />} />

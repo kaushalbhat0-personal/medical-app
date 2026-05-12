@@ -402,7 +402,10 @@ def _get_continue_care(
         .where(Appointment.patient_id == patient.id)
         .where(Appointment.is_deleted == False)
         .where(Appointment.status == AppointmentStatus.completed)
-        .order_by(Appointment.appointment_time.desc())
+        .order_by(
+            Appointment.doctor_id,
+            Appointment.appointment_time.desc(),
+        )
         .distinct(Appointment.doctor_id)
         .limit(5)
     )
