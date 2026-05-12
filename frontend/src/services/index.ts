@@ -47,4 +47,15 @@ export {
   type TenantBrandingProfileUpdate,
 } from './branding';
 
+// Phase P3 — Daily Care Dashboard + Adherence Experience
+export { dailyCareApi, type DailyCareDashboardAggregate } from './dailyCare';
+export {
+  medicationScheduleApi,
+  type MedicationScheduleRead,
+  type AdherenceActionPayload,
+  type AdherenceActionResponse,
+  type TodayAdherenceSummary,
+  type MedicationScheduleListResponse,
+} from './medicationSchedule';
+
 

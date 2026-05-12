@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     billing,
     branding,
     communications,
+    daily_care,
     dashboard,
     doctor,
     doctor_profile,
@@ -48,3 +49,4 @@ api_router.include_router(communications.router)
 api_router.include_router(patient_workspace.router)
 api_router.include_router(patient_communication.router)
 api_router.include_router(medication_schedule.router)
+api_router.include_router(daily_care.router)

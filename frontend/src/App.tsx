@@ -36,6 +36,8 @@ import { PatientVitalsHistory } from './pages/patient/PatientVitalsHistory';
 import { PatientFollowUps } from './pages/patient/PatientFollowUps';
 import { PatientCommunicationCenter } from './pages/patient/PatientCommunicationCenter';
 import { PatientDocuments } from './pages/patient/PatientDocuments';
+import { PatientMedicines } from './pages/patient/PatientMedicines';
+
 import { DoctorHome } from './pages/doctor/DoctorHome';
 import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
@@ -621,7 +623,16 @@ function AnimatedRoutes() {
               </AnimatedPage>
             }
           />
+          <Route
+            path="medicines"
+            element={
+              <AnimatedPage>
+                <PatientMedicines />
+              </AnimatedPage>
+            }
+          />
         </Route>
+
 
         <Route
           path="/"
