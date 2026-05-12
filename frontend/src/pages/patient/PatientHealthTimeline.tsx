@@ -1,42 +1,60 @@
 /**
- * PatientHealthTimeline — timeline-first patient experience.
+ * PatientHealthTimeline — enhanced longitudinal health memory.
  *
- * Each encounter card shows:
- * - doctor
- * - clinic
- * - date/time
- * - diagnosis summary
- * - treatment summary
- * - medicines prescribed
- * - follow-up recommendation
- * - downloadable documents
+ * PHASE UX2: Encounter Experience + Health Memory
  *
- * Timeline feels:
- * - reassuring
- * - readable
- * - mobile-first
- * - chronological
- *
- * NOT enterprise/admin-like.
+ * Enhanced with:
+ * - Sticky month headers
+ * - Timeline continuity feel
+ * - Visual encounter progression
+ * - Encounter category icons
+ * - Search/filter capability
+ * - Empty states with guidance
+ * - Better grouping by year/month
+ * - Reduced visual noise
+ * - Smooth mobile transitions
+ * - Lightweight derived insights (observational only)
  *
  * CRITICAL:
  * - SOAP internal sections are NEVER exposed
  * - Doctor-only notes are NEVER exposed
+ * - Audit metadata is NEVER exposed
+ * - Insights are observational only, NOT diagnostic
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import dayjs from 'dayjs';
-import { HeartPulse } from 'lucide-react';
+import {
+  Calendar,
+  HeartPulse,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { TimelineEncounterCard } from '../../components/patient/TimelineEncounterCard';
+import { PatientCareContinuityCard } from '../../components/patient/PatientCareContinuityCard';
 import { patientWorkspaceApi } from '../../services/patientWorkspace';
 import type { EncounterCard } from '../../types';
 import { ErrorState } from '../../components/common';
+import {
+  groupEncountersByYearMonth,
+  deriveHealthInsights,
+} from '../../utils/patientTimeline';
+import {
+  getPrimaryDoctor,
+  getCareStreak,
+  getUpcomingFollowUp,
+  getLastCompletedVisit,
+  getRecentSpecialtyHistory,
+} from '../../utils/continuity';
 
 export function PatientHealthTimeline() {
   const [encounters, setEncounters] = useState<EncounterCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showInsights, setShowInsights] = useState(true);
 
   const loadEncounters = useCallback(async () => {
     setError(null);
@@ -55,39 +73,48 @@ export function PatientHealthTimeline() {
     void loadEncounters();
   }, [loadEncounters]);
 
-  // Group encounters by month/year
-  const groupedEncounters = useMemo(() => {
-    const groups: Map<string, EncounterCard[]> = new Map();
+  // ── Filter by search query ──────────────────────────────────────────────
+  const filteredEncounters = useMemo(() => {
+    if (!searchQuery.trim()) return encounters;
 
-    for (const enc of encounters) {
-      const monthKey = enc.appointment_time
-        ? dayjs(enc.appointment_time).format('YYYY-MM')
-        : 'Unknown';
+    const q = searchQuery.toLowerCase().trim();
+    return encounters.filter(
+      (enc) =>
+        enc.doctor_name?.toLowerCase().includes(q) ||
+        enc.diagnosis?.toLowerCase().includes(q) ||
+        enc.treatment_summary?.toLowerCase().includes(q) ||
+        enc.clinic_name?.toLowerCase().includes(q) ||
+        enc.doctor_specialization?.toLowerCase().includes(q),
+    );
+  }, [encounters, searchQuery]);
 
-      if (!groups.has(monthKey)) {
-        groups.set(monthKey, []);
-      }
-      groups.get(monthKey)!.push(enc);
-    }
+  // ── Group by year → month ───────────────────────────────────────────────
+  const yearGroups = useMemo(
+    () => groupEncountersByYearMonth(filteredEncounters),
+    [filteredEncounters],
+  );
 
-    // Sort groups by month (newest first)
-    const sorted = Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
+  // ── Derived insights (observational only) ───────────────────────────────
+  const insights = useMemo(() => deriveHealthInsights(encounters), [encounters]);
 
-    return sorted.map(([key, items]) => ({
-      key,
-      label: items[0]?.appointment_time
-        ? dayjs(items[0].appointment_time).format('MMMM YYYY')
-        : 'Unknown',
-      items,
-    }));
-  }, [encounters]);
+  // ── Continuity data ─────────────────────────────────────────────────────
+  const primaryDoctor = useMemo(() => getPrimaryDoctor(encounters), [encounters]);
+  const careStreak = useMemo(() => getCareStreak(encounters), [encounters]);
+  const upcomingFollowUp = useMemo(() => getUpcomingFollowUp(encounters), [encounters]);
+  const lastCompletedVisit = useMemo(() => getLastCompletedVisit(encounters), [encounters]);
+  const specialtyHistory = useMemo(() => getRecentSpecialtyHistory(encounters), [encounters]);
+  const activeMedicationCount = useMemo(
+    () => encounters.reduce((sum, e) => sum + e.prescriptions_count, 0),
+    [encounters],
+  );
 
   if (error) {
     return <ErrorState title="Health Timeline" description={error} />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
@@ -100,6 +127,78 @@ export function PatientHealthTimeline() {
         </p>
       </div>
 
+      {/* ── Continuity Card ──────────────────────────────────────────────── */}
+      {!loading && encounters.length > 0 && (
+        <PatientCareContinuityCard
+          primaryDoctor={primaryDoctor}
+          careStreak={careStreak}
+          upcomingFollowUp={upcomingFollowUp}
+          lastCompletedVisit={lastCompletedVisit}
+          specialtyHistory={specialtyHistory}
+          activeMedicationCount={activeMedicationCount}
+        />
+      )}
+
+      {/* ── Insights (observational only) ─────────────────────────────────── */}
+      {!loading && insights.length > 0 && showInsights && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 shadow-sm">
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" aria-hidden />
+              <h2 className="text-sm font-semibold text-foreground">Your Care Insights</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInsights(false)}
+              className="text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
+              aria-label="Dismiss insights"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="px-5 pb-4">
+            <div className="space-y-2">
+              {insights.map((insight, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 rounded-xl bg-background/60 px-3.5 py-2.5"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <HeartPulse className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-sm text-foreground/80">{insight.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Search ────────────────────────────────────────────────────────── */}
+      {!loading && encounters.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" aria-hidden />
+          <Input
+            type="text"
+            placeholder="Search visits by doctor, diagnosis, or clinic…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="rounded-2xl border-border/60 pl-10 text-sm h-12 bg-card"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Loading state ─────────────────────────────────────────────────── */}
       {loading ? (
         <div className="space-y-6">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -117,7 +216,21 @@ export function PatientHealthTimeline() {
             </Card>
           ))}
         </div>
+      ) : filteredEncounters.length === 0 && searchQuery ? (
+        /* ── No search results ──────────────────────────────────────────── */
+        <Card className="border-dashed">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
+              <Search className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <CardTitle className="text-lg pt-3">No results found</CardTitle>
+            <CardDescription className="max-w-sm mx-auto">
+              No visits match "{searchQuery}". Try a different search term.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       ) : encounters.length === 0 ? (
+        /* ── Empty state ────────────────────────────────────────────────── */
         <Card className="border-dashed">
           <CardHeader className="text-center pb-2">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
@@ -131,18 +244,55 @@ export function PatientHealthTimeline() {
           </CardHeader>
         </Card>
       ) : (
+        /* ── Timeline ───────────────────────────────────────────────────── */
         <div className="space-y-8">
-          {groupedEncounters.map((group) => (
-            <div key={group.key} className="space-y-3">
+          {yearGroups.map((yearGroup) => (
+            <div key={yearGroup.year}>
+              {/* Year header */}
               <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-md sm:mx-0 sm:px-0">
-                <h2 className="text-lg font-semibold text-foreground">
-                  {group.label}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {yearGroup.label}
+                  </h2>
+                  <span className="text-xs text-muted-foreground/50">
+                    {yearGroup.totalEncounters} visit{yearGroup.totalEncounters !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 <div className="mt-1 h-px bg-gradient-to-r from-primary/20 to-transparent" />
               </div>
-              <div className="space-y-4">
-                {group.items.map((enc) => (
-                  <TimelineEncounterCard key={enc.appointment_id} encounter={enc} />
+
+              {/* Months */}
+              <div className="mt-4 space-y-6">
+                {yearGroup.months.map((monthGroup) => (
+                  <div key={monthGroup.key} className="space-y-3">
+                    {/* Month header */}
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-primary/40" aria-hidden />
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        {monthGroup.label}
+                      </h3>
+                      <span className="text-xs text-muted-foreground/40">
+                        {monthGroup.items.length} visit{monthGroup.items.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Encounter cards */}
+                    <div className="space-y-3">
+                      {monthGroup.items.map((enc, idx) => (
+                        <div key={enc.appointment_id} className="relative">
+                          {/* Continuity connector (not for last item) */}
+                          {idx < monthGroup.items.length - 1 && (
+                            <div
+                              className="absolute left-[23px] top-[60px] bottom-[-8px] w-px bg-border/40 z-0"
+                              aria-hidden
+                            />
+                          )}
+                          <TimelineEncounterCard encounter={enc} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
