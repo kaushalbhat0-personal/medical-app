@@ -569,3 +569,241 @@ export interface HealthNewsItem {
   category: string;
   published_at: string;
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase P1 — Patient Health Workspace Types
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * EncounterCard — patient-safe encounter summary for timeline rendering.
+ * Maps to backend EncounterCard schema (patient_workspace.py).
+ * SOAP internal sections are NEVER exposed.
+ */
+export interface EncounterCard {
+  appointment_id: string;
+  appointment_time: string;
+  status: string;
+  doctor_id: string;
+  doctor_name: string;
+  doctor_specialization: string | null;
+  clinic_name: string | null;
+  diagnosis: string | null;
+  treatment_summary: string | null;
+  prescriptions_count: number;
+  follow_up_date: string | null;
+  follow_up_notes: string | null;
+  has_prescription: boolean;
+  has_encounter_summary: boolean;
+  encounter_started_at: string | null;
+  encounter_completed_at: string | null;
+}
+
+/**
+ * VitalsSnapshot — vitals captured during an appointment, for chronological history.
+ * Maps to backend VitalsSnapshot schema (patient_workspace.py).
+ */
+export interface VitalsSnapshot {
+  appointment_id: string;
+  appointment_time: string;
+  doctor_name: string | null;
+  temperature: number | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  pulse: number | null;
+  respiratory_rate: number | null;
+  spo2: number | null;
+  weight: number | null;
+  height: number | null;
+  bmi: number | null;
+  notes: string | null;
+}
+
+/**
+ * FollowUpItem — single follow-up recommendation.
+ * Maps to backend FollowUpItem schema (patient_workspace.py).
+ */
+export interface FollowUpItem {
+  appointment_id: string;
+  appointment_time: string;
+  doctor_id: string;
+  doctor_name: string;
+  doctor_specialization: string | null;
+  follow_up_date: string;
+  follow_up_notes: string | null;
+  is_overdue: boolean;
+}
+
+/**
+ * FollowUpSummary — aggregated follow-up information.
+ * Maps to backend FollowUpSummary schema (patient_workspace.py).
+ */
+export interface FollowUpSummary {
+  upcoming: FollowUpItem[];
+  overdue: FollowUpItem[];
+  total_upcoming: number;
+  total_overdue: number;
+}
+
+/**
+ * DocumentRef — reference to a downloadable document.
+ * Maps to backend DocumentRef schema (patient_workspace.py).
+ */
+export interface DocumentRef {
+  appointment_id: string;
+  appointment_time: string | null;
+  doctor_name: string | null;
+  document_type: string; // "prescription" | "encounter_summary" | "invoice"
+  download_url: string | null;
+}
+
+/**
+ * PatientHealthWorkspaceAggregate — canonical READ-ONLY aggregate for the Patient Health Workspace.
+ * Maps to backend PatientHealthWorkspaceAggregate schema (patient_workspace.py).
+ * Appointment is the encounter anchor. No separate Encounter table exists.
+ */
+export interface PatientHealthWorkspaceAggregate {
+  patient_profile: {
+    id: string;
+    name: string;
+    age: number | null;
+    gender: string | null;
+    phone: string | null;
+  };
+  upcoming_appointments: Array<{
+    id: string;
+    appointment_time: string;
+    status: string;
+    doctor_id: string;
+    doctor_name: string;
+    doctor_specialization: string | null;
+    clinic_name: string | null;
+  }>;
+  recent_encounters: EncounterCard[];
+  vitals_history: VitalsSnapshot[];
+  prescriptions_history: Array<{
+    id: string;
+    appointment_id: string;
+    appointment_time: string | null;
+    doctor_name: string | null;
+    notes: string | null;
+    created_at: string;
+    items: Array<{
+      medicine_name: string;
+      dosage: string | null;
+      frequency: string | null;
+      duration: string | null;
+      instructions: string | null;
+    }>;
+  }>;
+  follow_ups: FollowUpSummary;
+  billing_summary: {
+    total_billed: number;
+    total_paid: number;
+    total_unpaid: number;
+    recent_bills: Array<{
+      id: string;
+      amount: number;
+      currency: string;
+      status: string;
+      description: string | null;
+      created_at: string;
+      paid_at: string | null;
+    }>;
+  };
+  recent_documents: DocumentRef[];
+  communication_summary: {
+    unread_messages: number;
+    last_message_at: string | null;
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase P2 — Patient Communication Center Types
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface DocumentLink {
+  document_type: string; // "prescription" | "encounter_summary" | "invoice"
+  download_url: string | null;
+  appointment_id: string | null;
+}
+
+export interface CommunicationCard {
+  id: string;
+  event_type: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  is_read: boolean;
+  is_urgent: boolean;
+  doctor_name: string | null;
+  clinic_name: string | null;
+  linked_appointment_id: string | null;
+  linked_bill_id: string | null;
+  linked_documents: DocumentLink[];
+  cta_actions: string[];
+}
+
+export interface ReminderCard {
+  id: string;
+  event_type: string;
+  title: string;
+  reminder_date: string;
+  urgency: "urgent" | "upcoming" | "completed";
+  doctor_name: string | null;
+  clinic_name: string | null;
+  linked_appointment_id: string | null;
+  linked_bill_id: string | null;
+  cta_actions: string[];
+}
+
+export interface CommunicationPreferencesRead {
+  email_enabled: boolean;
+  sms_enabled: boolean;
+  whatsapp_enabled: boolean;
+  reminder_enabled: boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+  locale: string;
+  opt_out_all: boolean;
+}
+
+export interface CommunicationPreferencesUpdate {
+  email_enabled?: boolean;
+  sms_enabled?: boolean;
+  whatsapp_enabled?: boolean;
+  reminder_enabled?: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+  locale?: string;
+  opt_out_all?: boolean;
+}
+
+export interface PatientCommunicationAggregate {
+  recent_notifications: CommunicationCard[];
+  unread_count: number;
+  reminders_by_urgency: {
+    urgent: ReminderCard[];
+    upcoming: ReminderCard[];
+    completed: ReminderCard[];
+  };
+  preferences: CommunicationPreferencesRead;
+  linked_documents: DocumentLink[];
+}
+
+export interface CommunicationTimelineResponse {
+  items: CommunicationCard[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface ReminderListResponse {
+  reminders_by_urgency: {
+    urgent: ReminderCard[];
+    upcoming: ReminderCard[];
+    completed: ReminderCard[];
+  };
+  total_urgent: number;
+  total_upcoming: number;
+  total_completed: number;
+}

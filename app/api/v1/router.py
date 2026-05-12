@@ -14,13 +14,15 @@ from app.api.v1.endpoints import (
     encounter,
     health,
     inventory,
+    medication_schedule,
     patient,
+    patient_communication,
+    patient_workspace,
     public_discovery,
     reporting,
     tenant,
     users,
 )
-
 
 
 api_router = APIRouter()
@@ -43,6 +45,6 @@ api_router.include_router(admin_doctor_verification.router, prefix="/admin")
 api_router.include_router(documents.router)
 api_router.include_router(branding.router)
 api_router.include_router(communications.router)
-
-
-
+api_router.include_router(patient_workspace.router)
+api_router.include_router(patient_communication.router)
+api_router.include_router(medication_schedule.router)

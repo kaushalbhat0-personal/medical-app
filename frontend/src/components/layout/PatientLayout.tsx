@@ -1,5 +1,15 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Home, Stethoscope, Calendar, Receipt, HeartPulse } from 'lucide-react';
+import {
+  Activity,
+  Calendar,
+  FileText,
+  HeartPulse,
+  Home,
+  MessageSquare,
+  Receipt,
+  Stethoscope,
+  Timer,
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -7,6 +17,11 @@ import { PatientSearchCombobox } from '../patient/PatientSearchCombobox';
 
 const tabs = [
   { to: '/patient/home', label: 'Home', icon: Home },
+  { to: '/patient/timeline', label: 'Timeline', icon: HeartPulse },
+  { to: '/patient/vitals', label: 'Vitals', icon: Activity },
+  { to: '/patient/follow-ups', label: 'Follow-ups', icon: Timer },
+  { to: '/patient/documents', label: 'Documents', icon: FileText },
+  { to: '/patient/communications', label: 'Inbox', icon: MessageSquare },
   { to: '/patient/doctors', label: 'Doctors', icon: Stethoscope },
   { to: '/patient/appointments', label: 'Appointments', icon: Calendar },
   { to: '/patient/bills', label: 'Bills', icon: Receipt },
@@ -29,7 +44,7 @@ export function PatientLayout() {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">Care</p>
-                  <p className="truncate text-xs text-muted-foreground">Find doctors &amp; book visits</p>
+                  <p className="truncate text-xs text-muted-foreground">Your health workspace</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 sm:hidden">

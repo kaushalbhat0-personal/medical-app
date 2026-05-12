@@ -30,6 +30,12 @@ import { PatientDoctors } from './pages/patient/PatientDoctors';
 import { PatientAppointments } from './pages/patient/PatientAppointments';
 import { PatientBills } from './pages/patient/PatientBills';
 import { PatientDoctorDetail } from './pages/patient/PatientDoctorDetail';
+import { PatientHealthTimeline } from './pages/patient/PatientHealthTimeline';
+import { PatientEncounterDetail } from './pages/patient/PatientEncounterDetail';
+import { PatientVitalsHistory } from './pages/patient/PatientVitalsHistory';
+import { PatientFollowUps } from './pages/patient/PatientFollowUps';
+import { PatientCommunicationCenter } from './pages/patient/PatientCommunicationCenter';
+import { PatientDocuments } from './pages/patient/PatientDocuments';
 import { DoctorHome } from './pages/doctor/DoctorHome';
 import { DoctorDoctorsPage } from './pages/doctor/DoctorDoctorsPage';
 import { DoctorPatientsPage } from './pages/doctor/DoctorPatientsPage';
@@ -564,6 +570,54 @@ function AnimatedRoutes() {
             element={
               <AnimatedPage>
                 <PatientBills />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="timeline"
+            element={
+              <AnimatedPage>
+                <PatientHealthTimeline />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="encounters/:appointmentId"
+            element={
+              <AnimatedPage>
+                <PatientEncounterDetail />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="vitals"
+            element={
+              <AnimatedPage>
+                <PatientVitalsHistory />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="follow-ups"
+            element={
+              <AnimatedPage>
+                <PatientFollowUps />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="documents"
+            element={
+              <AnimatedPage>
+                <PatientDocuments />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="communications"
+            element={
+              <AnimatedPage>
+                <PatientCommunicationCenter />
               </AnimatedPage>
             }
           />

@@ -38,6 +38,15 @@ from app.models.notification import (
     NotificationEvent,
     NotificationEventType,
 )
+from app.models.patient_communication_preference import (
+    PatientCommunicationPreference,
+)
+from app.models.patient_medication_schedule import (
+    MedicationAdherenceLog,
+    MedicationScheduleAdherenceAction,
+    MedicationScheduleStatus,
+    PatientMedicationSchedule,
+)
 from app.models.tenant_branding import (
     TenantBrandingProfile,
     TenantOrganizationProfile,
@@ -79,6 +88,11 @@ __all__ = [
     "NotificationDeliveryStatus",
     "NotificationChannel",
     "CommunicationTemplate",
+    "PatientCommunicationPreference",
+    "PatientMedicationSchedule",
+    "MedicationScheduleStatus",
+    "MedicationScheduleAdherenceAction",
+    "MedicationAdherenceLog",
 ]
 
 
