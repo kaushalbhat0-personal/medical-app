@@ -87,6 +87,14 @@ api.interceptors.request.use(
       }
       const mode = localStorage.getItem('app_mode');
       config.headers['X-Data-Scope'] = mode === 'practice' ? 'doctor' : 'tenant';
+
+      // Active workspace context: propagate the current workspace slug so the
+      // backend can apply request-scoped operational context (see workspace_context.py).
+      // Falls back safely if no workspace is stored (backward-compatible).
+      const lastWorkspace = localStorage.getItem('medical_webapp_last_workspace');
+      if (lastWorkspace) {
+        config.headers['X-Workspace'] = lastWorkspace;
+      }
     }
 
     // Some forms submit empty strings for optional filters (e.g. ?doctor_id=).

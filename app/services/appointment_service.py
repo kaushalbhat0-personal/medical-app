@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
+from app.core.workspace_context import ActiveWorkspace, WorkspaceSlug, is_elevated_workspace_access
 from app.crud import crud_appointment, crud_billing
 from app.models.appointment import Appointment, AppointmentStatus, Prescription
 from app.models.user import User, UserRole
@@ -648,6 +649,7 @@ def mark_appointment_completed(
     restrict_to_doctor_id: UUID | None = None,
     completion: MarkAppointmentCompletedRequest | None = None,
     idempotency_key: str | None = None,
+    active_workspace: ActiveWorkspace | None = None,
 ) -> tuple[Appointment, bool]:
     """Returns (appointment, idempotent_replay). Replay is True when Idempotency-Key matched a prior body."""
     appointment = crud_appointment.get_appointment_for_update_locked(db, appointment_id)
@@ -662,6 +664,7 @@ def mark_appointment_completed(
         rbac_action="mark_appointment_completed",
         restrict_to_doctor_id=restrict_to_doctor_id,
         require_assigned_doctor=True,
+        active_workspace=active_workspace,
     )
 
     if settings.REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY:
@@ -872,11 +875,27 @@ def _assert_doctor_assigned_to_appointment(
     appointment: Appointment,
     *,
     rbac_action: str,
+    active_workspace: ActiveWorkspace | None = None,
 ) -> None:
     # Capability-based check: user must have a Doctor record linked via user_id
     # AND that doctor must be the assigned doctor for this appointment.
     # This works for ANY user role - admin, staff, or doctor - as long as they
     # have a valid Doctor record linked to their user account.
+    #
+    # WORKSPACE ELEVATION: Admin/super_admin in the doctor workspace may bypass
+    # the doctor-record requirement. This is request-scoped only — the user's
+    # role remains unchanged.
+    if is_elevated_workspace_access(current_user, active_workspace, target_slug=WorkspaceSlug.doctor):
+        log_structured_audit_event(
+            event="workspace_elevated_access",
+            actor_id=str(current_user.id),
+            workspace=active_workspace.slug.value if active_workspace else "unknown",
+            elevated_workspace_access=True,
+            resource_type="appointment",
+            rbac_action=rbac_action,
+            appointment_id=str(appointment.id),
+        )
+        return
     doc = doctor_service.get_current_doctor(db, current_user)
     if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
         log_rbac_mutation_violation(
@@ -904,6 +923,7 @@ def authorize_appointment_access(
     rbac_action: str = "appointment_access",
     restrict_to_doctor_id: UUID | None = None,
     require_assigned_doctor: bool = False,
+    active_workspace: ActiveWorkspace | None = None,
 ) -> None:
     # Authorization is capability-based:
     # A user may act as a doctor if they have a Doctor record linked via user_id.
@@ -953,7 +973,7 @@ def authorize_appointment_access(
     # This works for ANY user with a Doctor record (admin, staff, or doctor role).
     if require_assigned_doctor:
         _assert_doctor_assigned_to_appointment(
-            db, current_user, appointment, rbac_action=rbac_action
+            db, current_user, appointment, rbac_action=rbac_action, active_workspace=active_workspace
         )
         return
 

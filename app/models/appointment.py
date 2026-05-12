@@ -210,6 +210,7 @@ class AppointmentVitals(Base):
     pulse: Mapped[int | None] = mapped_column(Integer, nullable=True)
     weight: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
     respiratory_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    spo2: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     bmi: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

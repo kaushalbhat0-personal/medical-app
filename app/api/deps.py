@@ -13,6 +13,11 @@ from app.core.data_scope import ResolvedDataScope, resolve_data_scope
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG, resolve_tenant_id_for_scoped_request
+from app.core.workspace_context import (
+    ActiveWorkspace,
+    WorkspaceSlug,
+    is_workspace_allowed_for_role,
+)
 from app.crud import crud_doctor, crud_doctor_profile, crud_user
 from app.models.doctor import Doctor
 from app.models.user import User, UserRole
@@ -295,3 +300,36 @@ def require_current_user_admin_or_owner(
 
 # Alias for clinic_operations endpoint (maps to get_scoped_tenant_id)
 get_current_tenant_id = get_scoped_tenant_id
+
+
+def get_active_workspace(
+    x_workspace: str | None = Header(default=None, alias="X-Workspace"),
+    current_user: User = Depends(get_current_active_user),
+) -> ActiveWorkspace | None:
+    """Resolve the request-scoped active workspace from the ``X-Workspace`` header.
+
+    Returns ``None`` when the header is absent (backward-compatible fallback).
+    Raises ``HTTPException(400)`` for invalid slugs and ``HTTPException(403)``
+    for workspaces the user's role is not allowed to activate.
+
+    This is an **optional** dependency — endpoints that do not inject it
+    behave exactly as before.
+    """
+    if x_workspace is None:
+        return None
+
+    try:
+        slug = WorkspaceSlug(x_workspace.strip().lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid workspace slug: '{x_workspace}'",
+        )
+
+    if not is_workspace_allowed_for_role(current_user.role, slug):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Workspace '{slug.value}' is not allowed for your role",
+        )
+
+    return ActiveWorkspace(slug=slug)

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, Body, HTTPExcep
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    get_active_workspace,
     get_current_active_user,
     get_current_user,
     get_optional_scoped_tenant_id,
@@ -13,6 +14,7 @@ from app.api.deps import (
     require_doctor_verification_approved,
     require_structured_profile_complete,
 )
+from app.core.workspace_context import ActiveWorkspace
 from app.core.config import settings
 from app.core.data_scope import ResolvedDataScope, restrict_doctor_id_for_detail
 from app.core.database import get_db
@@ -98,6 +100,7 @@ def mark_appointment_completed(
     tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id_active),
     data_scope: ResolvedDataScope = Depends(get_resolved_data_scope),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    active_workspace: ActiveWorkspace | None = Depends(get_active_workspace),
 ) -> AppointmentRead:
     effective = data if data is not None else MarkAppointmentCompletedRequest()
     appt, idempotent_replay = appointment_service.mark_appointment_completed(
@@ -108,6 +111,7 @@ def mark_appointment_completed(
         restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
         completion=effective,
         idempotency_key=idempotency_key,
+        active_workspace=active_workspace,
     )
     if idempotent_replay:
         response.headers["X-Idempotent-Replay"] = "1"
