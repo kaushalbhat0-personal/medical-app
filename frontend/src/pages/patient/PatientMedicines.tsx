@@ -14,11 +14,10 @@ import {
   XCircle,
   Timer,
   Clock,
-  AlertTriangle,
-  ChevronRight,
   ArrowLeft,
   Sparkles,
 } from 'lucide-react';
+
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { medicationScheduleApi, type MedicationScheduleRead, type TodayAdherenceSummary } from '../../services/medicationSchedule';
