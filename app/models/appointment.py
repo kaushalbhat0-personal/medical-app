@@ -11,8 +11,15 @@ from app.core.database import Base
 
 class AppointmentStatus(str, enum.Enum):
     scheduled = "scheduled"
+    confirmed = "confirmed"
+    arrived = "arrived"
+    checked_in = "checked_in"
+    vitals_completed = "vitals_completed"
+    waiting_for_doctor = "waiting_for_doctor"
+    in_consultation = "in_consultation"
     completed = "completed"
     cancelled = "cancelled"
+    no_show = "no_show"
 
 
 class Appointment(Base):

@@ -47,6 +47,14 @@ from app.models.patient_medication_schedule import (
     MedicationScheduleStatus,
     PatientMedicationSchedule,
 )
+from app.models.supplier import Supplier
+from app.models.purchase_order import (
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderStatus,
+    PaymentStatus,
+)
+from app.models.clinic_queue import ClinicQueueEntry, ClinicQueueStatus
 from app.models.tenant_branding import (
     TenantBrandingProfile,
     TenantOrganizationProfile,
@@ -76,6 +84,11 @@ __all__ = [
     "InventoryMovement",
     "InventoryMovementType",
     "AppointmentInventoryUsage",
+    "Supplier",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderStatus",
+    "PaymentStatus",
     "Tenant",
     "TenantCreationIdempotency",
     "TenantType",

@@ -291,3 +291,7 @@ def require_current_user_admin_or_owner(
             status_code=status.HTTP_403_FORBIDDEN, detail=str(e)
         ) from e
     return current_user
+
+
+# Alias for clinic_operations endpoint (maps to get_scoped_tenant_id)
+get_current_tenant_id = get_scoped_tenant_id

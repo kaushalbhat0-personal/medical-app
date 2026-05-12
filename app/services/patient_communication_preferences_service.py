@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from app.models.patient_communication_preference import (
     PatientCommunicationPreference,
 )
+from app.models.user import User
 from app.services.exceptions import NotFoundError
 from app.services.security_audit import log_structured_audit_event
 
@@ -188,6 +189,50 @@ def update_patient_preferences(
     )
 
     return prefs
+
+
+class PatientCommunicationPreferencesService:
+    """Class-based wrapper for patient communication preferences operations.
+    
+    Provides the interface expected by tests that instantiate the service
+    with db and current_user parameters.
+    """
+    
+    def __init__(self, db: Session, current_user: User) -> None:
+        self.db = db
+        self.current_user = current_user
+    
+    def get_preferences(self, patient_id: UUID, tenant_id: UUID) -> PatientCommunicationPreference:
+        return get_patient_preferences(self.db, patient_id, tenant_id)
+    
+    def get_or_create(self, patient_id: UUID, tenant_id: UUID) -> PatientCommunicationPreference:
+        return get_or_create_patient_preferences(self.db, patient_id, tenant_id)
+    
+    def update_preferences(
+        self,
+        patient_id: UUID,
+        tenant_id: UUID,
+        *,
+        email_enabled: bool | None = None,
+        sms_enabled: bool | None = None,
+        whatsapp_enabled: bool | None = None,
+        reminder_enabled: bool | None = None,
+        quiet_hours_start: str | None = None,
+        quiet_hours_end: str | None = None,
+        locale: str | None = None,
+        opt_out_all: bool | None = None,
+    ) -> PatientCommunicationPreference:
+        return update_patient_preferences(
+            self.db, patient_id, tenant_id,
+            email_enabled=email_enabled,
+            sms_enabled=sms_enabled,
+            whatsapp_enabled=whatsapp_enabled,
+            reminder_enabled=reminder_enabled,
+            quiet_hours_start=quiet_hours_start,
+            quiet_hours_end=quiet_hours_end,
+            locale=locale,
+            opt_out_all=opt_out_all,
+        )
 
 
 def validate_preferences(

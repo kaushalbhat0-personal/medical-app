@@ -23,7 +23,6 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from app.schemas.tenant_organization_profile import (
-    TenantOrganizationProfileCreate,
     TenantOrganizationProfileRead,
     TenantOrganizationProfileUpdate,
 )
@@ -55,8 +54,8 @@ from app.schemas.document import (
 
 
 @pytest.fixture
-def sample_org_create() -> TenantOrganizationProfileCreate:
-    return TenantOrganizationProfileCreate(
+def sample_org_create() -> TenantOrganizationProfileUpdate:
+    return TenantOrganizationProfileUpdate(
         organization_name="Test Clinic",
         legal_name="Test Clinic Pvt Ltd",
         logo_url="https://example.com/logo.png",
@@ -495,7 +494,7 @@ class TestOrganizationProfileSchemas:
 
     def test_create_schema_optional_fields(self):
         """Organization profile create schema should work with minimal fields."""
-        data = TenantOrganizationProfileCreate()
+        data = TenantOrganizationProfileUpdate()
         assert data.organization_name is None
         assert data.gst_number is None
 

@@ -1585,3 +1585,147 @@ def generate_encounter_summary_pdf(
     )
 
     return pdf_bytes
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PROCUREMENT DOCUMENT BUILDERS
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _build_purchase_invoice_html(
+    po,
+    supplier,
+    items_data: list[dict],
+    branding: BrandingContext | None = None,
+) -> str:
+    """Build purchase invoice PDF HTML from purchase order data."""
+    header = _build_clinic_header(
+        tenant_name=supplier.supplier_name if supplier else None,
+        branding=branding,
+    )
+
+    info_blocks = [
+        ("Invoice Number", po.invoice_number or ""),
+        ("Invoice Date", po.invoice_date.strftime("%d %b %Y") if po.invoice_date else ""),
+        ("Supplier", supplier.supplier_name if supplier else ""),
+        ("GST Number", supplier.gst_number or ""),
+        ("Status", po.status.value.upper() if hasattr(po.status, "value") else str(po.status).upper()),
+        ("Payment", po.payment_status.value.upper() if hasattr(po.payment_status, "value") else str(po.payment_status).upper()),
+    ]
+    if po.payment_method:
+        info_blocks.append(("Payment Method", po.payment_method))
+    if po.notes:
+        info_blocks.append(("Notes", _escape_html(po.notes)))
+
+    info_grid = _build_info_grid(info_blocks)
+
+    # Items table
+    item_headers = ["Item", "Batch", "Expiry", "Qty", "Unit Cost", "Tax %", "Line Total"]
+    item_rows = []
+    for it in items_data:
+        item_rows.append([
+            _escape_html(it.get("item_name", "")),
+            _escape_html(it.get("batch_number", "") or ""),
+            it.get("expiry_date", "") or "",
+            str(it.get("quantity", 0)),
+            _fmt_currency(Decimal(str(it.get("unit_cost", "0.00")))),
+            f"{it.get('tax_percent', 0)}%",
+            _fmt_currency(Decimal(str(it.get("line_total", "0.00")))),
+        ])
+
+    items_table = _build_table(item_headers, item_rows)
+
+    # Totals
+    total_rows = [
+        ["", "", "", "", "Subtotal", _fmt_currency(Decimal(str(po.subtotal)))],
+        ["", "", "", "", "Tax Amount", _fmt_currency(Decimal(str(po.tax_amount)))],
+        ["", "", "", "", "Discount", _fmt_currency(Decimal(str(po.discount_amount)))],
+    ]
+    total_rows.append(
+        ["", "", "", "", "Total", _fmt_currency(Decimal(str(po.total_amount)))]
+    )
+    totals_table = _build_table(
+        ["", "", "", "", "Description", "Amount"],
+        total_rows,
+    )
+
+    body = f"""
+{header}
+<div class="section">
+    <div class="section-title">Purchase Invoice</div>
+    {info_grid}
+</div>
+<div class="section">
+    <div class="section-title">Items</div>
+    {items_table}
+</div>
+<div class="section">
+    <div class="section-title">Totals</div>
+    {totals_table}
+</div>
+<!-- TODO: Phase 4 — XLSX export for purchase invoices -->
+<!-- TODO: Phase 4 — HSN/SAC code columns -->
+"""
+
+    return _build_html_document(
+        title=f"Purchase Invoice - {po.invoice_number or po.id}",
+        body_html=body,
+        meta=DocumentMeta(
+            document_type=DocumentType.purchase_invoice,
+            tenant_id=po.tenant_id,
+            resource_id=str(po.id),
+        ),
+        branding=branding,
+    )
+
+
+def generate_purchase_invoice_pdf(
+    db: Session,
+    po_id: UUID,
+    current_user: User,
+    tenant_id: UUID | None,
+    *,
+    fmt: DocumentFormat = DocumentFormat.pdf,
+) -> bytes:
+    """Generate a purchase invoice PDF for the given purchase order."""
+    from app.models.purchase_order import PurchaseOrder
+    from app.models.supplier import Supplier
+    from app.models.inventory import InventoryItem
+
+    po = db.get(PurchaseOrder, po_id)
+    if po is None:
+        raise NotFoundError("Purchase order not found")
+
+    supplier = db.get(Supplier, po.supplier_id)
+
+    items_data = []
+    for poi in po.items:
+        item = db.get(InventoryItem, poi.inventory_item_id)
+        items_data.append({
+            "item_name": item.name if item else "Unknown",
+            "batch_number": poi.batch_number,
+            "expiry_date": poi.expiry_date.strftime("%d %b %Y") if poi.expiry_date else "",
+            "quantity": poi.quantity,
+            "unit_cost": str(poi.unit_cost),
+            "tax_percent": float(poi.tax_percent),
+            "line_total": str(poi.line_total),
+        })
+
+    branding = _load_branding_context(db, po.tenant_id)
+    html = _build_purchase_invoice_html(po, supplier, items_data, branding=branding)
+
+    if fmt == DocumentFormat.html:
+        return _render_html(html)
+
+    pdf_bytes = _render_pdf(html)
+
+    log_structured_audit_event(
+        event="purchase_invoice_generated",
+        tenant_id=po.tenant_id,
+        resource_id=str(po_id),
+        actor_id=str(current_user.id),
+        document_type="purchase_invoice",
+        request_id=get_request_id(),
+    )
+
+    return pdf_bytes

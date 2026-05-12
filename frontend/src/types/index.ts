@@ -256,7 +256,7 @@ export interface Appointment {
   appointment_time?: string;
   scheduled_at?: string;
   /** `pending` is client-only until refetch replaces with server status. */
-  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  status: 'scheduled' | 'confirmed' | 'arrived' | 'checked_in' | 'vitals_completed' | 'waiting_for_doctor' | 'in_consultation' | 'completed' | 'cancelled' | 'no_show' | 'pending';
   /**
    * DEPRECATED: completion_notes is deprecated and should not be written for new visits.
    * Use clinical_notes for visit documentation. Preserved for backward compatibility.

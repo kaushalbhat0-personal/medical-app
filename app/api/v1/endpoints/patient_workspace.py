@@ -19,6 +19,7 @@ Authorization:
 from __future__ import annotations
 
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -46,7 +47,7 @@ router = APIRouter(
 def get_patient_workspace(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> PatientHealthWorkspaceAggregate:
     """
     Get the full Patient Health Workspace aggregate for the authenticated patient.
@@ -77,7 +78,7 @@ def get_patient_encounters(
     limit: int = Query(default=50, ge=1, le=200, description="Maximum records to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[EncounterCard]:
     """
     Get paginated encounter cards for the patient timeline.
@@ -94,7 +95,7 @@ def get_patient_encounters(
 def get_patient_vitals_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> list[VitalsSnapshot]:
     """
     Get chronological vitals history for the patient.
@@ -109,7 +110,7 @@ def get_patient_vitals_history(
 def get_patient_follow_ups(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> FollowUpSummary:
     """
     Get follow-up summary for the patient.

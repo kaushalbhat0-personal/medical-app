@@ -49,7 +49,7 @@ router = APIRouter(
 def get_daily_care_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> DailyCareDashboardAggregate:
     """
     Get the full Daily Care Dashboard for the authenticated patient.

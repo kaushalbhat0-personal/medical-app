@@ -11,6 +11,10 @@ import {
 } from '../../utils/tenantIdForRequest';
 import { cn } from '@/lib/utils';
 import { ModeSwitcher } from './ModeSwitcher';
+import { WorkspaceSwitcher } from '../../workspace/WorkspaceSwitcher';
+import { resolveUserWorkspace } from '../../workspace/resolver';
+import { getAllWorkspaceSlugs } from '../../workspace/registry';
+import { persistLastWorkspace } from '../../workspace/WorkspaceSwitcher';
 
 export interface HeaderProps {
   user: User | null;
@@ -161,6 +165,15 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
           </div>
         ) : null}
       </div>
+
+      {/* Workspace Switcher - shown when user has multiple workspaces */}
+      {user && (
+        <WorkspaceSwitcher
+          currentWorkspace={resolveUserWorkspace(user, localStorage.getItem('token'))}
+          availableWorkspaces={getAllWorkspaceSlugs()}
+          onSwitch={(slug) => persistLastWorkspace(slug)}
+        />
+      )}
 
       <div className="ml-3 flex min-w-0 flex-shrink-0 items-center gap-1 sm:gap-2">
         {user && <ModeSwitcher user={user} />}

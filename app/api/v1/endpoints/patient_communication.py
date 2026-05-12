@@ -67,7 +67,7 @@ router = APIRouter(
 def get_patient_communication_aggregate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> PatientCommunicationAggregate:
     """
     Get the full Patient Communication Aggregate for the authenticated patient.
@@ -98,7 +98,7 @@ def get_patient_communication_timeline(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> CommunicationTimelineResponse:
     """
     Get paginated communication cards for the patient timeline.
@@ -122,7 +122,7 @@ def get_patient_communication_timeline(
 def get_patient_reminders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> ReminderListResponse:
     """
     Get reminders grouped by urgency for the patient.
@@ -149,7 +149,7 @@ def get_patient_reminders(
 def get_unread_count(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> dict:
     """
     Get the unread notification count for the patient.
@@ -165,7 +165,7 @@ def mark_notification_as_read(
     event_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> dict:
     """
     Mark a notification event as read by the patient.
@@ -188,7 +188,7 @@ def mark_notification_as_read(
 def get_communication_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> CommunicationPreferencesRead:
     """
     Get communication preferences for the authenticated patient.
@@ -226,7 +226,7 @@ def update_communication_preferences(
     data: CommunicationPreferencesUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    tenant_id: str | None = Depends(get_optional_scoped_tenant_id),
+    tenant_id: UUID | None = Depends(get_optional_scoped_tenant_id),
 ) -> CommunicationPreferencesRead:
     """
     Update communication preferences for the authenticated patient.

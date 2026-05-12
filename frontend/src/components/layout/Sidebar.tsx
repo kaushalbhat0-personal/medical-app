@@ -1,37 +1,30 @@
-import {
-  X,
-  PanelLeft,
-  LayoutDashboard,
-  BarChart3,
-  Users,
-  Stethoscope,
-  Calendar,
-  CreditCard,
-  Home,
-  Receipt,
-  Package,
-  Building2,
-  ShieldCheck,
-  Palette,
-  Bell,
-} from 'lucide-react';
+import { X, PanelLeft } from 'lucide-react';
 
-import { useMemo } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import type { User } from '../../types';
 import {
-  canAccessAdminUI,
-  canVerifyDoctorsInTenant,
   getEffectiveRoles,
-  isPatientRole,
-  isSuperAdminRole,
   normalizeRoles,
 } from '../../utils/roles';
-import { doctorNavItemHint, isDoctorNavItemVisible } from '../../utils/doctorVerification';
+import { doctorNavItemHint } from '../../utils/doctorVerification';
 import { useAppMode } from '../../contexts/AppModeContext';
 import { NavItem } from './NavItem';
-import { DOCTOR_PRACTICE_NAV } from './doctorNav';
 import { cn } from '@/lib/utils';
+
+/**
+ * workspace-driven sidebar
+ *
+ * Replaces the old branching logic (staffNavBase, adminModeNavBase,
+ * patientFallbackNavItems, DOCTOR_PRACTICE_NAV) with a single
+ * workspace registry lookup.
+ *
+ * Each user sees ONLY their workspace's navigation — calm, focused,
+ * operationally contextual.
+ */
+import {
+  resolveUserWorkspace,
+  WORKSPACE_REGISTRY,
+  type WorkspaceConfig,
+} from '../../workspace';
 
 interface SidebarProps {
   user: User | null;
@@ -40,92 +33,22 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-const staffNavBase: { path: string; label: string; icon: LucideIcon }[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/patients', label: 'Patients', icon: Users },
-  { path: '/doctors', label: 'Doctors', icon: Stethoscope },
-  { path: '/appointments', label: 'Appointments', icon: Calendar },
-  { path: '/billing', label: 'Billing', icon: CreditCard },
-];
-
-const patientFallbackNavItems = [
-  { path: '/patient/home', label: 'Home', icon: Home },
-  { path: '/patient/doctors', label: 'Doctors', icon: Stethoscope },
-  { path: '/patient/appointments', label: 'Appointments', icon: Calendar },
-  { path: '/patient/bills', label: 'Bills', icon: Receipt },
-];
-
-const adminModeNavBase: { path: string; label: string; icon: LucideIcon }[] = [
-  { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/patients', label: 'Patients', icon: Users },
-  { path: '/doctors', label: 'Doctors', icon: Stethoscope },
-  { path: '/admin/inventory', label: 'Inventory', icon: Package },
-  { path: '/admin/branding', label: 'Branding', icon: Palette },
-  { path: '/admin/communications', label: 'Communications', icon: Bell },
-  { path: '/dashboard', label: 'Reports', icon: BarChart3 },
-  { path: '/billing', label: 'Billing', icon: CreditCard },
-];
-
-
-const verificationsNavItem = {
-  path: '/admin/doctor-verifications',
-  label: 'Verifications',
-  icon: ShieldCheck,
-};
-
 export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { resolvedMode } = useAppMode();
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
   const effRoles = getEffectiveRoles(user, token);
   const roles = normalizeRoles(effRoles);
-  const isDoctorOnly =
-    roles.includes('doctor') && !roles.includes('admin') && !roles.includes('super_admin');
-  const useAdminModeLayout =
-    canAccessAdminUI(effRoles) &&
-    resolvedMode === 'admin' &&
-    !isPatientRole(effRoles) &&
-    !isDoctorOnly;
-  const showVerifyNav = canVerifyDoctorsInTenant(user, token);
 
-  const staffNavItems = useMemo(() => {
-    if (!canAccessAdminUI(effRoles)) return staffNavBase;
-    const adminItem = { path: '/admin/dashboard', label: 'Admin', icon: BarChart3 };
-    const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
-    const inventoryItem = { path: '/admin/inventory', label: 'Inventory', icon: Package };
-    const brandingItem = { path: '/admin/branding', label: 'Branding', icon: Palette };
-    const mid = isSuperAdminRole(effRoles)
-      ? [adminItem, tenantsItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem, brandingItem]
-      : [adminItem, ...(showVerifyNav ? [verificationsNavItem] : []), inventoryItem, brandingItem];
-    return [staffNavBase[0], ...mid, ...staffNavBase.slice(1)];
-  }, [effRoles, showVerifyNav]);
+  // Resolve workspace from user roles
+  const workspaceSlug = resolveUserWorkspace(user, token);
+  const workspace: WorkspaceConfig = WORKSPACE_REGISTRY[workspaceSlug];
 
-  const adminModeItems = useMemo(() => {
-    if (!isSuperAdminRole(effRoles)) {
-      if (showVerifyNav) {
-        return [adminModeNavBase[0], verificationsNavItem, ...adminModeNavBase.slice(1)];
-      }
-      return adminModeNavBase;
-    }
-    const tenantsItem = { path: '/admin/tenants', label: 'Tenants', icon: Building2 };
-    return [
-      adminModeNavBase[0],
-      tenantsItem,
-      ...(showVerifyNav ? [verificationsNavItem] : []),
-      ...adminModeNavBase.slice(1),
-    ];
-  }, [effRoles, showVerifyNav]);
-  const doctorNavFiltered = useMemo(
-    () => DOCTOR_PRACTICE_NAV.filter((item) => isDoctorNavItemVisible(user, token, item.path)),
-    [user, token]
-  );
+  // Determine if admin mode layout styling should apply
+  const useAdminModeLayout = resolvedMode === 'admin' && workspaceSlug === 'admin';
 
-  const navItems = isPatientRole(effRoles)
-    ? patientFallbackNavItems
-    : isDoctorOnly
-      ? doctorNavFiltered
-      : useAdminModeLayout
-        ? adminModeItems
-        : staffNavItems;
+  // Quick actions for the sidebar footer
+  const quickActions = workspace?.quickActions ?? [];
+
   return (
     <div
       className={cn(
@@ -133,6 +56,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
         useAdminModeLayout && 'border-slate-200/80 bg-slate-50/95 dark:border-slate-800 dark:bg-slate-950/50'
       )}
     >
+      {/* ── Header ─────────────────────────────────────── */}
       <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border/80 px-3">
         <div
           className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${
@@ -140,11 +64,11 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
           }`}
         >
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm">
-            C
+            <workspace.icon className="h-5 w-5" />
           </div>
           <div className="whitespace-nowrap">
-            <h1 className="text-sm font-semibold leading-tight text-foreground">CareOS</h1>
-            <p className="text-xs leading-tight text-muted-foreground">Operations</p>
+            <h1 className="text-sm font-semibold leading-tight text-foreground">{workspace.label}</h1>
+            <p className="text-xs leading-tight text-muted-foreground">{workspace.description}</p>
           </div>
         </div>
 
@@ -155,10 +79,10 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
         >
           <div className="group relative">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary font-bold text-primary-foreground shadow-sm">
-              C
+              <workspace.icon className="h-5 w-5" />
             </div>
             <div className="invisible absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100">
-              CareOS
+              {workspace.label}
               <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-border" />
             </div>
           </div>
@@ -188,24 +112,63 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* ── Navigation ─────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        <ul className="space-y-0.5">
-          {navItems.map((item) => (
-            <NavItem
-              key={item.path}
-              path={item.path}
-              label={item.label}
-              icon={item.icon}
-              isCollapsed={isCollapsed}
-              onNavigate={onClose}
-              title={isDoctorOnly ? doctorNavItemHint(user, item.path) : undefined}
-            />
-          ))}
-        </ul>
+        {workspace.sections.map((section, idx) => (
+          <div key={section.title ?? idx} className="mb-4">
+            {section.title && (
+              <p
+                className={cn(
+                  'mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60',
+                  isCollapsed && 'sr-only'
+                )}
+              >
+                {section.title}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {section.items.map((item) => (
+                <NavItem
+                  key={item.path}
+                  path={item.path}
+                  label={item.label}
+                  icon={item.icon}
+                  isCollapsed={isCollapsed}
+                  onNavigate={onClose}
+                  title={
+                    roles.includes('doctor') && !roles.includes('admin') && !roles.includes('super_admin')
+                      ? doctorNavItemHint(user, item.path)
+                      : undefined
+                  }
+                />
+              ))}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      {/* Footer - User info */}
+      {/* ── Quick Actions ──────────────────────────────── */}
+      {quickActions.length > 0 && !isCollapsed && (
+        <div className="flex-shrink-0 border-t border-border/80 px-2 py-3">
+          <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            Quick Actions
+          </p>
+          <ul className="space-y-0.5">
+            {quickActions.map((action) => (
+              <NavItem
+                key={action.path}
+                path={action.path}
+                label={action.label}
+                icon={action.icon}
+                isCollapsed={isCollapsed}
+                onNavigate={onClose}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ── Footer - User info ─────────────────────────── */}
       {user && (
         <div className="flex-shrink-0 border-t border-border/80 p-3">
           <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
@@ -225,7 +188,7 @@ export function Sidebar({ user, onClose, isCollapsed, onToggleCollapse }: Sideba
                 {user.full_name || user.email || 'User'}
               </p>
               <p className="max-w-[140px] truncate text-xs capitalize text-muted-foreground">
-                {effRoles.length ? effRoles.join(', ') : 'Unknown'}
+                {workspace.label}
               </p>
             </div>
           </div>

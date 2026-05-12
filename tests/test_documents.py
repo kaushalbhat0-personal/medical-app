@@ -70,7 +70,7 @@ class TestTemplateHelpers:
         result = _escape_html('<script>alert("xss")</script>')
         assert "<" in result
         assert ">" in result
-        assert """ in result
+        assert '"""' in result
 
     def test_escape_html_plain_text(self):
         assert _escape_html("Hello, World!") == "Hello, World!"
@@ -802,7 +802,7 @@ def current_user():
 
 @pytest.fixture
 def client():
-    """Test client fixture — requires app to be configured."""
+    """Test client fixture - requires app to be configured."""
     from app.main import app
 
     with TestClient(app) as c:

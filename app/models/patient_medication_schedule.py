@@ -35,7 +35,13 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
+
+# ── JSON type: use portable JSON (works on PostgreSQL + SQLite) ──
+# PostgreSQL JSONB is only needed in migrations for index/operator support.
+# Runtime column definitions use portable JSON to keep tests working on SQLite.
+JSONType = JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -125,7 +131,7 @@ class PatientMedicationSchedule(Base):
     start_date: Mapped[date] = mapped_column(DateTime(timezone=True), nullable=False)
     end_date: Mapped[date | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reminder_times: Mapped[list | None] = mapped_column(
-        JSONB,
+        JSONType,
         nullable=True,
         default=list,
         server_default="[]",

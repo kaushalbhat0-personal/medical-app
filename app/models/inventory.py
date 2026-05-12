@@ -39,6 +39,7 @@ class InventoryMovementType(str, enum.Enum):
     IN = "IN"
     OUT = "OUT"
     ADJUST = "ADJUST"
+    PROCUREMENT_IN = "PROCUREMENT_IN"
 
 
 class InventoryItem(Base):
@@ -175,11 +176,22 @@ class InventoryMovement(Base):
         nullable=False,
         server_default=func.now(),
     )
+    # Procurement snapshot fields
+    unit_cost: Mapped[float | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    supplier_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("suppliers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    invoice_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     item = relationship("InventoryItem", back_populates="movements")
     doctor = relationship("Doctor")
     billing = relationship("Billing")
     actor = relationship("User", foreign_keys=[created_by])
+    supplier = relationship("Supplier")
 
 
 class AppointmentInventoryUsage(Base):

@@ -31,6 +31,9 @@ class DocumentType(str, enum.Enum):
     patient_statement = "patient_statement"
     prescription = "prescription"
     encounter_summary = "encounter_summary"
+    purchase_invoice = "purchase_invoice"
+    inward_stock_summary = "inward_stock_summary"
+    supplier_purchase_history = "supplier_purchase_history"
 
 
 class DocumentFormat(str, enum.Enum):

@@ -6,6 +6,8 @@ from app.api.v1.endpoints import (
     auth,
     billing,
     branding,
+    clinic_operations,
+    clinic_queue,
     communications,
     daily_care,
     dashboard,
@@ -13,18 +15,22 @@ from app.api.v1.endpoints import (
     doctor_profile,
     documents,
     encounter,
+    front_desk,
     health,
     inventory,
     medication_schedule,
+    nurse_workflow,
     patient,
     patient_communication,
     patient_trust,
     patient_workspace,
+    procurement,
     public_discovery,
     reporting,
     tenant,
     users,
 )
+
 
 
 api_router = APIRouter()
@@ -52,3 +58,10 @@ api_router.include_router(patient_communication.router)
 api_router.include_router(patient_trust.router)
 api_router.include_router(medication_schedule.router)
 api_router.include_router(daily_care.router)
+api_router.include_router(procurement.router)
+api_router.include_router(clinic_queue.router)
+api_router.include_router(front_desk.router)
+api_router.include_router(nurse_workflow.router)
+api_router.include_router(clinic_operations.router)
+
+

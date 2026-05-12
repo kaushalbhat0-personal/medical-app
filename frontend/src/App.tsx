@@ -7,6 +7,9 @@ import { AppModeProvider } from './contexts/AppModeContext';
 import { initDoctorSlotsCacheCrossTabSync } from './services';
 import { setNavigator } from './utils/navigation';
 import { getEffectiveRoles, postLoginHomePath } from './utils/roles';
+import { RouteIsolation } from './workspace/route-isolation';
+import { resolveUserWorkspace } from './workspace/resolver';
+import { getLoginRedirectRoute } from './workspace/contextual-redirects';
 import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AdminRoute } from './components/layout/AdminRoute';
@@ -59,6 +62,7 @@ import { AdminTenantsPage } from './pages/AdminTenantsPage';
 import { AdminDoctorVerificationsPage } from './pages/AdminDoctorVerificationsPage';
 import AdminBrandingPage from './pages/AdminBrandingPage';
 import AdminCommunicationsPage from './pages/AdminCommunicationsPage';
+import AdminProcurementDashboard from './pages/AdminProcurementDashboard';
 
 import { Signup } from './pages/Signup';
 import { SignupPatient } from './pages/SignupPatient';
@@ -121,11 +125,13 @@ function AnimatedRoutes() {
     setNavigator(navigate);
   }, [navigate]);
 
-  const effectiveRoles = getEffectiveRoles(user, localStorage.getItem('token'));
+  const token = localStorage.getItem('token');
+  const effectiveRoles = getEffectiveRoles(user, token);
   const needsPasswordReset = user?.force_password_reset === true;
+  const resolvedWorkspace = resolveUserWorkspace(user, token);
   const loginRedirect = needsPasswordReset
     ? '/reset-password'
-    : postLoginHomePath(effectiveRoles, user);
+    : getLoginRedirectRoute(resolvedWorkspace, location.pathname);
 
   if (
     !isLoading &&
@@ -372,6 +378,23 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/admin/procurement"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
+              <StaffRoute user={user}>
+                <AdminRoute user={user}>
+                  <AppLayout user={user} onLogout={logout}>
+                    <AnimatedPage>
+                      <AdminProcurementDashboard />
+                    </AnimatedPage>
+                  </AppLayout>
+                </AdminRoute>
+              </StaffRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/patients"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
@@ -436,7 +459,9 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}>
               <DoctorRoute user={user}>
-                <DoctorLayout />
+                <RouteIsolation workspaceSlug="doctor">
+                  <DoctorLayout />
+                </RouteIsolation>
               </DoctorRoute>
             </ProtectedRoute>
           }

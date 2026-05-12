@@ -48,6 +48,20 @@ class TenantBrandingProfileRead(BaseModel):
     updated_at: datetime
 
 
+class TenantBrandingProfileCreate(BaseModel):
+    """Create model — all fields optional for initial creation."""
+
+    primary_color: str | None = Field(default=None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$")
+    secondary_color: str | None = Field(default=None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$")
+    accent_color: str | None = Field(default=None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$")
+
+    document_header_style: str | None = Field(default=None, max_length=50)
+    watermark_text: str | None = Field(default=None, max_length=255)
+
+    prescription_template: str | None = Field(default=None, max_length=100)
+    invoice_template: str | None = Field(default=None, max_length=100)
+
+
 class TenantBrandingProfileUpdate(BaseModel):
     """Update model — all fields optional for partial updates."""
 

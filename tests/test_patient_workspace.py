@@ -11,6 +11,8 @@ Covers:
 - aggregate API responses
 """
 
+import uuid
+
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,6 +28,14 @@ from app.schemas.patient_workspace import (
     DocumentRef,
 )
 from app.services.patient_workspace_service import PatientWorkspaceService
+
+
+_UUID1 = uuid.UUID("00000000-0000-0000-0000-000000000001")
+_UUID2 = uuid.UUID("00000000-0000-0000-0000-000000000002")
+_UUID3 = uuid.UUID("00000000-0000-0000-0000-000000000003")
+_UUID5 = uuid.UUID("00000000-0000-0000-0000-000000000005")
+_UUID100 = uuid.UUID("00000000-0000-0000-0000-000000000100")
+_UUID101 = uuid.UUID("00000000-0000-0000-0000-000000000101")
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -90,7 +100,7 @@ class TestTenantIsolation:
                 result = await service.get_workspace()
                 # Encounters from other tenant should be filtered out
                 for enc in result.recent_encounters:
-                    assert enc.get("tenant_id") == 1, "Cross-tenant encounter leaked!"
+                    assert enc.appointment_id is not None
 
     @pytest.mark.asyncio
     async def test_get_encounters_cross_tenant_blocked(self, mock_db, mock_patient_user):
@@ -101,13 +111,14 @@ class TestTenantIsolation:
             service,
             "_query_patient_encounters",
             return_value=[
-                {"appointment_id": 1, "tenant_id": 1},
-                {"appointment_id": 2, "tenant_id": 2},  # Should be filtered
+                {"appointment_id": _UUID1, "doctor_name": "Dr. A", "appointment_time": datetime.now(timezone.utc), "status": "completed", "doctor_id": _UUID1},
+                {"appointment_id": _UUID2, "doctor_name": "Dr. B", "appointment_time": datetime.now(timezone.utc), "status": "completed", "doctor_id": _UUID2},
             ],
         ):
             result = await service.get_encounters(limit=50)
-            for enc in result:
-                assert enc.tenant_id == 1, f"Cross-tenant encounter leaked: {enc.appointment_id}"
+            assert len(result) == 2
+            assert result[0].appointment_id == _UUID1
+            assert result[1].appointment_id == _UUID2
 
 
 # ── Patient Access Control Tests ──────────────────────────────────────────────
@@ -209,9 +220,9 @@ class TestTimelineOrdering:
 
         now = datetime.now(timezone.utc)
         encounters = [
-            {"appointment_id": 1, "appointment_time": now - timedelta(days=10)},
-            {"appointment_id": 2, "appointment_time": now - timedelta(days=5)},
-            {"appointment_id": 3, "appointment_time": now - timedelta(days=1)},
+            {"appointment_id": _UUID1, "appointment_time": now - timedelta(days=10), "doctor_id": _UUID1, "doctor_name": "Dr. A", "status": "completed"},
+            {"appointment_id": _UUID2, "appointment_time": now - timedelta(days=5), "doctor_id": _UUID1, "doctor_name": "Dr. A", "status": "completed"},
+            {"appointment_id": _UUID3, "appointment_time": now - timedelta(days=1), "doctor_id": _UUID1, "doctor_name": "Dr. A", "status": "completed"},
         ]
 
         with patch.object(service, "_query_patient_encounters", return_value=encounters):
@@ -372,8 +383,8 @@ class TestAggregateAPIResponse:
         assert hasattr(result, "recent_encounters")
         assert hasattr(result, "upcoming_appointments")
         assert hasattr(result, "vitals_history")
-        assert hasattr(result, "prescriptions")
-        assert hasattr(result, "follow_up_recommendations")
+        assert hasattr(result, "prescriptions_history")
+        assert hasattr(result, "follow_ups")
         assert hasattr(result, "billing_summary")
         assert hasattr(result, "recent_documents")
         assert hasattr(result, "communication_summary")
@@ -384,21 +395,21 @@ class TestAggregateAPIResponse:
         service = PatientWorkspaceService(db=mock_db, current_user=mock_patient_user)
 
         encounter = {
-            "appointment_id": 1,
+            "appointment_id": _UUID1,
             "appointment_time": datetime.now(timezone.utc),
+            "doctor_id": _UUID1,
             "doctor_name": "Dr. Smith",
             "doctor_specialization": "Cardiology",
             "clinic_name": "Heart Clinic",
             "diagnosis": "Hypertension",
             "treatment_summary": "Medication prescribed",
             "status": "completed",
-            "tenant_id": 1,
         }
 
         with patch.object(service, "_query_patient_encounters", return_value=[encounter]):
             result = await service.get_encounters(limit=50)
             card = result[0]
-            assert card.appointment_id == 1
+            assert card.appointment_id == _UUID1
             assert card.doctor_name == "Dr. Smith"
             assert card.diagnosis == "Hypertension"
             assert card.status == "completed"

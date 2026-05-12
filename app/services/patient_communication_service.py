@@ -568,6 +568,37 @@ def get_patient_reminders(
     return reminders_by_urgency
 
 
+class PatientCommunicationService:
+    """Class-based wrapper for patient communication operations.
+    
+    Provides the interface expected by tests that instantiate the service
+    with db and current_user parameters.
+    """
+    
+    def __init__(self, db: Session, current_user: User) -> None:
+        self.db = db
+        self.current_user = current_user
+    
+    def get_aggregate(self) -> PatientCommunicationAggregate:
+        return get_patient_communication_aggregate(self.db, self.current_user)
+    
+    def get_timeline(self, skip: int = 0, limit: int = 20) -> PatientCommunicationAggregate:
+        cards, total = get_patient_communication_timeline(self.db, self.current_user, skip=skip, limit=limit)
+        # Return a simple aggregate-like object for test compatibility
+        from collections import namedtuple
+        TimelineResult = namedtuple("TimelineResult", ["items", "total", "skip", "limit"])
+        return TimelineResult(items=cards, total=total, skip=skip, limit=limit)
+    
+    def get_reminders(self) -> dict[str, list[ReminderCard]]:
+        return get_patient_reminders(self.db, self.current_user)
+    
+    def get_unread_count(self) -> int:
+        return get_unread_count(self.db, self.current_user)
+    
+    def mark_as_read(self, event_id: UUID) -> bool:
+        return mark_notification_as_read(self.db, self.current_user, event_id)
+
+
 def get_unread_count(
     db: Session,
     current_user: User,

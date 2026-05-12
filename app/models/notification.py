@@ -31,7 +31,13 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
+
+# ── JSON type: use portable JSON (works on PostgreSQL + SQLite) ──
+# PostgreSQL JSONB is only needed in migrations for index/operator support.
+# Runtime column definitions use portable JSON to keep tests working on SQLite.
+JSONType = JSON
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -124,7 +130,7 @@ class NotificationEvent(Base):
     )
     # Structured payload — contains reference data, NOT full PHI.
     # PHI is resolved at template rendering time from source-of-truth models.
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -198,7 +204,7 @@ class NotificationDelivery(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-    provider_response: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    provider_response: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     retry_count: Mapped[int] = mapped_column(
         Integer,
