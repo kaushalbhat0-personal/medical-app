@@ -138,8 +138,8 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceSlug, WorkspaceConfig> = {
         items: [
           { path: '/doctor/dashboard', label: 'Queue', icon: Clock },
           { path: '/doctor/appointments', label: 'Encounters', icon: Stethoscope },
-          { path: '/doctor/inventory', label: 'Prescriptions', icon: Pill },
-          { path: '/doctor/bills', label: 'Follow-ups', icon: CalendarCheck },
+          { path: '/doctor/appointments', label: 'Prescriptions', icon: Pill },
+          { path: '/doctor/appointments', label: 'Follow-ups', icon: CalendarCheck },
         ],
       },
       {
@@ -147,7 +147,6 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceSlug, WorkspaceConfig> = {
         items: [
           { path: '/doctor/patients', label: 'Patients', icon: Users },
           { path: '/doctor/availability', label: 'Availability', icon: Calendar },
-          { path: '/complete-profile', label: 'Profile', icon: UserRound },
         ],
       },
     ],
@@ -231,7 +230,7 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceSlug, WorkspaceConfig> = {
         items: [
           { path: '/billing', label: 'Billing', icon: CreditCard },
           { path: '/admin/financial-dashboard', label: 'Tax Exports', icon: FileText },
-          { path: '/admin/procurement', label: 'Procurement Reports', icon: BarChart3 },
+          { path: '/billing', label: 'Revenue Reports', icon: BarChart3 },
           { path: '/billing', label: 'Dues', icon: Receipt },
         ],
       },
@@ -251,8 +250,7 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceSlug, WorkspaceConfig> = {
         items: [
           { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { path: '/admin/tenants', label: 'Tenants', icon: Building2 },
-          { path: '/admin/procurement', label: 'Procurement', icon: ShoppingCart },
-          { path: '/admin/inventory', label: 'Inventory', icon: Package },
+          { path: '/admin/doctor-verifications', label: 'Verifications', icon: ShieldCheck },
         ],
       },
       {
@@ -260,7 +258,6 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceSlug, WorkspaceConfig> = {
         items: [
           { path: '/admin/branding', label: 'Branding', icon: Palette },
           { path: '/admin/communications', label: 'Communications', icon: Bell },
-          { path: '/admin/doctor-verifications', label: 'Verifications', icon: ShieldCheck },
         ],
       },
     ],
