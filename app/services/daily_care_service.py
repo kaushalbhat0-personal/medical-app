@@ -38,7 +38,7 @@ from app.models.patient_medication_schedule import (
     MedicationScheduleStatus,
     PatientMedicationSchedule,
 )
-from app.models.prescription import Prescription, PrescriptionItem
+from app.models.appointment import Prescription, PrescriptionItem
 from app.models.user import User, UserRole
 from app.schemas.daily_care import (
     ContinueCare,

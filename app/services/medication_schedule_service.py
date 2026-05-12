@@ -128,7 +128,7 @@ def derive_schedule_from_prescription(
     patient_id = _resolve_patient_id(current_user)
 
     # Load the prescription item with its prescription
-    from app.models.prescription import Prescription, PrescriptionItem
+    from app.models.appointment import Prescription, PrescriptionItem
 
     prescription_item = db.get(PrescriptionItem, prescription_item_id)
     if not prescription_item:
@@ -219,7 +219,7 @@ def derive_schedules_for_prescription(
     Returns:
         List of created MedicationScheduleRead objects.
     """
-    from app.models.prescription import Prescription, PrescriptionItem
+    from app.models.appointment import Prescription, PrescriptionItem
 
     prescription = db.get(Prescription, prescription_id)
     if not prescription:

@@ -113,7 +113,7 @@ def list_schedules(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     active_only: bool = Query(True),
-    status_filter: str | None = Query(None, regex=r"^(active|completed|paused)$"),
+    status_filter: str | None = Query(None, pattern=r"^(active|completed|paused)$"),
     db=Depends(get_db),
     current_user=Depends(get_current_user),
 ):
