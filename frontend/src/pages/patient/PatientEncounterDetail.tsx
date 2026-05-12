@@ -43,11 +43,9 @@ import {
   Activity,
   Weight,
   Ruler,
-  ChevronRight,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { encountersApi } from '../../services/appointments';
 import { documentsApi } from '../../services/documents';
@@ -142,7 +140,7 @@ export function PatientEncounterDetail() {
     return <ErrorState title="Not Found" description="This encounter could not be found." />;
   }
 
-  const { appointment, doctor, vitals, prescriptions } = encounter;
+  const { appointment, vitals, prescriptions } = encounter;
   const hasPrescriptions = (prescriptions?.length ?? 0) > 0;
   const hasVitals = vitals && Object.values(vitals).some((v) => v != null && v !== '');
   const hasFollowUp = !!appointment.follow_up_date;
