@@ -43,6 +43,31 @@ def get_bill_by_appointment(db: Session, appointment_id: UUID) -> Billing | None
     return db.scalars(stmt).first()
 
 
+def get_bills_by_patient(
+    db: Session,
+    patient_id: UUID,
+    limit: int = 20,
+) -> list[Billing]:
+    """Get bills for a specific patient, newest first.
+
+    Args:
+        db: Database session.
+        patient_id: UUID of the patient.
+        limit: Maximum number of bills to return (default 20).
+
+    Returns:
+        List of Billing objects ordered by created_at descending.
+    """
+    stmt = (
+        select(Billing)
+        .where(Billing.patient_id == patient_id)
+        .where(Billing.is_deleted == False)
+        .order_by(Billing.created_at.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(stmt).all())
+
+
 def get_bills(
     db: Session,
     skip: int = 0,
