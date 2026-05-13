@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
+from app.core.clinical_capabilities import has_clinician_capability
 from app.core.workspace_context import ActiveWorkspace, WorkspaceSlug, is_elevated_workspace_access
 from app.crud import crud_appointment, crud_billing
 from app.models.appointment import Appointment, AppointmentStatus, Prescription
@@ -891,20 +892,17 @@ def _assert_doctor_assigned_to_appointment(
     # This works for ANY user role - admin, staff, or doctor - as long as they
     # have a valid Doctor record linked to their user account.
     #
-    # WORKSPACE ELEVATION: Admin/super_admin in the doctor workspace may bypass
-    # the doctor-record requirement. This is request-scoped only — the user's
-    # role remains unchanged.
-    if is_elevated_workspace_access(current_user, active_workspace, target_slug=WorkspaceSlug.doctor):
-        log_structured_audit_event(
-            event="workspace_elevated_access",
-            actor_id=str(current_user.id),
-            workspace=active_workspace.slug.value if active_workspace else "unknown",
-            elevated_workspace_access=True,
-            resource_type="appointment",
-            rbac_action=rbac_action,
-            appointment_id=str(appointment.id),
+    # CLINICIAN CAPABILITY: The user must have clinician capability (doctor role,
+    # normalized doctor role, or linked Doctor record). Workspace context does NOT
+    # grant clinical authority — a pure admin without a Doctor record cannot perform
+    # clinical actions regardless of workspace.
+    if not has_clinician_capability(db, current_user):
+        log_rbac_mutation_violation(
+            current_user,
+            "appointment",
+            action=rbac_action,
         )
-        return
+        raise ForbiddenError("Only clinicians can perform this action")
     doc = doctor_service.get_current_doctor(db, current_user)
     if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
         log_rbac_mutation_violation(

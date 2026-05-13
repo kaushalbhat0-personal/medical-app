@@ -73,9 +73,12 @@ export function DoctorAppointmentDetailPage() {
     };
   }, [appointmentId, retryKey]);
 
-  // Clinical actions require: clinician workspace + doctor capability + write access + scheduled status
+  // Clinical actions require: clinician capability (doctor role, normalized doctor role,
+  // or linked Doctor record) + write access + scheduled status.
+  // Workspace context does NOT block clinical actions — a tenant doctor in the Finance
+  // workspace can still start encounters because clinician capability exists.
   const canStartEncounter =
-    isClinician && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+    hasClinicianCapability && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
 
   const handleEncounterNavigation = useCallback(() => {
     if (!appointmentId) return;

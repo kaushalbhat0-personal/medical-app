@@ -31,6 +31,7 @@ from app.schemas.inventory import (
     StockReduceRequest,
 )
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
+from app.core.clinical_capabilities import has_clinician_capability
 from app.core.workspace_context import (
     ActiveWorkspace,
     WorkspaceSlug,
@@ -718,51 +719,29 @@ def consume_inventory_for_appointment(
     Idempotent per ``(appointment_id, item_id)``: existing lines are skipped; concurrent duplicate
     inserts are tolerated without double-counting metrics.
 
-    WORKSPACE ELEVATION: Admin/super_admin in the doctor workspace may bypass
-    the doctor-record requirement. This is request-scoped only — the user's
-    role remains unchanged.
+    CLINICIAN CAPABILITY: The user must have clinician capability (doctor role,
+    normalized doctor role, or linked Doctor record). Workspace context does NOT
+    grant clinical authority — a pure admin without a Doctor record cannot consume
+    clinical inventory regardless of workspace.
     """
     if not items:
         return
 
-    logger.warning(
-        "[INVENTORY DEBUG] role=%s workspace=%s elevated=%s",
-        current_user.role,
-        active_workspace.slug.value if active_workspace else None,
-        is_elevated_workspace_access(
-            current_user, active_workspace, target_slug=WorkspaceSlug.doctor
-        ),
-    )
-
-    # WORKSPACE ELEVATION: Admin/super_admin in the doctor workspace may bypass
-    # the doctor-record requirement for inventory consumption.
-    is_elevated = is_elevated_workspace_access(
-        current_user, active_workspace, target_slug=WorkspaceSlug.doctor
-    )
-
-    if not is_elevated and current_user.role != UserRole.doctor:
-
+    # CLINICIAN CAPABILITY: The user must have clinician capability (doctor role,
+    # normalized doctor role, or linked Doctor record). Workspace context does NOT
+    # grant clinical authority — a pure admin without a Doctor record cannot consume
+    # clinical inventory regardless of workspace.
+    if not has_clinician_capability(db, current_user):
         log_rbac_mutation_violation(
             current_user, "inventory", action="consume_inventory"
         )
-        raise ForbiddenError("Only doctors can record visit inventory usage")
+        raise ForbiddenError("Only clinicians can record visit inventory usage")
 
-    if is_elevated:
-        log_structured_audit_event(
-            event="workspace_elevated_access",
-            actor_id=str(current_user.id),
-            workspace=active_workspace.slug.value if active_workspace else "unknown",
-            elevated_workspace_access=True,
-            resource_type="inventory",
-            rbac_action="consume_inventory",
-            appointment_id=str(appointment.id),
-        )
-    else:
-        doc = doctor_service.get_current_doctor(db, current_user)
-        if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
-            raise ForbiddenError("Cross-tenant access not allowed")
-        if appointment.doctor_id != doc.id:
-            raise ForbiddenError("Not your appointment")
+    doc = doctor_service.get_current_doctor(db, current_user)
+    if appointment.tenant_id is not None and doc.tenant_id != appointment.tenant_id:
+        raise ForbiddenError("Cross-tenant access not allowed")
+    if appointment.doctor_id != doc.id:
+        raise ForbiddenError("Not your appointment")
 
     if require_scheduled and appointment.status != AppointmentStatus.scheduled:
         raise ValidationError("Inventory can only be consumed for scheduled visits")

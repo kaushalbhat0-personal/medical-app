@@ -97,10 +97,13 @@ export function EncounterWorkspacePage() {
   const patient = aggregate?.patient ?? null;
 
   // Check if user can mark this encounter as complete
-  // Clinical actions require: clinician workspace + doctor capability + write access + scheduled status
+  // Clinical actions require: clinician capability (doctor role, normalized doctor role,
+  // or linked Doctor record) + write access + scheduled status.
+  // Workspace context does NOT block clinical actions — a tenant doctor in the Finance
+  // workspace can still complete encounters because clinician capability exists.
   const canMarkComplete = useMemo(() => {
-    return isClinician && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
-  }, [isClinician, isIndependent, isReadOnly, appointment?.status]);
+    return hasClinicianCapability && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+  }, [hasClinicianCapability, isIndependent, isReadOnly, appointment?.status]);
 
 
   /**
