@@ -1,7 +1,11 @@
+import logging
 from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, status
+
+logger = logging.getLogger(__name__)
+
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -332,4 +336,10 @@ def get_active_workspace(
             detail=f"Workspace '{slug.value}' is not allowed for your role",
         )
 
+    logger.warning(
+        "[WORKSPACE DEBUG] header=%s resolved=%s role=%s",
+        x_workspace,
+        slug.value,
+        current_user.role,
+    )
     return ActiveWorkspace(slug=slug)

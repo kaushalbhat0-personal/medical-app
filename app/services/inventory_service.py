@@ -725,6 +725,15 @@ def consume_inventory_for_appointment(
     if not items:
         return
 
+    logger.warning(
+        "[INVENTORY DEBUG] role=%s workspace=%s elevated=%s",
+        current_user.role,
+        active_workspace.slug.value if active_workspace else None,
+        is_elevated_workspace_access(
+            current_user, active_workspace, target_slug=WorkspaceSlug.doctor
+        ),
+    )
+
     # WORKSPACE ELEVATION: Admin/super_admin in the doctor workspace may bypass
     # the doctor-record requirement for inventory consumption.
     is_elevated = is_elevated_workspace_access(
@@ -732,6 +741,7 @@ def consume_inventory_for_appointment(
     )
 
     if not is_elevated and current_user.role != UserRole.doctor:
+
         log_rbac_mutation_violation(
             current_user, "inventory", action="consume_inventory"
         )

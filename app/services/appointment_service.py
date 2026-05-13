@@ -667,7 +667,15 @@ def mark_appointment_completed(
         active_workspace=active_workspace,
     )
 
+    logger.warning(
+        "[SERVICE DEBUG] active_workspace=%s slug=%s role=%s",
+        active_workspace,
+        active_workspace.slug.value if active_workspace else None,
+        current_user.role,
+    )
+
     if settings.REQUIRE_APPOINTMENT_COMPLETION_IDEMPOTENCY_KEY:
+
         if idempotency_key is None or not str(idempotency_key).strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

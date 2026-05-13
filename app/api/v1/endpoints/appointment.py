@@ -1,7 +1,11 @@
+import logging
 from enum import Enum
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Response, Body, HTTPException, status
+
+logger = logging.getLogger(__name__)
+
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -103,7 +107,14 @@ def mark_appointment_completed(
     active_workspace: ActiveWorkspace | None = Depends(get_active_workspace),
 ) -> AppointmentRead:
     effective = data if data is not None else MarkAppointmentCompletedRequest()
+    logger.warning(
+        "[ENDPOINT DEBUG] active_workspace=%s slug=%s role=%s",
+        active_workspace,
+        active_workspace.slug.value if active_workspace else None,
+        current_user.role,
+    )
     appt, idempotent_replay = appointment_service.mark_appointment_completed(
+
         db,
         appointment_id,
         current_user,
