@@ -885,6 +885,7 @@ def _assert_doctor_assigned_to_appointment(
     appointment: Appointment,
     *,
     rbac_action: str,
+    restrict_to_doctor_id: UUID | None = None,
     active_workspace: ActiveWorkspace | None = None,
 ) -> None:
     # Capability-based check: user must have a Doctor record linked via user_id
@@ -903,7 +904,31 @@ def _assert_doctor_assigned_to_appointment(
             action=rbac_action,
         )
         raise ForbiddenError("Only clinicians can perform this action")
-    doc = doctor_service.get_current_doctor(db, current_user)
+
+    # Resolve the doctor identity for this user.
+    # When restrict_to_doctor_id is provided (from data_scope), use it directly
+    # to avoid ambiguity from get_doctor_by_user_id returning a different Doctor row.
+    # Fall back to get_current_doctor when restrict_to_doctor_id is None.
+    if restrict_to_doctor_id is not None:
+        doc = doctor_service.get_doctor_or_404(db, restrict_to_doctor_id)
+    else:
+        doc = doctor_service.get_current_doctor(db, current_user)
+
+    # Defensive logging for debugging authorization failures
+    logger.warning(
+        "[APM_AUTH] _assert_doctor_assigned_to_appointment: "
+        "user_id=%s role=%s resolved_doctor_id=%s appointment_doctor_id=%s "
+        "resolved_doctor_tenant_id=%s appointment_tenant_id=%s "
+        "restrict_to_doctor_id=%s has_clinician_capability=True",
+        current_user.id,
+        current_user.role,
+        doc.id,
+        appointment.doctor_id,
+        doc.tenant_id,
+        appointment.tenant_id,
+        restrict_to_doctor_id,
+    )
+
     if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
         log_rbac_mutation_violation(
             current_user,
@@ -980,7 +1005,9 @@ def authorize_appointment_access(
     # This works for ANY user with a Doctor record (admin, staff, or doctor role).
     if require_assigned_doctor:
         _assert_doctor_assigned_to_appointment(
-            db, current_user, appointment, rbac_action=rbac_action, active_workspace=active_workspace
+            db, current_user, appointment, rbac_action=rbac_action,
+            restrict_to_doctor_id=restrict_to_doctor_id,
+            active_workspace=active_workspace,
         )
         return
 
