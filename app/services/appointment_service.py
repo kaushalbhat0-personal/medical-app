@@ -916,6 +916,22 @@ def _assert_doctor_assigned_to_appointment(
 
     # Defensive logging for debugging authorization failures
     logger.warning(
+        "[ENCOUNTER_AUTH_DEBUG] "
+        "user=%s role=%s "
+        "restrict_to_doctor_id=%s "
+        "resolved_doctor_id=%s "
+        "appointment_doctor_id=%s "
+        "appointment_tenant_id=%s "
+        "resolved_doctor_tenant_id=%s",
+        current_user.id,
+        current_user.role,
+        restrict_to_doctor_id,
+        doc.id,
+        appointment.doctor_id,
+        appointment.tenant_id,
+        doc.tenant_id,
+    )
+    logger.warning(
         "[APM_AUTH] _assert_doctor_assigned_to_appointment: "
         "user_id=%s role=%s resolved_doctor_id=%s appointment_doctor_id=%s "
         "resolved_doctor_tenant_id=%s appointment_tenant_id=%s "
@@ -928,6 +944,7 @@ def _assert_doctor_assigned_to_appointment(
         appointment.tenant_id,
         restrict_to_doctor_id,
     )
+
 
     if non_nil_tenant_id(doc.tenant_id) != non_nil_tenant_id(appointment.tenant_id):
         log_rbac_mutation_violation(
@@ -960,10 +977,21 @@ def authorize_appointment_access(
     # Authorization is capability-based:
     # A user may act as a doctor if they have a Doctor record linked via user_id.
     # Role (admin/doctor/staff) is NOT used for permission decisions here.
+    logger.warning(
+        "[AUTH_TRACE] authorize_appointment_access entry: "
+        "user=%s role=%s require_assigned_doctor=%s restrict_to_doctor_id=%s "
+        "appt_doctor_id=%s appt_tenant_id=%s rbac_action=%s",
+        current_user.id, current_user.role, require_assigned_doctor,
+        restrict_to_doctor_id, appointment.doctor_id, appointment.tenant_id,
+        rbac_action,
+    )
+
     if appointment.tenant_id is None:
+        logger.warning("[AUTH_TRACE] BRANCH: appointment.tenant_id is None -> ValidationError")
         raise ValidationError("Appointment tenant is not set")
 
     if current_user.role == UserRole.super_admin:
+        logger.warning("[AUTH_TRACE] BRANCH: super_admin")
         if (
             restrict_to_doctor_id is not None
             and appointment.doctor_id != restrict_to_doctor_id
@@ -975,6 +1003,7 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.patient:
+        logger.warning("[AUTH_TRACE] BRANCH: patient")
         if require_assigned_doctor:
             log_rbac_mutation_violation(
                 current_user,
@@ -1004,6 +1033,7 @@ def authorize_appointment_access(
     # check if user has a Doctor record and is the assigned doctor.
     # This works for ANY user with a Doctor record (admin, staff, or doctor role).
     if require_assigned_doctor:
+        logger.warning("[AUTH_TRACE] BRANCH: require_assigned_doctor=True -> _assert_doctor_assigned_to_appointment")
         _assert_doctor_assigned_to_appointment(
             db, current_user, appointment, rbac_action=rbac_action,
             restrict_to_doctor_id=restrict_to_doctor_id,
@@ -1012,6 +1042,7 @@ def authorize_appointment_access(
         return
 
     if current_user.role in (UserRole.admin, UserRole.staff):
+        logger.warning("[AUTH_TRACE] BRANCH: admin/staff")
         if (
             restrict_to_doctor_id is not None
             and appointment.doctor_id != restrict_to_doctor_id
@@ -1023,6 +1054,7 @@ def authorize_appointment_access(
         return
 
     if current_user.role == UserRole.doctor and current_user.is_owner:
+        logger.warning("[AUTH_TRACE] BRANCH: doctor+is_owner")
         if restrict_to_doctor_id is None:
             return
         if appointment.doctor_id == restrict_to_doctor_id:
@@ -1033,13 +1065,16 @@ def authorize_appointment_access(
         raise ForbiddenError("Not allowed to access this appointment")
 
     if current_user.role == UserRole.doctor:
+        logger.warning("[AUTH_TRACE] BRANCH: doctor (non-owner)")
         _assert_doctor_assigned_to_appointment(
             db, current_user, appointment, rbac_action=rbac_action
         )
         return
 
+    logger.warning("[AUTH_TRACE] BRANCH: fallback ForbiddenError (role=%s)", current_user.role)
     log_rbac_mutation_violation(current_user, "appointment")
     raise ForbiddenError("Not allowed to access this appointment")
+
 
 
 authorize_appointment_read = authorize_appointment_access
