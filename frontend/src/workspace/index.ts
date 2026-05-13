@@ -70,3 +70,13 @@ export {
 
 /* ── Route Isolation ─────────────────────────── */
 export { RouteIsolation } from './route-isolation';
+
+/* ── Active Workspace ────────────────────────── */
+export {
+  useActiveWorkspace,
+  resolveActiveWorkspace,
+  resolveAvailableWorkspaces,
+  hasClinicianCapability,
+} from './useActiveWorkspace';
+
+export type { ActiveWorkspaceState } from './useActiveWorkspace';

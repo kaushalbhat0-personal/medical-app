@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { CheckCircle2, FileText, Printer } from 'lucide-react';
+import { CheckCircle2, FileText, Printer, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { ErrorState } from '../../components/common';
@@ -41,6 +41,9 @@ import {
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import { appointmentsApi, billingApi, documentsApi, encountersApi, inventoryApi } from '../../services';
+import { useActiveWorkspace } from '../../workspace/useActiveWorkspace';
+import { useAuth } from '../../hooks/useAuth';
+
 
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
@@ -62,6 +65,9 @@ import { CompleteVisitModal } from './components/CompleteVisitModal';
 export function EncounterWorkspacePage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
+  const { user } = useAuth();
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const { isClinician, hasClinicianCapability } = useActiveWorkspace(user, token);
 
   // Core data state — single aggregate from the API
   const [aggregate, setAggregate] = useState<EncounterDetailAggregate | null>(null);
@@ -91,9 +97,11 @@ export function EncounterWorkspacePage() {
   const patient = aggregate?.patient ?? null;
 
   // Check if user can mark this encounter as complete
+  // Clinical actions require: clinician workspace + doctor capability + write access + scheduled status
   const canMarkComplete = useMemo(() => {
-    return isIndependent && !isReadOnly && appointment?.status === 'scheduled';
-  }, [isIndependent, isReadOnly, appointment?.status]);
+    return isClinician && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+  }, [isClinician, isIndependent, isReadOnly, appointment?.status]);
+
 
   /**
    * Main data loading effect — consumes the canonical Encounter Aggregate API.
@@ -451,12 +459,30 @@ export function EncounterWorkspacePage() {
         }
 
       />
-      
+
+      {/* 
+        PART 3 — Workspace Context Banner
+        Shown when user has clinician capability but is NOT in the clinician workspace.
+        This is a calm informational banner, not an error.
+      */}
+      {!isClinician && hasClinicianCapability && appointment?.status === 'scheduled' && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="flex items-center gap-2">
+            <ArrowRight className="h-4 w-4 shrink-0" />
+            <span>
+              Switch to{' '}
+              <span className="font-medium">Clinician workspace</span> to complete this encounter.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 
         Mobile-responsive grid layout
         - Single column on mobile
         - Two columns on tablet/desktop
       */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         {/* Left column: Clinical content (2/3 width on desktop) */}

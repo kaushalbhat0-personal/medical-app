@@ -12,8 +12,9 @@ import {
 import { cn } from '@/lib/utils';
 import { ModeSwitcher } from './ModeSwitcher';
 import { WorkspaceSwitcher } from '../../workspace/WorkspaceSwitcher';
-import { resolveUserWorkspace, resolveUserWorkspaces } from '../../workspace/resolver';
-import { persistLastWorkspace } from '../../workspace/WorkspaceSwitcher';
+import { useActiveWorkspace } from '../../workspace/useActiveWorkspace';
+
+
 
 export interface HeaderProps {
   user: User | null;
@@ -30,6 +31,10 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
     typeof window !== 'undefined' ? getActiveTenantId() : null
   );
   const switcherRef = useRef<HTMLDivElement>(null);
+
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const { workspace: activeWorkspace, availableWorkspaces, switchWorkspace } = useActiveWorkspace(user, token);
+
 
   const showSwitcher = isSuperAdminRole(getEffectiveRoles(user, localStorage.getItem('token')));
 
@@ -168,11 +173,12 @@ export function Header({ user, onLogout, onMenuToggle, centerSlot }: HeaderProps
       {/* Workspace Switcher - shown when user has multiple workspaces */}
       {user && (
         <WorkspaceSwitcher
-          currentWorkspace={resolveUserWorkspace(user, localStorage.getItem('token'))}
-          availableWorkspaces={resolveUserWorkspaces(user, localStorage.getItem('token'))}
-          onSwitch={(slug) => persistLastWorkspace(slug)}
+          currentWorkspace={activeWorkspace}
+          availableWorkspaces={availableWorkspaces}
+          onSwitch={switchWorkspace}
         />
       )}
+
 
       <div className="ml-3 flex min-w-0 flex-shrink-0 items-center gap-1 sm:gap-2">
         {user && <ModeSwitcher user={user} />}

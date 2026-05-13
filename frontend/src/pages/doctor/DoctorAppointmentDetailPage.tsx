@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar } from 'lucide-react';
+import { ArrowLeft, Calendar, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,10 @@ import { ErrorState } from '../../components/common';
 import { DISPLAY_TIMEZONE } from '../../constants/time';
 import { formatAppointmentDateTimeWithZoneLabel } from '../../utils/doctorSchedule';
 import { useDoctorWorkspace } from '../../contexts/DoctorWorkspaceContext';
+import { useActiveWorkspace } from '../../workspace/useActiveWorkspace';
+import { useAuth } from '../../hooks/useAuth';
 import type { Appointment, Bill } from '../../types';
+
 
 function statusVariant(
   s: Appointment['status']
@@ -25,11 +28,15 @@ export function DoctorAppointmentDetailPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
   const { isIndependent, isReadOnly } = useDoctorWorkspace();
+  const { user } = useAuth();
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const { isClinician, hasClinicianCapability } = useActiveWorkspace(user, token);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [linkedBill, setLinkedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+
 
   useEffect(() => {
     if (!appointmentId) {
@@ -66,13 +73,15 @@ export function DoctorAppointmentDetailPage() {
     };
   }, [appointmentId, retryKey]);
 
+  // Clinical actions require: clinician workspace + doctor capability + write access + scheduled status
   const canStartEncounter =
-    isIndependent && !isReadOnly && appointment?.status === 'scheduled';
+    isClinician && isIndependent && !isReadOnly && appointment?.status === 'scheduled';
 
   const handleEncounterNavigation = useCallback(() => {
     if (!appointmentId) return;
     navigate(`/doctor/appointments/${appointmentId}`);
   }, [appointmentId, navigate]);
+
 
   if (error && !loading) {
     return (
@@ -214,9 +223,22 @@ export function DoctorAppointmentDetailPage() {
               </Button>
             </div>
           )}
+          {/* Workspace context banner — shown when user has clinician capability but wrong workspace */}
+          {!isClinician && hasClinicianCapability && appointment?.status === 'scheduled' && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mt-3">
+              <div className="flex items-center gap-2">
+                <ArrowRight className="h-4 w-4 shrink-0" />
+                <span>
+                  Switch to{' '}
+                  <span className="font-medium">Clinician workspace</span> to start this encounter.
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
+
   );
 }
 
