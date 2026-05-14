@@ -49,14 +49,32 @@ logger = logging.getLogger(__name__)
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _resolve_patient_id(current_user) -> UUID:
-    """Resolve the patient ID from the current user context."""
-    # The current_user may have patient_id or be the patient record itself
+def _resolve_patient_id(db: Session, current_user) -> UUID:
+    """Resolve the patient ID from the current user context.
+
+    CRITICAL: current_user.id is the User UUID, NOT the Patient UUID.
+    The Patient and User are separate tables with different UUIDs.
+    We must use patient_service.get_patient_by_user_id() to resolve
+    the actual Patient UUID from the User.
+
+    Resolution order:
+      1. current_user.patient_id — if the user object has a patient_id attribute
+         (e.g., from a JWT claim or custom attribute).
+      2. patient_service.get_patient_by_user_id() — authoritative DB lookup
+         to map User UUID → Patient UUID via Patient.user_id FK.
+    """
+    # Priority 1: direct patient_id attribute (e.g., JWT claim)
     if hasattr(current_user, "patient_id") and current_user.patient_id:
         return UUID(str(current_user.patient_id))
-    if hasattr(current_user, "id") and hasattr(current_user, "role"):
-        if current_user.role == "patient":
-            return UUID(str(current_user.id))
+
+    # Priority 2: resolve via DB lookup (User UUID → Patient UUID)
+    try:
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        if patient:
+            return UUID(str(patient.id))
+    except (NotFoundError, ForbiddenError):
+        pass
+
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Only patients can access medication schedules",
@@ -64,10 +82,10 @@ def _resolve_patient_id(current_user) -> UUID:
 
 
 def _enforce_patient_access(
-    current_user, patient_id: UUID, tenant_id: UUID
+    db: Session, current_user, patient_id: UUID, tenant_id: UUID
 ) -> None:
     """Enforce that the current user is the patient and belongs to the tenant."""
-    resolved_patient_id = _resolve_patient_id(current_user)
+    resolved_patient_id = _resolve_patient_id(db, current_user)
     if resolved_patient_id != patient_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -93,33 +111,33 @@ def _enforce_patient_role(current_user) -> None:
 
 def _resolve_patient_tenant(db: Session, current_user) -> UUID:
     """
-    Resolve tenant_id authoritatively from the Patient record.
+    Resolve tenant_id authoritatively.
 
-    Resolution order (resource-authoritative):
-      1. patient.tenant_id — the Patient record is the source of truth
-         for tenant membership in patient flows.
-      2. current_user.tenant_id — validated fallback if Patient record
-         is unavailable, but only if it is a proper UUID (never empty).
+    Resolution order:
+      1. current_user.tenant_id — the user's own tenant is the primary source
+         of truth for tenant membership.
+      2. patient.tenant_id — fallback if current_user.tenant_id is unavailable,
+         but only if it is a proper UUID (never empty).
 
     Raises:
         HTTPException 403: If tenant cannot be resolved, preserving
                            multi-tenant isolation guarantees.
     """
-    # Priority 1: resource-authoritative — resolve from Patient record
-    try:
-        patient = patient_service.get_patient_by_user_id(db, current_user.id)
-        if patient.tenant_id:
-            return UUID(str(patient.tenant_id))
-    except (NotFoundError, ForbiddenError):
-        pass
-
-    # Priority 2: validated current_user.tenant_id (must be a real UUID)
+    # Priority 1: current_user.tenant_id (must be a real UUID)
     user_tenant = getattr(current_user, "tenant_id", None)
     if user_tenant is not None:
         try:
             return UUID(str(user_tenant))
         except (ValueError, TypeError):
             pass
+
+    # Priority 2: fallback — resolve from Patient record
+    try:
+        patient = patient_service.get_patient_by_user_id(db, current_user.id)
+        if patient.tenant_id:
+            return UUID(str(patient.tenant_id))
+    except (NotFoundError, ForbiddenError):
+        pass
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -163,7 +181,7 @@ def derive_schedule_from_prescription(
                        if the prescription item doesn't exist.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
 
     # Load the prescription item with its prescription
     from app.models.appointment import Prescription, PrescriptionItem
@@ -191,7 +209,7 @@ def derive_schedule_from_prescription(
 
     # Validate tenant isolation
     tenant_id = UUID(str(prescription.tenant_id))
-    _enforce_patient_access(current_user, patient_id, tenant_id)
+    _enforce_patient_access(db, current_user, patient_id, tenant_id)
 
     # Check if a schedule already exists for this prescription item
     existing = crud_medication_schedule.get_schedule_by_prescription_item(
@@ -266,7 +284,7 @@ def derive_schedules_for_prescription(
             detail="Prescription not found",
         )
 
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
     if UUID(str(prescription.patient_id)) != patient_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -353,7 +371,7 @@ def record_adherence(
         Updated MedicationScheduleRead.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
 
     schedule = crud_medication_schedule.get_schedule_by_id(db, schedule_id)
     if not schedule:
@@ -439,7 +457,7 @@ def get_due_medications(
         List of MedicationScheduleRead for medications that are due today.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
     tenant_id = _resolve_patient_tenant(db, current_user)
 
     schedules = crud_medication_schedule.get_due_medications(
@@ -459,7 +477,7 @@ def get_today_adherence_summary(
         TodayAdherenceSummary with counts and streak data.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
 
     # Get due medications
     tenant_id = _resolve_patient_tenant(db, current_user)
@@ -527,7 +545,7 @@ def get_patient_schedules(
         Tuple of (list of MedicationScheduleRead, total count).
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
     tenant_id = _resolve_patient_tenant(db, current_user)
 
     if active_only:
@@ -562,7 +580,7 @@ def get_schedule_detail(
         HTTPException: If not found or not owned by the patient.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
 
     schedule = crud_medication_schedule.get_schedule_by_id(db, schedule_id)
     if not schedule:
@@ -611,7 +629,7 @@ def update_schedule(
         Updated MedicationScheduleRead.
     """
     _enforce_patient_role(current_user)
-    patient_id = _resolve_patient_id(current_user)
+    patient_id = _resolve_patient_id(db, current_user)
 
     schedule = crud_medication_schedule.get_schedule_by_id(db, schedule_id)
     if not schedule:

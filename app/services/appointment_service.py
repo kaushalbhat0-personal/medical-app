@@ -16,8 +16,9 @@ from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
 from app.core.clinical_capabilities import has_clinician_capability
 from app.core.workspace_context import ActiveWorkspace
-from app.crud import crud_appointment, crud_billing
+from app.crud import crud_appointment, crud_billing, crud_medication_schedule
 from app.models.appointment import Appointment, AppointmentStatus, Prescription
+from app.models.patient_medication_schedule import PatientMedicationSchedule
 from app.models.user import User, UserRole
 from app.services import doctor_service, doctor_slot_service, inventory_service, patient_service
 from app.utils.appointment_datetime import normalize_appointment_time_utc
@@ -490,13 +491,101 @@ def _validate_prescription_against_appointment(
         raise ValidationError("Prescription must include notes or items")
 
 
+def _derive_medication_schedules_from_prescription(
+    db: Session,
+    prescription: Prescription,
+    appointment: Appointment,
+) -> None:
+    """
+    Auto-derive PatientMedicationSchedule records from a prescription.
+
+    This is called during encounter completion to ensure medication schedules
+    are created as canonical patient records — independent of inventory or billing.
+
+    Each PrescriptionItem becomes a PatientMedicationSchedule with:
+    - medicine_name, dosage, frequency, duration, instructions snapshotted
+    - start_date = encounter completed time
+    - end_date = derived from duration if parseable, else NULL (ongoing)
+    - is_active = True, status = active
+    """
+    from datetime import timedelta
+    import re
+
+    if not prescription.items:
+        logger.info(
+            "[RX_TRACE] _derive_medication_schedules: no items in prescription %s for appointment %s patient %s tenant %s",
+            prescription.id,
+            appointment.id,
+            appointment.patient_id,
+            appointment.tenant_id,
+        )
+        return
+
+    now = datetime.now(timezone.utc)
+    created_count = 0
+
+    for item in prescription.items:
+        # Try to parse duration into days for end_date calculation
+        end_date: datetime | None = None
+        if item.duration:
+            # Match patterns like "7 days", "2 weeks", "1 month", "3 months"
+            duration_match = re.match(
+                r"(\d+)\s*(day|days|week|weeks|month|months|year|years)?",
+                item.duration.strip(),
+                re.IGNORECASE,
+            )
+            if duration_match:
+                num = int(duration_match.group(1))
+                unit = (duration_match.group(2) or "days").lower()
+                if unit.startswith("day"):
+                    end_date = now + timedelta(days=num)
+                elif unit.startswith("week"):
+                    end_date = now + timedelta(weeks=num)
+                elif unit.startswith("month"):
+                    end_date = now + timedelta(days=num * 30)
+                elif unit.startswith("year"):
+                    end_date = now + timedelta(days=num * 365)
+
+        crud_medication_schedule.create_medication_schedule(
+            db,
+            patient_id=appointment.patient_id,
+            prescription_id=prescription.id,
+            prescription_item_id=item.id,
+            tenant_id=appointment.tenant_id,
+            medicine_name=item.medicine_name,
+            dosage=item.dosage,
+            frequency=item.frequency,
+            duration=item.duration,
+            instructions=item.instructions,
+            start_date=now,
+            end_date=end_date,
+        )
+        created_count += 1
+
+    logger.info(
+        "[RX_TRACE] _derive_medication_schedules: created %d schedules from prescription %s for appointment %s patient %s tenant %s",
+        created_count,
+        prescription.id,
+        appointment.id,
+        appointment.patient_id,
+        appointment.tenant_id,
+    )
+
+
 def _create_appointment_prescriptions(
     db: Session,
     appointment: Appointment,
     prescriptions: list[PrescriptionCreate],
 ) -> None:
     if not prescriptions:
+        logger.info(
+            "[RX_TRACE] _create_appointment_prescriptions: no prescriptions for appointment %s patient %s tenant %s",
+            appointment.id,
+            appointment.patient_id,
+            appointment.tenant_id,
+        )
         return
+    created_prescription_count = 0
     for prescription_payload in prescriptions:
         if not prescription_payload.notes and not prescription_payload.items:
             continue
@@ -520,6 +609,9 @@ def _create_appointment_prescriptions(
                     "instructions": item_payload.instructions,
                 },
             )
+        created_prescription_count += 1
+        # Auto-derive medication schedules from this prescription
+        _derive_medication_schedules_from_prescription(db, prescription, appointment)
         log_structured_audit_event(
             event="prescription_created",
             tenant_id=appointment.tenant_id,
@@ -530,6 +622,13 @@ def _create_appointment_prescriptions(
             patient_id=str(appointment.patient_id),
             status="success",
         )
+    logger.info(
+        "[RX_TRACE] _create_appointment_prescriptions: created %d prescriptions for appointment %s patient %s tenant %s",
+        created_prescription_count,
+        appointment.id,
+        appointment.patient_id,
+        appointment.tenant_id,
+    )
 
 
 def create_prescription_for_appointment(

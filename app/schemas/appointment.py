@@ -106,6 +106,7 @@ class AppointmentRead(BaseModel):
     id: UUID
     patient_id: UUID
     doctor_id: UUID
+    tenant_id: UUID
     appointment_time: datetime
     status: AppointmentStatus
     created_by: UUID

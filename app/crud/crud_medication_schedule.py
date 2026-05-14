@@ -124,6 +124,12 @@ def get_active_schedules_for_patient(
         .scalars()
         .all()
     )
+    logger.info(
+        "[SCHEDULE_QUERY_TRACE] get_active_schedules_for_patient: patient=%s tenant=%s returned=%d",
+        patient_id,
+        tenant_id,
+        len(items),
+    )
     return list(items), total
 
 
@@ -160,6 +166,13 @@ def get_all_schedules_for_patient(
         )
         .scalars()
         .all()
+    )
+    logger.info(
+        "[SCHEDULE_QUERY_TRACE] get_all_schedules_for_patient: patient=%s tenant=%s returned=%d total=%d",
+        patient_id,
+        tenant_id,
+        len(items),
+        total,
     )
     return list(items), total
 

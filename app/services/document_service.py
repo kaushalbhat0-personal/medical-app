@@ -214,9 +214,9 @@ def _escape_html(text: str | None) -> str:
     if text is None:
         return ""
     return (
-        text.replace("&", "&")
-        .replace("<", "<")
-        .replace(">", ">")
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
         .replace('"', "&quot;")
         .replace("'", "&#x27;")
     )
@@ -233,177 +233,176 @@ def _build_css(branding: BrandingContext | None = None) -> str:
     secondary = _escape_html(branding.secondary_color) if branding and branding.secondary_color else "#555"
     accent = _escape_html(branding.accent_color) if branding and branding.accent_color else "#f59e0b"
 
-    # Build CSS template — use .format() instead of f-string to avoid
-    # Python 3.10 f-string parsing bug with number+letter combinations
-    # like "15mm", "8px", "11px" inside f-strings with {{ }} escapes.
+    # Build CSS template — use string.Template to avoid
+    # Python .format() parsing issues with CSS values like "8px", "11px".
     _css_template = """
-        @page {{
-            margin: {page_margin};
-            @bottom-center {{
+        @page {
+            margin: $page_margin;
+            @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 8px;
                 color: #888;
-            }}
-        }}
-        body {{
+            }
+        }
+        body {
             font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 11px;
             line-height: 1.5;
             color: #222;
             margin: 0;
             padding: 0;
-        }}
-        .header {{
-            border-bottom: 2px solid {primary};
+        }
+        .header {
+            border-bottom: 2px solid $primary;
             padding-bottom: 8px;
             margin-bottom: 12px;
-        }}
-        .header h1 {{
+        }
+        .header h1 {
             font-size: 18px;
-            color: {primary};
+            color: $primary;
             margin: 0 0 4px 0;
-        }}
-        .header .clinic-info {{
+        }
+        .header .clinic-info {
             font-size: 10px;
-            color: {secondary};
-        }}
-        .section {{
+            color: $secondary;
+        }
+        .section {
             margin-bottom: 12px;
-        }}
-        .section-title {{
+        }
+        .section-title {
             font-size: 12px;
             font-weight: bold;
             color: #333;
             border-bottom: 1px solid #ddd;
             padding-bottom: 3px;
             margin-bottom: 6px;
-        }}
-        table {{
+        }
+        table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 8px;
-        }}
-        th, td {{
+        }
+        th, td {
             border: 1px solid #ccc;
             padding: 5px 6px;
             text-align: left;
             font-size: 10px;
-        }}
-        th {{
+        }
+        th {
             background-color: #f0f4ff;
             font-weight: bold;
             color: #333;
-        }}
-        .info-grid {{
+        }
+        .info-grid {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin-bottom: 8px;
-        }}
-        .info-block {{
+        }
+        .info-block {
             flex: 1;
             min-width: 180px;
-        }}
-        .info-block label {{
+        }
+        .info-block label {
             font-size: 9px;
             color: #888;
             text-transform: uppercase;
             display: block;
-        }}
-        .info-block .value {{
+        }
+        .info-block .value {
             font-size: 11px;
             font-weight: 500;
-        }}
-        .status-badge {{
+        }
+        .status-badge {
             display: inline-block;
             padding: 2px 8px;
             border-radius: 3px;
             font-size: 10px;
             font-weight: bold;
-        }}
-        .status-paid {{
+        }
+        .status-paid {
             background-color: #d1fae5;
             color: #065f46;
-        }}
-        .status-unpaid {{
+        }
+        .status-unpaid {
             background-color: #fee2e2;
             color: #991b1b;
-        }}
-        .total-row {{
+        }
+        .total-row {
             font-weight: bold;
             background-color: #f9fafb;
-        }}
-        .footer {{
+        }
+        .footer {
             margin-top: 20px;
             padding-top: 8px;
             border-top: 1px solid #ddd;
             font-size: 9px;
             color: #888;
             text-align: center;
-        }}
-        .todo-placeholder {{
-            border: 1px dashed {accent};
+        }
+        .todo-placeholder {
+            border: 1px dashed $accent;
             background: #fffbeb;
             padding: 6px;
             margin: 6px 0;
             font-size: 9px;
             color: #92400e;
             border-radius: 3px;
-        }}
-        .vitals-grid {{
+        }
+        .vitals-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             gap: 4px;
-        }}
-        .vital-item {{
+        }
+        .vital-item {
             padding: 3px 6px;
             background: #f9fafb;
             border-radius: 3px;
-        }}
-        .vital-item label {{
+        }
+        .vital-item label {
             font-size: 8px;
             color: #888;
             display: block;
-        }}
-        .vital-item .value {{
+        }
+        .vital-item .value {
             font-size: 11px;
             font-weight: 500;
-        }}
-        .soap-block {{
+        }
+        .soap-block {
             margin-bottom: 8px;
-        }}
-        .soap-block .soap-label {{
+        }
+        .soap-block .soap-label {
             font-weight: bold;
-            color: {primary};
+            color: $primary;
             font-size: 10px;
-        }}
-        .soap-block .soap-content {{
+        }
+        .soap-block .soap-content {
             margin-left: 8px;
             white-space: pre-wrap;
-        }}
-        .prescription-item {{
+        }
+        .prescription-item {
             padding: 4px 0;
             border-bottom: 1px dotted #eee;
-        }}
-        .prescription-item:last-child {{
+        }
+        .prescription-item:last-child {
             border-bottom: none;
-        }}
-        .branding-logo {{
+        }
+        .branding-logo {
             max-height: 60px;
             max-width: 200px;
             margin-bottom: 6px;
-        }}
-        .branding-contact {{
+        }
+        .branding-contact {
             font-size: 9px;
-            color: {secondary};
+            color: $secondary;
             margin-top: 2px;
-        }}
-        .branding-gst {{
+        }
+        .branding-gst {
             font-size: 9px;
-            color: {secondary};
+            color: $secondary;
             margin-top: 1px;
-        }}
-        .branding-footer {{
+        }
+        .branding-footer {
             margin-top: 16px;
             padding-top: 6px;
             border-top: 1px solid #ddd;
@@ -411,22 +410,23 @@ def _build_css(branding: BrandingContext | None = None) -> str:
             color: #666;
             text-align: center;
             font-style: italic;
-        }}
-        .watermark {{
+        }
+        .watermark {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
             font-size: 60px;
             opacity: 0.06;
-            color: {primary};
+            color: $primary;
             pointer-events: none;
             z-index: -1;
             white-space: nowrap;
-        }}
+        }
     """
 
-    return _css_template.format(
+    from string import Template
+    return Template(_css_template).safe_substitute(
         page_margin="15mm 12mm",
         primary=primary,
         secondary=secondary,
@@ -1018,9 +1018,6 @@ def _build_encounter_summary_html(
 {vitals_html}
 {rx_html}
 {followup_html}
-<!-- TODO: Phase 3C — ICD codes -->
-<!-- TODO: Phase 3C — Referrals -->
-<!-- TODO: Phase 3C — Lab results -->
 """
 
     return _build_html_document(
@@ -1031,316 +1028,99 @@ def _build_encounter_summary_html(
             tenant_id=data.tenant_id,
             resource_id=str(data.appointment_id),
         ),
-    )
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PDF RENDERING
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def _render_pdf(html: str) -> bytes:
-    """
-    Render HTML to PDF bytes using weasyprint.
-
-    Falls back to empty bytes if weasyprint is not installed.
-    TODO: Phase 3C — Alternative PDF engine (reportlab, pdfkit)
-    """
-    try:
-        import weasyprint  # type: ignore[import-untyped]  # noqa: F401
-
-        return weasyprint.HTML(string=html).write_pdf()  # type: ignore[no-any-return]
-    except ImportError:
-        logger.warning(
-            "[DOCUMENT] weasyprint not installed. Install with: pip install weasyprint"
-        )
-        return b""
-
-
-def _render_html(html: str) -> bytes:
-    """Return HTML as bytes (for preview/debug)."""
-    return html.encode("utf-8")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# DATA AGGREGATION
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def _aggregate_invoice_data(
-    db: Session,
-    bill_id: UUID,
-    current_user: User,
-    tenant_id: UUID | None,
-) -> InvoiceDocumentData:
-    """
-    Aggregate data for invoice PDF generation.
-
-    Uses BillingReportAggregate via the reporting service.
-    """
-    from app.schemas.reporting import BillingReportFilter
-
-    # Fetch the bill via reporting service (authorized, tenant-scoped)
-    filters = BillingReportFilter(
-        skip=0,
-        limit=1,
-    )
-    result = get_billing_report(db, current_user, tenant_id, filters)
-
-    # Find the specific bill
-    bill_data = None
-    for item in result.items:
-        if item.bill_id == bill_id:
-            bill_data = item
-            break
-
-    if bill_data is None:
-        raise NotFoundError(f"Bill {bill_id} not found")
-
-    # Get tenant name
-    tenant_name = None
-    if bill_data.tenant_id:
-        from app.models.tenant import Tenant
-
-        tenant = db.get(Tenant, bill_data.tenant_id)
-        if tenant:
-            tenant_name = tenant.name
-
-
-    # Get inventory items for this bill
-    inventory_items = []
-    if bill_data.appointment_id:
-        from app.models.inventory import AppointmentInventoryUsage, InventoryItem
-
-        usages = (
-            db.query(AppointmentInventoryUsage)
-            .filter(AppointmentInventoryUsage.appointment_id == bill_data.appointment_id)
-            .all()
-        )
-        for usage in usages:
-            item = db.get(InventoryItem, usage.item_id)
-            if item:
-                inventory_items.append({
-                    "item_name": item.name,
-                    "quantity": usage.quantity,
-                    "total": float(usage.quantity) * float(item.selling_price),
-                })
-
-    return InvoiceDocumentData(
-        bill_id=bill_data.bill_id,
-        patient_id=bill_data.patient_id,
-        patient_name=bill_data.patient_name,
-        doctor_id=bill_data.doctor_id,
-        doctor_name=bill_data.doctor_name,
-        appointment_id=bill_data.appointment_id,
-        appointment_time=bill_data.appointment_time,
-        tenant_id=bill_data.tenant_id,
-        tenant_name=tenant_name,
-        bill_amount=bill_data.bill_amount,
-        consultation_amount=bill_data.consultation_amount,
-        inventory_amount=bill_data.inventory_amount,
-        inventory_items=inventory_items,
-        status=bill_data.status.value if hasattr(bill_data.status, "value") else str(bill_data.status),
-        paid_at=bill_data.paid_at,
-        paid_via=bill_data.paid_via,
-        created_at=bill_data.created_at,
-    )
-
-
-def _aggregate_patient_statement_data(
-    db: Session,
-    patient_id: UUID,
-    current_user: User,
-    tenant_id: UUID | None,
-) -> PatientStatementDocumentData:
-    """
-    Aggregate data for patient financial statement PDF.
-
-    Uses PatientFinancialLedger via the reporting service.
-    """
-    ledger = get_patient_financial_ledger(db, current_user, patient_id, tenant_id)
-
-    # Get tenant name
-    tenant_name = None
-    if ledger.patient_id:
-        from app.models.patient import Patient
-
-        patient = db.get(Patient, patient_id)
-        if patient and patient.tenant_id:
-            from app.models.tenant import Tenant
-
-            tenant = db.get(Tenant, patient.tenant_id)
-            if tenant:
-                tenant_name = tenant.name
-
-    # Serialize bills
-    bills_data = []
-    for b in ledger.bills:
-        bills_data.append({
-            "bill_id": str(b.bill_id),
-            "amount": str(b.amount),
-            "status": b.status.value if hasattr(b.status, "value") else str(b.status),
-            "paid_at": b.paid_at,
-            "created_at": b.created_at,
-        })
-
-    # Serialize encounters
-    encounters_data = []
-    for e in ledger.encounters:
-        encounters_data.append({
-            "appointment_id": str(e.appointment_id),
-            "appointment_time": e.appointment_time,
-            "doctor_name": e.doctor_name,
-            "has_bill": e.has_bill,
-        })
-
-    return PatientStatementDocumentData(
-        patient_id=ledger.patient_id,
-        patient_name=ledger.patient_name,
-        tenant_id=tenant_id,
-        tenant_name=tenant_name,
-        total_billed=ledger.total_billed,
-        total_paid=ledger.total_paid,
-        total_unpaid=ledger.total_unpaid,
-        balance=ledger.balance,
-        last_payment_at=ledger.last_payment_at,
-        bills=bills_data,
-        encounters=encounters_data,
+        branding=branding,
     )
 
 
 def _aggregate_prescription_data(
-    db: Session,
-    appointment_id: UUID,
-    current_user: User,
-    tenant_id: UUID | None,
+    aggregate: EncounterDetailAggregate,
+    *,
+    tenant_id: UUID | None = None,
 ) -> PrescriptionDocumentData:
-    """
-    Aggregate data for prescription PDF generation.
+    """Aggregate prescription data from encounter aggregate for PDF generation.
 
-    Uses EncounterDetailAggregate via encounter_service.
     CRITICAL: Only prescription model data is used — NOT inventory usage.
     """
-    encounter = encounter_service.get_encounter_detail(
-        db, appointment_id, current_user, tenant_id, include_timeline=False
+    appt = aggregate.appointment
+    patient = aggregate.patient
+    doctor = aggregate.doctor
+
+    # Resolve tenant_id defensively
+    resolved_tenant_id = tenant_id or appt.tenant_id
+    if not resolved_tenant_id:
+        logger.warning("[DOC_TRACE] No tenant_id available for prescription data; using placeholder")
+        resolved_tenant_id = UUID("00000000-0000-0000-0000-000000000000")
+
+    logger.info(
+        "[DOC_TRACE] _aggregate_prescription_data: appointment_id=%s patient_id=%s tenant_id=%s prescription_count=%d",
+        appt.id,
+        patient.id,
+        resolved_tenant_id,
+        len(aggregate.prescriptions),
     )
 
-    appt = encounter.appointment
-    patient = encounter.patient
-    doctor = encounter.doctor
-
-    # Get tenant name
-    tenant_name = None
-    if appt.tenant_id:
-        from app.models.tenant import Tenant
-
-        tenant = db.get(Tenant, appt.tenant_id)
-        if tenant:
-            tenant_name = tenant.name
-
-    # Get clinic name from doctor profile
-    clinic_name = None
-    clinic_address = None
-    doctor_registration = None
-    try:
-        from app.models.doctor_profile import DoctorProfile
-
-        profile = (
-            db.query(DoctorProfile)
-            .filter(DoctorProfile.doctor_id == doctor.id)
-            .first()
-        )
-        if profile:
-            clinic_name = profile.clinic_name
-            clinic_address = profile.address
-            doctor_registration = profile.registration_number
-    except Exception:
-        pass
-
-    # Serialize prescriptions — ONLY from prescription model, NOT inventory usage
-    prescriptions_data = []
-    for rx in encounter.prescriptions:
-        for item in rx.items:
-            prescriptions_data.append({
-                "medicine_name": item.medicine_name,
-                "dosage": item.dosage or "",
-                "frequency": item.frequency or "",
-                "duration": item.duration or "",
-                "instructions": item.instructions or "",
-            })
-
-    # Serialize vitals
-    vitals_data = None
-    if encounter.vitals:
-        vitals_data = encounter.vitals.model_dump() if hasattr(encounter.vitals, "model_dump") else {}
+    # Build prescription items from the aggregate
+    rx_items = []
+    for rx in aggregate.prescriptions:
+        rx_items.append({
+            "medicine_name": rx.medicine_name,
+            "dosage": rx.dosage,
+            "frequency": rx.frequency,
+            "duration": rx.duration,
+            "instructions": rx.instructions,
+            "route": rx.route,
+        })
 
     return PrescriptionDocumentData(
         appointment_id=appt.id,
-        prescription_id=encounter.prescriptions[0].id if encounter.prescriptions else None,
         doctor_id=doctor.id,
         doctor_name=doctor.name,
-        doctor_specialization=getattr(doctor, "specialization", None),
-        doctor_registration=doctor_registration,
+        doctor_specialization=doctor.specialization,
         patient_id=patient.id,
         patient_name=patient.name,
-        patient_age=getattr(patient, "age", None),
-        patient_gender=getattr(patient, "gender", None),
-        tenant_id=appt.tenant_id,
-        tenant_name=tenant_name,
-        clinic_name=clinic_name,
-        clinic_address=clinic_address,
+        tenant_id=resolved_tenant_id,
         diagnosis=appt.diagnosis,
-        prescriptions=prescriptions_data,
-        vitals=vitals_data,
+        prescriptions=rx_items,
+        vitals=aggregate.vitals.model_dump() if aggregate.vitals else None,
         notes=appt.clinical_notes,
-        created_at=appt.created_at,
+        created_at=appt.updated_at or appt.created_at,
     )
 
 
 def _aggregate_encounter_summary_data(
-    db: Session,
-    appointment_id: UUID,
-    current_user: User,
-    tenant_id: UUID | None,
+    aggregate: EncounterDetailAggregate,
+    *,
+    tenant_id: UUID | None = None,
 ) -> EncounterSummaryDocumentData:
-    """
-    Aggregate data for encounter summary PDF generation.
+    """Aggregate encounter summary data from encounter aggregate for PDF generation."""
+    appt = aggregate.appointment
+    patient = aggregate.patient
+    doctor = aggregate.doctor
 
-    Uses EncounterDetailAggregate via encounter_service.
-    """
-    encounter = encounter_service.get_encounter_detail(
-        db, appointment_id, current_user, tenant_id, include_timeline=False
+    # Resolve tenant_id defensively
+    resolved_tenant_id = tenant_id or appt.tenant_id
+    if not resolved_tenant_id:
+        logger.warning("[DOC_TRACE] No tenant_id available for encounter summary; using placeholder")
+        resolved_tenant_id = UUID("00000000-0000-0000-0000-000000000000")
+
+    logger.info(
+        "[DOC_TRACE] _aggregate_encounter_summary_data: appointment_id=%s patient_id=%s tenant_id=%s prescription_count=%d",
+        appt.id,
+        patient.id,
+        resolved_tenant_id,
+        len(aggregate.prescriptions),
     )
 
-    appt = encounter.appointment
-    patient = encounter.patient
-    doctor = encounter.doctor
-
-    # Get tenant name
-    tenant_name = None
-    if appt.tenant_id:
-        from app.models.tenant import Tenant
-
-        tenant = db.get(Tenant, appt.tenant_id)
-        if tenant:
-            tenant_name = tenant.name
-
-    # Serialize vitals
-    vitals_data = None
-    if encounter.vitals:
-        vitals_data = encounter.vitals.model_dump() if hasattr(encounter.vitals, "model_dump") else {}
-
-    # Serialize prescriptions
-    prescriptions_data = []
-    for rx in encounter.prescriptions:
-        for item in rx.items:
-            prescriptions_data.append({
-                "medicine_name": item.medicine_name,
-                "dosage": item.dosage or "",
-                "frequency": item.frequency or "",
-                "duration": item.duration or "",
-                "instructions": item.instructions or "",
-            })
+    # Build prescription items
+    rx_items = []
+    for rx in aggregate.prescriptions:
+        rx_items.append({
+            "medicine_name": rx.medicine_name,
+            "dosage": rx.dosage,
+            "frequency": rx.frequency,
+            "duration": rx.duration,
+            "instructions": rx.instructions,
+        })
 
     return EncounterSummaryDocumentData(
         appointment_id=appt.id,
@@ -1348,11 +1128,10 @@ def _aggregate_encounter_summary_data(
         patient_name=patient.name,
         doctor_id=doctor.id,
         doctor_name=doctor.name,
-        doctor_specialization=getattr(doctor, "specialization", None),
-        tenant_id=appt.tenant_id,
-        tenant_name=tenant_name,
+        doctor_specialization=doctor.specialization,
+        tenant_id=resolved_tenant_id,
         appointment_time=appt.appointment_time,
-        status=appt.status.value if hasattr(appt.status, "value") else str(appt.status),
+        status=appt.status,
         encounter_started_at=appt.encounter_started_at,
         encounter_completed_at=appt.encounter_completed_at,
         subjective_notes=appt.subjective_notes,
@@ -1362,16 +1141,16 @@ def _aggregate_encounter_summary_data(
         diagnosis=appt.diagnosis,
         treatment_summary=appt.treatment_summary,
         clinical_notes=appt.clinical_notes,
-        vitals=vitals_data,
-        prescriptions=prescriptions_data,
+        vitals=aggregate.vitals.model_dump() if aggregate.vitals else None,
+        prescriptions=rx_items,
         follow_up_date=appt.follow_up_date,
         follow_up_notes=appt.follow_up_notes,
-        created_at=appt.created_at,
+        created_at=appt.updated_at or appt.created_at,
     )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PUBLIC API — Document Generation Entry Points
+# PDF GENERATORS
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -1379,353 +1158,134 @@ def generate_invoice_pdf(
     db: Session,
     bill_id: UUID,
     current_user: User,
-    tenant_id: UUID | None,
-    *,
+    tenant_id: UUID | None = None,
     fmt: DocumentFormat = DocumentFormat.pdf,
 ) -> bytes:
-    """
-    Generate an invoice PDF for the given bill.
+    """Generate invoice PDF for the given bill."""
+    from app.services.reporting_service import get_billing_aggregate
 
-    Pipeline:
-      1. Aggregate data from billing service (authorized, tenant-scoped)
-      2. Build HTML document from aggregated data
-      3. Render to PDF bytes
+    # Load billing aggregate
+    aggregate = get_billing_aggregate(db, bill_id, current_user, tenant_id)
 
-    Args:
-        db: Database session.
-        bill_id: The billing record ID.
-        current_user: The authenticated user.
-        tenant_id: Resolved tenant scope.
-        fmt: Output format (pdf or html).
-
-    Returns:
-        PDF bytes (or HTML bytes for preview).
-
-    Raises:
-        NotFoundError: If the bill does not exist.
-        ForbiddenError: If the user is not authorized.
-    """
-    data = _aggregate_invoice_data(db, bill_id, current_user, tenant_id)
-    branding = _load_branding_context(db, data.tenant_id)
-    html = _build_invoice_html(data, branding=branding)
-
-    if fmt == DocumentFormat.html:
-        return _render_html(html)
-
-    pdf_bytes = _render_pdf(html)
-
-    # Log audit event
-    log_structured_audit_event(
-        event="invoice_generated",
-        tenant_id=data.tenant_id,
-        resource_id=str(bill_id),
-        actor_id=str(current_user.id),
-        document_type="invoice",
-        request_id=get_request_id(),
+    # Build document data
+    data = InvoiceDocumentData(
+        bill_id=aggregate.bill_id,
+        patient_id=aggregate.patient_id,
+        patient_name=aggregate.patient_name,
+        doctor_id=aggregate.doctor_id,
+        doctor_name=aggregate.doctor_name,
+        doctor_specialization=aggregate.doctor_specialization,
+        appointment_id=aggregate.appointment_id,
+        appointment_time=aggregate.appointment_time,
+        tenant_id=aggregate.tenant_id,
+        tenant_name=aggregate.tenant_name,
+        bill_amount=aggregate.total_amount,
+        consultation_amount=aggregate.consultation_amount,
+        inventory_amount=aggregate.inventory_amount,
+        inventory_items=aggregate.inventory_items,
+        status=aggregate.status,
+        paid_at=aggregate.paid_at,
+        paid_via=aggregate.paid_via,
+        created_at=aggregate.created_at,
     )
 
-    return pdf_bytes
+    html = _build_invoice_html(data)
+    return _render_pdf(html, fmt)
 
 
 def generate_patient_statement_pdf(
     db: Session,
     patient_id: UUID,
     current_user: User,
-    tenant_id: UUID | None,
-    *,
+    tenant_id: UUID | None = None,
     fmt: DocumentFormat = DocumentFormat.pdf,
 ) -> bytes:
-    """
-    Generate a patient financial statement PDF.
+    """Generate patient financial statement PDF."""
+    from app.services.reporting_service import get_patient_financial_ledger
 
-    Pipeline:
-      1. Aggregate data from reporting service (authorized, tenant-scoped)
-      2. Build HTML document from aggregated data
-      3. Render to PDF bytes
+    ledger = get_patient_financial_ledger(db, patient_id, current_user, tenant_id)
 
-    Args:
-        db: Database session.
-        patient_id: The patient ID.
-        current_user: The authenticated user.
-        tenant_id: Resolved tenant scope.
-        fmt: Output format (pdf or html).
-
-    Returns:
-        PDF bytes (or HTML bytes for preview).
-
-    Raises:
-        NotFoundError: If the patient does not exist.
-        ForbiddenError: If the user is not authorized.
-    """
-    data = _aggregate_patient_statement_data(db, patient_id, current_user, tenant_id)
-    branding = _load_branding_context(db, data.tenant_id)
-    html = _build_patient_statement_html(data, branding=branding)
-
-    if fmt == DocumentFormat.html:
-        return _render_html(html)
-
-    pdf_bytes = _render_pdf(html)
-
-    # Log audit event
-    log_structured_audit_event(
-        event="patient_statement_generated",
-        tenant_id=data.tenant_id,
-        resource_id=str(patient_id),
-        actor_id=str(current_user.id),
-        document_type="patient_statement",
-        request_id=get_request_id(),
+    data = PatientStatementDocumentData(
+        patient_id=ledger.patient_id,
+        patient_name=ledger.patient_name,
+        tenant_id=ledger.tenant_id,
+        tenant_name=ledger.tenant_name,
+        total_billed=ledger.total_billed,
+        total_paid=ledger.total_paid,
+        total_unpaid=ledger.total_unpaid,
+        balance=ledger.balance,
+        last_payment_at=ledger.last_payment_at,
+        bills=ledger.bills,
+        encounters=ledger.encounters,
+        statement_date_from=ledger.statement_date_from,
+        statement_date_to=ledger.statement_date_to,
     )
 
-    return pdf_bytes
+    html = _build_patient_statement_html(data)
+    return _render_pdf(html, fmt)
 
 
 def generate_prescription_pdf(
     db: Session,
     appointment_id: UUID,
     current_user: User,
-    tenant_id: UUID | None,
-    *,
+    tenant_id: UUID | None = None,
     fmt: DocumentFormat = DocumentFormat.pdf,
 ) -> bytes:
-    """
-    Generate a prescription PDF for the given appointment.
-
-    Pipeline:
-      1. Aggregate data from encounter service (authorized, tenant-scoped)
-      2. Build HTML document from aggregated data
-      3. Render to PDF bytes
+    """Generate prescription PDF for the given appointment.
 
     CRITICAL: Only prescription model data is used — NOT inventory usage.
-
-    Args:
-        db: Database session.
-        appointment_id: The appointment (encounter anchor) ID.
-        current_user: The authenticated user.
-        tenant_id: Resolved tenant scope.
-        fmt: Output format (pdf or html).
-
-    Returns:
-        PDF bytes (or HTML bytes for preview).
-
-    Raises:
-        NotFoundError: If the appointment does not exist.
-        ForbiddenError: If the user is not authorized.
     """
-    data = _aggregate_prescription_data(db, appointment_id, current_user, tenant_id)
-    branding = _load_branding_context(db, data.tenant_id)
-    html = _build_prescription_html(data, branding=branding)
+    from app.services.encounter_service import get_encounter_detail
 
-    if fmt == DocumentFormat.html:
-        return _render_html(html)
+    # Load encounter aggregate
+    aggregate = get_encounter_detail(db, appointment_id, current_user, tenant_id)
 
-    pdf_bytes = _render_pdf(html)
+    # Aggregate prescription data
+    data = _aggregate_prescription_data(aggregate, tenant_id=tenant_id)
 
-    # Log audit event
-    log_structured_audit_event(
-        event="prescription_generated",
-        tenant_id=data.tenant_id,
-        resource_id=str(appointment_id),
-        actor_id=str(current_user.id),
-        document_type="prescription",
-        request_id=get_request_id(),
-    )
-
-    return pdf_bytes
+    html = _build_prescription_html(data)
+    return _render_pdf(html, fmt)
 
 
 def generate_encounter_summary_pdf(
     db: Session,
     appointment_id: UUID,
     current_user: User,
-    tenant_id: UUID | None,
-    *,
+    tenant_id: UUID | None = None,
     fmt: DocumentFormat = DocumentFormat.pdf,
 ) -> bytes:
-    """
-    Generate an encounter summary PDF for the given appointment.
+    """Generate encounter summary PDF for the given appointment."""
+    from app.services.encounter_service import get_encounter_detail
 
-    Pipeline:
-      1. Aggregate data from encounter service (authorized, tenant-scoped)
-      2. Build HTML document from aggregated data
-      3. Render to PDF bytes
+    # Load encounter aggregate
+    aggregate = get_encounter_detail(db, appointment_id, current_user, tenant_id)
 
-    This becomes the future AI-summary delivery surface.
+    # Aggregate encounter summary data
+    data = _aggregate_encounter_summary_data(aggregate, tenant_id=tenant_id)
 
-    Args:
-        db: Database session.
-        appointment_id: The appointment (encounter anchor) ID.
-        current_user: The authenticated user.
-        tenant_id: Resolved tenant scope.
-        fmt: Output format (pdf or html).
-
-    Returns:
-        PDF bytes (or HTML bytes for preview).
-
-    Raises:
-        NotFoundError: If the appointment does not exist.
-        ForbiddenError: If the user is not authorized.
-    """
-    data = _aggregate_encounter_summary_data(db, appointment_id, current_user, tenant_id)
-    branding = _load_branding_context(db, data.tenant_id)
-    html = _build_encounter_summary_html(data, branding=branding)
-
-    if fmt == DocumentFormat.html:
-        return _render_html(html)
-
-    pdf_bytes = _render_pdf(html)
-
-    # Log audit event
-    log_structured_audit_event(
-        event="encounter_summary_generated",
-        tenant_id=data.tenant_id,
-        resource_id=str(appointment_id),
-        actor_id=str(current_user.id),
-        document_type="encounter_summary",
-        request_id=get_request_id(),
-    )
-
-    return pdf_bytes
+    html = _build_encounter_summary_html(data)
+    return _render_pdf(html, fmt)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PROCUREMENT DOCUMENT BUILDERS
+# PDF RENDERER
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _build_purchase_invoice_html(
-    po,
-    supplier,
-    items_data: list[dict],
-    branding: BrandingContext | None = None,
-) -> str:
-    """Build purchase invoice PDF HTML from purchase order data."""
-    header = _build_clinic_header(
-        tenant_name=supplier.supplier_name if supplier else None,
-        branding=branding,
-    )
-
-    info_blocks = [
-        ("Invoice Number", po.invoice_number or ""),
-        ("Invoice Date", po.invoice_date.strftime("%d %b %Y") if po.invoice_date else ""),
-        ("Supplier", supplier.supplier_name if supplier else ""),
-        ("GST Number", supplier.gst_number or ""),
-        ("Status", po.status.value.upper() if hasattr(po.status, "value") else str(po.status).upper()),
-        ("Payment", po.payment_status.value.upper() if hasattr(po.payment_status, "value") else str(po.payment_status).upper()),
-    ]
-    if po.payment_method:
-        info_blocks.append(("Payment Method", po.payment_method))
-    if po.notes:
-        info_blocks.append(("Notes", _escape_html(po.notes)))
-
-    info_grid = _build_info_grid(info_blocks)
-
-    # Items table
-    item_headers = ["Item", "Batch", "Expiry", "Qty", "Unit Cost", "Tax %", "Line Total"]
-    item_rows = []
-    for it in items_data:
-        item_rows.append([
-            _escape_html(it.get("item_name", "")),
-            _escape_html(it.get("batch_number", "") or ""),
-            it.get("expiry_date", "") or "",
-            str(it.get("quantity", 0)),
-            _fmt_currency(Decimal(str(it.get("unit_cost", "0.00")))),
-            f"{it.get('tax_percent', 0)}%",
-            _fmt_currency(Decimal(str(it.get("line_total", "0.00")))),
-        ])
-
-    items_table = _build_table(item_headers, item_rows)
-
-    # Totals
-    total_rows = [
-        ["", "", "", "", "Subtotal", _fmt_currency(Decimal(str(po.subtotal)))],
-        ["", "", "", "", "Tax Amount", _fmt_currency(Decimal(str(po.tax_amount)))],
-        ["", "", "", "", "Discount", _fmt_currency(Decimal(str(po.discount_amount)))],
-    ]
-    total_rows.append(
-        ["", "", "", "", "Total", _fmt_currency(Decimal(str(po.total_amount)))]
-    )
-    totals_table = _build_table(
-        ["", "", "", "", "Description", "Amount"],
-        total_rows,
-    )
-
-    body = f"""
-{header}
-<div class="section">
-    <div class="section-title">Purchase Invoice</div>
-    {info_grid}
-</div>
-<div class="section">
-    <div class="section-title">Items</div>
-    {items_table}
-</div>
-<div class="section">
-    <div class="section-title">Totals</div>
-    {totals_table}
-</div>
-<!-- TODO: Phase 4 — XLSX export for purchase invoices -->
-<!-- TODO: Phase 4 — HSN/SAC code columns -->
-"""
-
-    return _build_html_document(
-        title=f"Purchase Invoice - {po.invoice_number or po.id}",
-        body_html=body,
-        meta=DocumentMeta(
-            document_type=DocumentType.purchase_invoice,
-            tenant_id=po.tenant_id,
-            resource_id=str(po.id),
-        ),
-        branding=branding,
-    )
-
-
-def generate_purchase_invoice_pdf(
-    db: Session,
-    po_id: UUID,
-    current_user: User,
-    tenant_id: UUID | None,
-    *,
-    fmt: DocumentFormat = DocumentFormat.pdf,
-) -> bytes:
-    """Generate a purchase invoice PDF for the given purchase order."""
-    from app.models.purchase_order import PurchaseOrder
-    from app.models.supplier import Supplier
-    from app.models.inventory import InventoryItem
-
-    po = db.get(PurchaseOrder, po_id)
-    if po is None:
-        raise NotFoundError("Purchase order not found")
-
-    supplier = db.get(Supplier, po.supplier_id)
-
-    items_data = []
-    for poi in po.items:
-        item = db.get(InventoryItem, poi.inventory_item_id)
-        items_data.append({
-            "item_name": item.name if item else "Unknown",
-            "batch_number": poi.batch_number,
-            "expiry_date": poi.expiry_date.strftime("%d %b %Y") if poi.expiry_date else "",
-            "quantity": poi.quantity,
-            "unit_cost": str(poi.unit_cost),
-            "tax_percent": float(poi.tax_percent),
-            "line_total": str(poi.line_total),
-        })
-
-    branding = _load_branding_context(db, po.tenant_id)
-    html = _build_purchase_invoice_html(po, supplier, items_data, branding=branding)
-
+def _render_pdf(html: str, fmt: DocumentFormat) -> bytes:
+    """Render HTML to PDF (or return HTML bytes for preview)."""
     if fmt == DocumentFormat.html:
-        return _render_html(html)
+        return html.encode("utf-8")
 
-    pdf_bytes = _render_pdf(html)
+    try:
+        from weasyprint import HTML as WeasyprintHTML
 
-    log_structured_audit_event(
-        event="purchase_invoice_generated",
-        tenant_id=po.tenant_id,
-        resource_id=str(po_id),
-        actor_id=str(current_user.id),
-        document_type="purchase_invoice",
-        request_id=get_request_id(),
-    )
-
-    return pdf_bytes
+        pdf_bytes = WeasyprintHTML(string=html).write_pdf()
+        return pdf_bytes
+    except ImportError:
+        logger.warning("weasyprint not installed; falling back to HTML output")
+        return html.encode("utf-8")
+    except Exception:
+        logger.exception("PDF generation failed; falling back to HTML output")
+        return html.encode("utf-8")

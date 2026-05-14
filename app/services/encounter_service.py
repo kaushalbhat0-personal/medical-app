@@ -232,12 +232,26 @@ def get_encounter_detail(
     )
 
     # 5. Build the aggregate
+    prescriptions_list = list(appointment.prescriptions)
+    prescription_count = len(prescriptions_list)
+    prescription_item_count = sum(len(rx.items) for rx in prescriptions_list)
+    logger.info(
+        "[ENCOUNTER_AGG_TRACE] get_encounter_detail: appointment=%s patient=%s tenant=%s "
+        "prescriptions=%d prescription_items=%d bill=%s",
+        appointment.id,
+        appointment.patient_id,
+        appointment.tenant_id,
+        prescription_count,
+        prescription_item_count,
+        bill.id if bill else "None",
+    )
+
     aggregate = EncounterDetailAggregate(
         appointment=appointment_service.appointment_to_read(db, appointment),
         patient=appointment.patient,
         doctor=appointment.doctor,
         vitals=appointment.vitals,
-        prescriptions=list(appointment.prescriptions),
+        prescriptions=prescriptions_list,
         inventory_usage=list(appointment.inventory_usages),
         bill=bill,
         timeline_context=None,
