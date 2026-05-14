@@ -754,7 +754,6 @@ def mark_appointment_completed(
             data.items,
             current_user,
             tenant_id,
-            active_workspace=active_workspace,
         )
     # DEPRECATED: completion_notes is deprecated and no longer written for new visits.
     # Use clinical_notes for visit documentation. Preserved for backward compatibility.
