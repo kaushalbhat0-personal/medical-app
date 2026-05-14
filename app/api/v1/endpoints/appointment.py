@@ -106,6 +106,7 @@ def mark_appointment_completed(
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     active_workspace: ActiveWorkspace | None = Depends(get_active_workspace),
 ) -> AppointmentRead:
+    logger.warning("[TRACE_MC] ENTERED endpoint handler")
     effective = data if data is not None else MarkAppointmentCompletedRequest()
     logger.warning(
         "[ENDPOINT DEBUG] active_workspace=%s slug=%s role=%s",
@@ -113,20 +114,23 @@ def mark_appointment_completed(
         active_workspace.slug.value if active_workspace else None,
         current_user.role,
     )
-    appt, idempotent_replay = appointment_service.mark_appointment_completed(
-
-        db,
-        appointment_id,
-        current_user,
-        tenant_id,
-        restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
-        completion=effective,
-        idempotency_key=idempotency_key,
-        active_workspace=active_workspace,
-    )
-    if idempotent_replay:
-        response.headers["X-Idempotent-Replay"] = "1"
-    return appointment_service.appointment_to_read(db, appt)
+    try:
+        appt, idempotent_replay = appointment_service.mark_appointment_completed(
+            db,
+            appointment_id,
+            current_user,
+            tenant_id,
+            restrict_to_doctor_id=restrict_doctor_id_for_detail(data_scope, current_user),
+            completion=effective,
+            idempotency_key=idempotency_key,
+            active_workspace=active_workspace,
+        )
+        if idempotent_replay:
+            response.headers["X-Idempotent-Replay"] = "1"
+        return appointment_service.appointment_to_read(db, appt)
+    except Exception as e:
+        logger.exception("[MARK_COMPLETED_EXCEPTION] type=%s msg=%s", type(e).__name__, str(e))
+        raise
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)

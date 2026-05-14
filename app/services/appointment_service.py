@@ -15,7 +15,7 @@ from app.core.data_scope import DataScopeKind, ResolvedDataScope
 from app.core.metrics import inc_counter
 from app.core.permissions import has_tenant_admin_privileges
 from app.core.clinical_capabilities import has_clinician_capability
-from app.core.workspace_context import ActiveWorkspace, WorkspaceSlug, is_elevated_workspace_access
+from app.core.workspace_context import ActiveWorkspace
 from app.crud import crud_appointment, crud_billing
 from app.models.appointment import Appointment, AppointmentStatus, Prescription
 from app.models.user import User, UserRole
@@ -653,6 +653,7 @@ def mark_appointment_completed(
     active_workspace: ActiveWorkspace | None = None,
 ) -> tuple[Appointment, bool]:
     """Returns (appointment, idempotent_replay). Replay is True when Idempotency-Key matched a prior body."""
+    logger.warning("[TRACE_MC] entered mark_appointment_completed: user=%s role=%s appt_id=%s", current_user.id, current_user.role, appointment_id)
     appointment = crud_appointment.get_appointment_for_update_locked(db, appointment_id)
     if appointment is None:
         raise NotFoundError("Appointment not found")
@@ -888,6 +889,7 @@ def _assert_doctor_assigned_to_appointment(
     restrict_to_doctor_id: UUID | None = None,
     active_workspace: ActiveWorkspace | None = None,
 ) -> None:
+    logger.warning("[TRACE_MC] entered _assert_doctor_assigned_to_appointment: user=%s role=%s appt_doctor_id=%s restrict=%s", current_user.id, current_user.role, appointment.doctor_id, restrict_to_doctor_id)
     # Capability-based check: user must have a Doctor record linked via user_id
     # AND that doctor must be the assigned doctor for this appointment.
     # This works for ANY user role - admin, staff, or doctor - as long as they

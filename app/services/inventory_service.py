@@ -32,11 +32,7 @@ from app.schemas.inventory import (
 )
 from app.core.tenant_context import MISSING_X_TENANT_ID_MSG
 from app.core.clinical_capabilities import has_clinician_capability
-from app.core.workspace_context import (
-    ActiveWorkspace,
-    WorkspaceSlug,
-    is_elevated_workspace_access,
-)
+
 from app.services.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.services.security_audit import (
     assert_authorized,
@@ -710,7 +706,6 @@ def consume_inventory_for_appointment(
     tenant_id: UUID | None,
     *,
     require_scheduled: bool = True,
-    active_workspace: ActiveWorkspace | None = None,
 ) -> None:
     """
     Deduct clinic (tenant-level) stock, write movements and ``appointment_inventory_usage``

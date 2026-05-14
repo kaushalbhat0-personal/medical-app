@@ -7,15 +7,21 @@ for the X-Workspace header propagation system.
 DESIGN PRINCIPLE
     Workspace = UX/Operational Context (what screen the user is looking at)
     Role      = Identity (who the user is, unchanged)
-    Capabilities = Authorization (checked against role + workspace)
+    Capabilities = Authorization (checked via service-layer guards)
+
+CRITICAL: Workspace is NOT an authorization authority.
+Authorization happens ONLY through:
+  - capability checks (has_clinician_capability)
+  - tenant/resource ownership (assert_authorized)
+  - explicit service authorization (authorize_appointment_access)
 
 There is NO ``effective_role`` mapping. An admin in the doctor workspace
 is still an admin — they just get scoped elevation at specific bottleneck
 checks (doctor-record requirement, inventory doctor-scope, etc.).
 
 SECURITY
-    - ``ROLE_ALLOWED_WORKSPACES`` is an explicit whitelist per role.
-    - No automatic future escalation: new workspaces must be added explicitly.
+    - ``ROLE_ALLOWED_WORKSPACES`` is an informational whitelist per role.
+    - Workspace mismatch does NOT block operations — it falls back gracefully.
     - Tenant isolation is preserved by upstream ``assert_authorized()`` calls.
     - Audit logs remain truthful: ``role=admin workspace=doctor``.
 """
