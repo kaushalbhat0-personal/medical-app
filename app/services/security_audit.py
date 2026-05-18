@@ -34,7 +34,7 @@ def enforce_tenant_match(
     current_user: User,
     resource: str,
 ) -> None:
-    logger.warning("[TRACE_MC] enforce_tenant_match: user=%s role=%s resource=%s tenant_id=%s resource_tenant_id=%s", current_user.id, current_user.role, resource, tenant_id, resource_tenant_id)
+    logger.debug("[TRACE_MC] enforce_tenant_match: user=%s role=%s resource=%s tenant_id=%s resource_tenant_id=%s", current_user.id, current_user.role, resource, tenant_id, resource_tenant_id)
     if tenant_id is None:
         logger.warning("[TRACE_MC] enforce_tenant_match: tenant_id is None -> ForbiddenError")
         log_rbac_mutation_violation(current_user, resource)
@@ -47,7 +47,7 @@ def enforce_tenant_match(
         logger.warning("[TRACE_MC] enforce_tenant_match: mismatch %s != %s -> ForbiddenError", resource_tenant_id, tenant_id)
         log_rbac_mutation_violation(current_user, resource)
         raise ForbiddenError("Resource is not in your tenant")
-    logger.warning("[TRACE_MC] enforce_tenant_match: PASS")
+    logger.debug("[TRACE_MC] enforce_tenant_match: PASS")
 
 
 def assert_authorized(
@@ -59,7 +59,7 @@ def assert_authorized(
     resource_tenant_id: UUID | None,
 ) -> None:
     """Tenant isolation: request scope and resource tenant must both be present and equal."""
-    logger.warning("[TRACE_MC] assert_authorized: user=%s role=%s action=%s resource=%s tenant_id=%s resource_tenant_id=%s", current_user.id, current_user.role, action, resource, tenant_id, resource_tenant_id)
+    logger.debug("[TRACE_MC] assert_authorized: user=%s role=%s action=%s resource=%s tenant_id=%s resource_tenant_id=%s", current_user.id, current_user.role, action, resource, tenant_id, resource_tenant_id)
     enforce_tenant_match(resource_tenant_id, tenant_id, current_user, resource)
 
 

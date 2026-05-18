@@ -106,7 +106,7 @@ def mark_appointment_completed(
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     active_workspace: ActiveWorkspace | None = Depends(get_active_workspace),
 ) -> AppointmentRead:
-    logger.warning("[TRACE_MC] ENTERED endpoint handler")
+    logger.debug("[TRACE_MC] ENTERED endpoint handler")
     effective = data if data is not None else MarkAppointmentCompletedRequest()
     logger.warning(
         "[ENDPOINT DEBUG] active_workspace=%s slug=%s role=%s",

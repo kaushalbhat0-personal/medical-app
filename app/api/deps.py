@@ -118,7 +118,7 @@ def get_current_user(
 def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    logger.warning("[TRACE_MC] entered get_current_active_user: user=%s role=%s active=%s", current_user.id, current_user.role, current_user.is_active)
+    logger.debug("[TRACE_MC] entered get_current_active_user: user=%s role=%s active=%s", current_user.id, current_user.role, current_user.is_active)
     if not current_user.is_active:
         raise inactive_user_exception()
     return current_user
@@ -143,7 +143,7 @@ def get_linked_doctor_profile_optional(
 ) -> Doctor | None:
     """Doctor row linked to this login (any role), for X-Data-Scope resolution."""
     result = crud_doctor.get_doctor_by_user_id(db, current_user.id)
-    logger.warning("[TRACE_MC] get_linked_doctor_profile_optional: user=%s role=%s doctor=%s", current_user.id, current_user.role, result.id if result else None)
+    logger.debug("[TRACE_MC] get_linked_doctor_profile_optional: user=%s role=%s doctor=%s", current_user.id, current_user.role, result.id if result else None)
     return result
 
 
@@ -152,11 +152,11 @@ def get_resolved_data_scope(
     current_user: User = Depends(get_current_user),
     linked_doctor: Doctor | None = Depends(get_linked_doctor_profile_optional),
 ) -> ResolvedDataScope:
-    logger.warning("[TRACE_MC] get_resolved_data_scope: user=%s role=%s x_data_scope=%s linked_doctor=%s", current_user.id, current_user.role, x_data_scope, linked_doctor.id if linked_doctor else None)
+    logger.debug("[TRACE_MC] get_resolved_data_scope: user=%s role=%s x_data_scope=%s linked_doctor=%s", current_user.id, current_user.role, x_data_scope, linked_doctor.id if linked_doctor else None)
     result = resolve_data_scope(
         x_data_scope, current_user=current_user, linked_doctor=linked_doctor
     )
-    logger.warning("[TRACE_MC] get_resolved_data_scope result: kind=%s doctor_id=%s", result.kind.value, result.doctor_id)
+    logger.debug("[TRACE_MC] get_resolved_data_scope result: kind=%s doctor_id=%s", result.kind.value, result.doctor_id)
     return result
 
 
@@ -177,16 +177,16 @@ def require_structured_profile_complete(
     `doctor_profiles.is_profile_complete` (clinicians cannot use the app with a stub profile).
     Does not apply to users without a linked doctor (e.g. staff-only, patients).
     """
-    logger.warning("[TRACE_MC] entered require_structured_profile_complete: user=%s role=%s", current_user.id, current_user.role)
+    logger.debug("[TRACE_MC] entered require_structured_profile_complete: user=%s role=%s", current_user.id, current_user.role)
     doctor = crud_doctor.get_doctor_by_user_id(db, current_user.id)
     if doctor is None:
-        logger.warning("[TRACE_MC] require_structured_profile_complete: no doctor row -> pass")
+        logger.debug("[TRACE_MC] require_structured_profile_complete: no doctor row -> pass")
         return
     prof = crud_doctor_profile.get_by_doctor_id(db, doctor.id)
     if prof is None or not prof.is_profile_complete:
         logger.warning("[TRACE_MC] require_structured_profile_complete: profile incomplete -> ForbiddenError")
         raise ForbiddenError("Complete your profile to continue")
-    logger.warning("[TRACE_MC] require_structured_profile_complete: profile complete -> pass")
+    logger.debug("[TRACE_MC] require_structured_profile_complete: profile complete -> pass")
 
 
 def require_doctor_verification_approved(
@@ -258,9 +258,9 @@ def get_optional_scoped_tenant_id_active(
     x_tenant_id: UUID | None = Header(default=None, alias="X-Tenant-ID"),
 ) -> UUID | None:
     """Like ``get_optional_scoped_tenant_id`` but requires an active user (mutations)."""
-    logger.warning("[TRACE_MC] entered get_optional_scoped_tenant_id_active: user=%s role=%s x_tenant_id=%s", current_user.id, current_user.role, x_tenant_id)
+    logger.debug("[TRACE_MC] entered get_optional_scoped_tenant_id_active: user=%s role=%s x_tenant_id=%s", current_user.id, current_user.role, x_tenant_id)
     result = resolve_tenant_id_for_scoped_request(db, current_user, x_tenant_id)
-    logger.warning("[TRACE_MC] get_optional_scoped_tenant_id_active result=%s", result)
+    logger.debug("[TRACE_MC] get_optional_scoped_tenant_id_active result=%s", result)
     return result
 
 
@@ -342,9 +342,9 @@ def get_active_workspace(
     This is an **optional** dependency — endpoints that do not inject it
     behave exactly as before.
     """
-    logger.warning("[TRACE_MC] entered get_active_workspace: user=%s role=%s x_workspace=%s", current_user.id, current_user.role, x_workspace)
+    logger.debug("[TRACE_MC] entered get_active_workspace: user=%s role=%s x_workspace=%s", current_user.id, current_user.role, x_workspace)
     if x_workspace is None:
-        logger.warning("[TRACE_MC] get_active_workspace: no header -> None")
+        logger.debug("[TRACE_MC] get_active_workspace: no header -> None")
         return None
 
     try:
