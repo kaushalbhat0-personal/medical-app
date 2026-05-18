@@ -32,7 +32,7 @@ def _build_token_payload(user, db: Session) -> dict:
     payload = {
         "sub": str(user.id),
         "type": "access",
-        "role": user.role.value if user.role else "admin",
+        "role": user.role.value,  # NOT NULL in DB — no fallback needed or permitted
         "roles": eff_roles,
         "tenant_id": None,
         "is_owner": user.is_owner,

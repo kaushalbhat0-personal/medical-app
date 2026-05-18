@@ -65,10 +65,14 @@ def _parse_access_token(token: str) -> TokenPayload:
     except ValueError:
         raise unauthorized_credentials_exception()
 
-    # Backward-compatible: legacy tokens may not contain role/tenant_id
+    # SECURITY INVARIANT: every token issued by this service contains an explicit
+    # `role` claim written from user.role.value (a NOT-NULL DB column).  A missing
+    # or malformed claim is therefore either a legacy pre-role token (which we
+    # must NOT silently upgrade) or a tampered / externally-forged token.
+    # Reject it unconditionally — never fall back to a privileged role.
     role = payload.get("role")
     if not role or not isinstance(role, str):
-        role = "admin"
+        raise unauthorized_credentials_exception()
 
     tenant_id = payload.get("tenant_id")
     if tenant_id and isinstance(tenant_id, str):
