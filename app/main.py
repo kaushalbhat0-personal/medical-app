@@ -144,13 +144,16 @@ def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
 @app.exception_handler(Exception)
 def handle_generic_exception(_: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception occurred")
-    # TEMP DEBUG:
-    # Returning raw exception messages can leak internal details. Keep this disabled in production
-    # once debugging is complete (return a generic message instead).
-    error_msg = str(exc)
+    # Return generic message in production to avoid leaking internal details
+    # In development, we can be more verbose for debugging
+    if settings.DEBUG:
+        error_detail = f"Internal error: {str(exc)}"
+    else:
+        error_detail = "Internal server error"
+    
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal error: {error_msg}"},
+        content={"detail": error_detail},
     )
 
 
