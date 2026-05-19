@@ -554,26 +554,29 @@ export const CompleteVisitModal = forwardRef<HTMLDivElement, CompleteVisitModalP
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-medicine-${row.key}`}>
-                          Medicine
-                        </label>
-                        <Input
-                          id={`rx-medicine-${row.key}`}
-                          placeholder="Medicine name"
-                          value={row.medicine_name}
-                          disabled={isSubmitting}
-                          onChange={(e) =>
-                            setPrescriptionRows((prev) =>
-                              prev.map((item) =>
-                                item.key === row.key
-                                  ? { ...item, medicine_name: e.target.value }
-                                  : item
-                              )
-                            )
-                          }
-                        />
-                      </div>
+<div>
+  <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-medicine-${row.key}`}>
+    Medicine Name
+  </label>
+  <Input
+    id={`rx-medicine-${row.key}`}
+    placeholder="Medicine name"
+    value={row.medicine_name}
+    disabled={isSubmitting}
+    onChange={(e) =>
+      setPrescriptionRows((prev) =>
+        prev.map((item) =>
+          item.key === row.key
+            ? { ...item, medicine_name: e.target.value }
+            : item
+        )
+      )
+    }
+  />
+  <p className="text-xs text-muted-foreground mt-1">
+    Enter the specific medicine name (e.g., amoxicillin)
+  </p>
+</div>
                       <div>
                         <label className="text-xs font-medium text-muted-foreground" htmlFor={`rx-dosage-${row.key}`}>
                           Dosage

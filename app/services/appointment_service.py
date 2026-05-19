@@ -670,6 +670,8 @@ def create_prescription_for_appointment(
                 "instructions": item_payload.instructions,
             },
         )
+    # Auto-derive medication schedules from this prescription
+    _derive_medication_schedules_from_prescription(db, prescription, appointment)
     log_structured_audit_event(
         event="prescription_created",
         tenant_id=appointment.tenant_id,

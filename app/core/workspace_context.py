@@ -29,12 +29,12 @@ SECURITY
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 from app.models.user import User, UserRole
 
 
-class WorkspaceSlug(StrEnum):
+class WorkspaceSlug(Enum):
     """Canonical workspace slugs. These match the frontend workspace registry keys."""
 
     frontdesk = "frontdesk"
