@@ -12,7 +12,7 @@ from app.core.config import settings
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def test_production_generic_exception_response(client, monkeypatch):

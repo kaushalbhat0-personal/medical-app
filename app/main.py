@@ -143,7 +143,7 @@ def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
 
 @app.exception_handler(Exception)
 def handle_generic_exception(_: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception occurred")
+    logger.error("Unhandled exception occurred", exc_info=exc)
     # Return generic message in production to avoid leaking internal details
     # In development, we can be more verbose for debugging
     if settings.DEBUG:
