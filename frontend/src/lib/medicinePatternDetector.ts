@@ -2,6 +2,19 @@
  * Simple heuristic to detect likely medicine instructions in free-text notes.
  * Intentionally simple and low-risk - only triggers on clear patterns.
  */
+// Lightweight structural type for Appointment fields used in this utility
+interface MedicineDetectionAppointment {
+  clinical_notes?: string | null;
+  subjective_notes?: string | null;
+  objective_notes?: string | null;
+  assessment_notes?: string | null;
+  plan_notes?: string | null;
+  diagnosis?: string | null;
+  treatment_summary?: string | null;
+  inventory_usages?: any[] | null;
+  prescriptions?: any[] | null;
+}
+
 export function containsLikelyMedicineInstructions(text: string): boolean {
   if (!text || typeof text !== 'string') return false;
   
@@ -25,7 +38,7 @@ export function containsLikelyMedicineInstructions(text: string): boolean {
 /**
  * Check if any notes fields contain likely medicine instructions
  */
-export function hasMedicineLikeNotes(appointment: Appointment): boolean {
+export function hasMedicineLikeNotes(appointment: MedicineDetectionAppointment): boolean {
   const noteFields = [
     appointment.clinical_notes,
     appointment.subjective_notes,
@@ -37,21 +50,21 @@ export function hasMedicineLikeNotes(appointment: Appointment): boolean {
   ];
   
   return noteFields.some((field): field is string => 
-    field && typeof field === 'string' && containsLikelyMedicineInstructions(field)
+    field != null && typeof field === 'string' && containsLikelyMedicineInstructions(field)
   );
 }
 
 /**
  * Check if structured medicine items exist (inventory usages or prescriptions)
  */
-export function hasStructuredMedicines(appointment: Appointment): boolean {
-  const hasInventoryUsages = appointment.inventory_usages && 
+export function hasStructuredMedicines(appointment: MedicineDetectionAppointment): boolean {
+  const hasInventoryUsages = !!(appointment.inventory_usages && 
     Array.isArray(appointment.inventory_usages) && 
-    appointment.inventory_usages.length > 0;
+    appointment.inventory_usages.length > 0);
     
-  const hasPrescriptions = appointment.prescriptions && 
+  const hasPrescriptions = !!(appointment.prescriptions && 
     Array.isArray(appointment.prescriptions) && 
-    appointment.prescriptions.length > 0;
+    appointment.prescriptions.length > 0);
     
   return hasInventoryUsages || hasPrescriptions;
 }

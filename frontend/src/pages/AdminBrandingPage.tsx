@@ -54,7 +54,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ErrorState, EmptyState } from '../components/common';
+import { ErrorState } from '../components/common';
 import {
   getOrganizationProfile,
   updateOrganizationProfile,
