@@ -88,92 +88,60 @@ def mock_current_user(patient_id, tenant_id):
 def sample_notification_events(patient_id, tenant_id):
     """Create sample notification events for testing."""
     now = datetime.now(timezone.utc)
-    return [
-        NotificationEvent(
-            id=uuid.uuid4(),
-            patient_id=patient_id,
-            tenant_id=tenant_id,
-            event_type=NotificationEventType.APPOINTMENT_REMINDER,
-            title="Upcoming Appointment",
-            summary="You have an appointment with Dr. Smith tomorrow at 10:00 AM.",
-            is_read=False,
-            is_urgent=False,
-            created_at=now - timedelta(hours=2),
-            doctor_name="Dr. Smith",
-            clinic_name="City Medical Center",
-            linked_appointment_id=uuid.uuid4(),
-            linked_bill_id=None,
-        ),
-        NotificationEvent(
-            id=uuid.uuid4(),
-            patient_id=patient_id,
-            tenant_id=tenant_id,
-            event_type=NotificationEventType.PRESCRIPTION_READY,
-            title="Prescription Ready",
-            summary="Your prescription from Dr. Johnson is ready for pickup.",
-            is_read=False,
-            is_urgent=False,
-            created_at=now - timedelta(hours=5),
-            doctor_name="Dr. Johnson",
-            clinic_name="City Medical Center",
-            linked_appointment_id=uuid.uuid4(),
-            linked_bill_id=None,
-        ),
-        NotificationEvent(
-            id=uuid.uuid4(),
-            patient_id=patient_id,
-            tenant_id=tenant_id,
-            event_type=NotificationEventType.PAYMENT_REMINDER,
-            title="Payment Reminder",
-            summary="Your invoice #1234 of $150.00 is overdue.",
-            is_read=False,
-            is_urgent=True,
-            created_at=now - timedelta(days=3),
-            doctor_name="Dr. Smith",
-            clinic_name="City Medical Center",
-            linked_appointment_id=None,
-            linked_bill_id=uuid.uuid4(),
-        ),
-        # Read notification
-        NotificationEvent(
-            id=uuid.uuid4(),
-            patient_id=patient_id,
-            tenant_id=tenant_id,
-            event_type=NotificationEventType.APPOINTMENT_CONFIRMED,
-            title="Appointment Confirmed",
-            summary="Your appointment with Dr. Williams on May 15 has been confirmed.",
-            is_read=True,
-            is_urgent=False,
-            created_at=now - timedelta(days=7),
-            doctor_name="Dr. Williams",
-            clinic_name="City Medical Center",
-            linked_appointment_id=uuid.uuid4(),
-            linked_bill_id=None,
-        ),
-    ]
+    events = []
+
+    e = NotificationEvent(
+        id=uuid.uuid4(), patient_id=patient_id, tenant_id=tenant_id,
+        event_type=NotificationEventType.appointment_reminder,
+        doctor_id=uuid.uuid4(), appointment_id=uuid.uuid4(), bill_id=None,
+        created_at=now - timedelta(hours=2),
+    )
+    e.is_read = False
+    events.append(e)
+
+    e = NotificationEvent(
+        id=uuid.uuid4(), patient_id=patient_id, tenant_id=tenant_id,
+        event_type=NotificationEventType.prescription_ready,
+        doctor_id=uuid.uuid4(), appointment_id=uuid.uuid4(), bill_id=None,
+        created_at=now - timedelta(hours=5),
+    )
+    e.is_read = False
+    events.append(e)
+
+    e = NotificationEvent(
+        id=uuid.uuid4(), patient_id=patient_id, tenant_id=tenant_id,
+        event_type=NotificationEventType.payment_received,
+        doctor_id=uuid.uuid4(), appointment_id=None, bill_id=uuid.uuid4(),
+        created_at=now - timedelta(days=3),
+    )
+    e.is_read = False
+    events.append(e)
+
+    # Read notification
+    e = NotificationEvent(
+        id=uuid.uuid4(), patient_id=patient_id, tenant_id=tenant_id,
+        event_type=NotificationEventType.appointment_booked,
+        doctor_id=uuid.uuid4(), appointment_id=uuid.uuid4(), bill_id=None,
+        created_at=now - timedelta(days=7),
+    )
+    e.is_read = True
+    events.append(e)
+
+    return events
 
 
 @pytest.fixture
 def sample_other_patient_events(other_patient_id, tenant_id):
     """Create notification events for a different patient (for isolation testing)."""
     now = datetime.now(timezone.utc)
-    return [
-        NotificationEvent(
-            id=uuid.uuid4(),
-            patient_id=other_patient_id,
-            tenant_id=tenant_id,
-            event_type=NotificationEventType.APPOINTMENT_REMINDER,
-            title="Other Patient Appointment",
-            summary="This should not be visible to Patient A.",
-            is_read=False,
-            is_urgent=False,
-            created_at=now - timedelta(hours=1),
-            doctor_name="Dr. Brown",
-            clinic_name="Other Clinic",
-            linked_appointment_id=uuid.uuid4(),
-            linked_bill_id=None,
-        ),
-    ]
+    e = NotificationEvent(
+        id=uuid.uuid4(), patient_id=other_patient_id, tenant_id=tenant_id,
+        event_type=NotificationEventType.appointment_reminder,
+        doctor_id=uuid.uuid4(), appointment_id=uuid.uuid4(), bill_id=None,
+        created_at=now - timedelta(hours=1),
+    )
+    e.is_read = False
+    return [e]
 
 
 @pytest.fixture
@@ -494,6 +462,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """Patient should be able to toggle email notifications."""
@@ -505,7 +475,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(email_enabled=False)
+            patient_id, tenant_id, email_enabled=False
         )
 
         assert updated.email_enabled is False
@@ -515,6 +485,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """Patient should be able to toggle SMS notifications."""
@@ -526,7 +498,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(sms_enabled=False)
+            patient_id, tenant_id, sms_enabled=False
         )
 
         assert updated.sms_enabled is False
@@ -535,6 +507,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """Patient should be able to toggle WhatsApp notifications."""
@@ -546,7 +520,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(whatsapp_enabled=True)
+            patient_id, tenant_id, whatsapp_enabled=True
         )
 
         assert updated.whatsapp_enabled is True
@@ -555,6 +529,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """Patient should be able to toggle reminder notifications."""
@@ -566,7 +542,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(reminder_enabled=False)
+            patient_id, tenant_id, reminder_enabled=False
         )
 
         assert updated.reminder_enabled is False
@@ -575,6 +551,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """
@@ -590,7 +568,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(opt_out_all=True)
+            patient_id, tenant_id, opt_out_all=True
         )
 
         assert updated.opt_out_all is True
@@ -602,6 +580,8 @@ class TestPreferenceUpdates:
         self,
         mock_db,
         mock_current_user,
+        patient_id,
+        tenant_id,
         sample_preferences,
     ):
         """Patient should receive their current communication preferences."""
@@ -612,7 +592,7 @@ class TestPreferenceUpdates:
         service = PatientCommunicationPreferencesService(
             db=mock_db, current_user=mock_current_user
         )
-        prefs = service.get_preferences()
+        prefs = service.get_preferences(patient_id, tenant_id)
 
         assert isinstance(prefs, CommunicationPreferencesRead)
         assert prefs.email_enabled is True
@@ -636,7 +616,7 @@ class TestPreferenceUpdates:
             db=mock_db, current_user=mock_current_user
         )
         updated = service.update_preferences(
-            CommunicationPreferencesUpdate(email_enabled=False)
+            patient_id, tenant_id, email_enabled=False
         )
 
         assert updated.email_enabled is False
