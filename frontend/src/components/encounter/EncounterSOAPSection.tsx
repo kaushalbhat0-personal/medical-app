@@ -46,7 +46,7 @@ export function EncounterSOAPSection({ appointment, compact = false }: Encounter
             )}
             <div className="space-y-4">
               {appointment.subjective_notes && (
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                     <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     Subjective
@@ -55,7 +55,7 @@ export function EncounterSOAPSection({ appointment, compact = false }: Encounter
                 </div>
               )}
               {appointment.objective_notes && (
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                     <Stethoscope className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     Objective
@@ -64,7 +64,7 @@ export function EncounterSOAPSection({ appointment, compact = false }: Encounter
                 </div>
               )}
               {appointment.assessment_notes && (
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                     <Brain className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     Assessment
@@ -73,7 +73,7 @@ export function EncounterSOAPSection({ appointment, compact = false }: Encounter
                 </div>
               )}
               {appointment.plan_notes && (
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                     <ClipboardList className="h-4 w-4 text-primary shrink-0" aria-hidden />
                     Plan

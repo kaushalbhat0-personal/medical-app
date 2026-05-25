@@ -461,7 +461,7 @@ export function DoctorAvailabilityPage() {
                   <li
                     key={String(w.id)}
                     data-testid={`availability-window-row-${w.id}`}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div>
                       <p className="text-sm font-medium">

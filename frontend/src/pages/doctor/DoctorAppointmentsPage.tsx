@@ -250,7 +250,7 @@ export function DoctorAppointmentsPage() {
             !billsLoading &&
             !billCoversAppointment(bills, a);
           return (
-            <Card key={String(a.id)} id={`appt-${a.id}`} className="scroll-mt-4 transition-colors">
+            <Card key={String(a.id)} id={`appt-${a.id}`} className="scroll-mt-4 transition-all hover:shadow-lg">
               <CardContent className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 space-y-1">
                   {pid ? (

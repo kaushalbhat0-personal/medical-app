@@ -129,7 +129,7 @@ export function DoctorPatientsPage() {
         <div className="grid gap-3">
           {patients.map((p) => (
             <Link key={String(p.id)} to={`/doctor/patients/${p.id}`} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Card className="transition-colors hover:bg-muted/40">
+              <Card className="transition-all hover:shadow-lg hover:bg-muted/40">
                 <CardContent className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-medium text-foreground">{p.name || 'Patient'}</p>

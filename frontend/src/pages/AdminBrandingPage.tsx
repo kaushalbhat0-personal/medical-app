@@ -227,9 +227,11 @@ export default function AdminBrandingPage() {
   if (orgLoading || brandLoading) {
     return (
       <div className="container mx-auto p-4 md:p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Building2 className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Branding & Organization Profile</h1>
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Branding & Organization Profile</h1>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -258,11 +260,13 @@ export default function AdminBrandingPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Building2 className="h-6 w-6 text-primary" />
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <Building2 className="h-5 w-5 text-primary" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold">Branding & Organization Profile</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">Branding & Organization Profile</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Configure your tenant identity, branding colors, and document appearance
           </p>
         </div>
@@ -335,7 +339,7 @@ export default function AdminBrandingPage() {
                   onChange={(e) => updateOrgField('logo_url', e.target.value || null)}
                 />
                 {orgProfile?.logo_url && (
-                  <div className="mt-2 p-2 border rounded-md inline-block">
+                  <div className="mt-2 inline-block rounded-lg border bg-white p-3 shadow-sm">
                     <img
                       src={orgProfile.logo_url}
                       alt="Logo preview"
@@ -585,7 +589,7 @@ export default function AdminBrandingPage() {
                       className="font-mono"
                     />
                     <div
-                      className="w-10 h-10 rounded-md border shrink-0"
+                      className="h-12 w-12 flex-shrink-0 rounded-lg border-2 shadow-sm"
                       style={{ backgroundColor: brandProfile?.primary_color || '#2563eb' }}
                     />
                   </div>
@@ -601,7 +605,7 @@ export default function AdminBrandingPage() {
                       className="font-mono"
                     />
                     <div
-                      className="w-10 h-10 rounded-md border shrink-0"
+                      className="h-12 w-12 flex-shrink-0 rounded-lg border-2 shadow-sm"
                       style={{ backgroundColor: brandProfile?.secondary_color || '#64748b' }}
                     />
                   </div>
@@ -617,7 +621,7 @@ export default function AdminBrandingPage() {
                       className="font-mono"
                     />
                     <div
-                      className="w-10 h-10 rounded-md border shrink-0"
+                      className="h-12 w-12 flex-shrink-0 rounded-lg border-2 shadow-sm"
                       style={{ backgroundColor: brandProfile?.accent_color || '#f59e0b' }}
                     />
                   </div>
@@ -694,25 +698,28 @@ export default function AdminBrandingPage() {
             </CardContent>
           </Card>
 
-          {/* Future TODO Hooks */}
-          <Card className="border-dashed">
+          {/* Upcoming Features */}
+          <Card>
             <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">
-                Future Branding Features
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Upcoming Branding Features
               </CardTitle>
+              <CardDescription>
+                Planned enhancements for future releases
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-xs">Multilingual Templates</Badge>
-                <Badge variant="outline" className="text-xs">Dark Mode Themes</Badge>
-                <Badge variant="outline" className="text-xs">White-Label Domains</Badge>
-                <Badge variant="outline" className="text-xs">Custom Typography</Badge>
-                <Badge variant="outline" className="text-xs">Hospital Chains</Badge>
-                <Badge variant="outline" className="text-xs">QR Verification</Badge>
-                <Badge variant="outline" className="text-xs">Doctor Signatures</Badge>
-                <Badge variant="outline" className="text-xs">Digital Stamps</Badge>
-                <Badge variant="outline" className="text-xs">NABH/JCI Metadata</Badge>
-                <Badge variant="outline" className="text-xs">Patient Portal Theming</Badge>
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="secondary" className="text-xs font-normal">Multilingual Templates</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Dark Mode Themes</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">White-Label Domains</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Custom Typography</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Hospital Chains</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">QR Verification</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Doctor Signatures</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Digital Stamps</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">NABH/JCI Metadata</Badge>
+                <Badge variant="secondary" className="text-xs font-normal">Patient Portal Theming</Badge>
               </div>
             </CardContent>
           </Card>
@@ -762,10 +769,11 @@ export default function AdminBrandingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={previewType === 'invoice' ? 'default' : 'outline'}
                   onClick={() => setPreviewType('invoice')}
+                  size="sm"
                   className="flex items-center gap-2"
                 >
                   <Receipt className="h-4 w-4" />
@@ -774,6 +782,7 @@ export default function AdminBrandingPage() {
                 <Button
                   variant={previewType === 'prescription' ? 'default' : 'outline'}
                   onClick={() => setPreviewType('prescription')}
+                  size="sm"
                   className="flex items-center gap-2"
                 >
                   <FileText className="h-4 w-4" />
@@ -782,6 +791,7 @@ export default function AdminBrandingPage() {
                 <Button
                   variant={previewType === 'encounter_summary' ? 'default' : 'outline'}
                   onClick={() => setPreviewType('encounter_summary')}
+                  size="sm"
                   className="flex items-center gap-2"
                 >
                   <Stethoscope className="h-4 w-4" />
@@ -792,7 +802,6 @@ export default function AdminBrandingPage() {
               <Button
                 onClick={handlePreview}
                 disabled={previewLoading}
-                className="w-full sm:w-auto"
               >
                 {previewLoading ? (
                   <>
@@ -808,21 +817,24 @@ export default function AdminBrandingPage() {
               </Button>
 
               {previewError && (
-                <div className="flex items-center gap-2 text-sm text-destructive p-3 bg-destructive/10 rounded-md">
-                  <AlertCircle className="h-4 w-4" />
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {previewError}
                 </div>
               )}
 
               {previewHtml && (
-                <div className="border rounded-md overflow-hidden">
-                  <div className="bg-muted px-3 py-2 text-xs text-muted-foreground border-b">
-                    Document Preview — {previewType.replace('_', ' ').toUpperCase()}
+                <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+                  <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-2.5">
+                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {previewType.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
                   </div>
                   <iframe
                     srcDoc={previewHtml}
                     title="Document Preview"
-                    className="w-full h-[600px] bg-white"
+                    className="h-[600px] w-full bg-white"
                     sandbox="allow-same-origin"
                   />
                 </div>
